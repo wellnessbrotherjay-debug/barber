@@ -1,0 +1,5 @@
+{
+  "name": "BarberSync",
+  "description": "A production-ready two-sided barber booking platform with customer, barber, and admin portals.",
+  "requestFramePermissions": ["geolocation"]
+}

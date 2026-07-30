@@ -1,10 +1,15 @@
-console.log("main.tsx is executing");
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import App from './App.tsx';
+import { BrowserRouter } from 'react-router-dom';
+import { Toaster } from 'sonner';
+import App from './App';
 import './index.css';
 
-const rootElement = document.getElementById('root');
-if (rootElement) {
-  createRoot(rootElement).render(<h1>HELLO</h1>);
-}
+createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <App />
+      <Toaster position="top-center" richColors />
+    </BrowserRouter>
+  </React.StrictMode>
+);

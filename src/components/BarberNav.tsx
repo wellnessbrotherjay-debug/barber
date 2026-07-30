@@ -1,19 +1,19 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, Scissors, Bell, User } from 'lucide-react';
+import { LayoutDashboard, Wallet, Star, User } from 'lucide-react';
 
 interface Props {
-  active: 'home' | 'bookings' | 'notifications' | 'profile';
+  active: 'jobs' | 'wallet' | 'reviews' | 'profile';
 }
 
 const items = [
-  { key: 'home' as const, label: 'Home', icon: Home, path: '/customer' },
-  { key: 'bookings' as const, label: 'Bookings', icon: Scissors, path: '/customer/bookings' },
-  { key: 'notifications' as const, label: 'Alerts', icon: Bell, path: '/customer/notifications' },
-  { key: 'profile' as const, label: 'Profile', icon: User, path: '/customer/profile' },
+  { key: 'jobs' as const, label: 'Jobs', icon: LayoutDashboard, path: '/barber' },
+  { key: 'wallet' as const, label: 'Wallet', icon: Wallet, path: '/barber/wallet' },
+  { key: 'reviews' as const, label: 'Reviews', icon: Star, path: '/barber/reviews' },
+  { key: 'profile' as const, label: 'Profile', icon: User, path: '/barber/profile' },
 ];
 
-export default function CustomerNav({ active }: Props) {
+export default function BarberNav({ active }: Props) {
   const navigate = useNavigate();
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[393px] h-[88px] bg-white border-t border-[#f0f0f0] flex items-start justify-around pt-3 z-50">

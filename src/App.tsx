@@ -5,27 +5,47 @@ import { useAuthStore } from '@/store/useAuthStore';
 import Splash from '@/features/onboarding/Splash';
 import RoleSelect from '@/features/onboarding/RoleSelect';
 import Login from '@/features/auth/Login';
+import BrowseBarbers from '@/features/customer/BrowseBarbers';
+
+function RequireRole({ role, children }: { role: 'customer' | 'barber'; children: React.ReactNode }) {
+  const { user } = useAuthStore();
+  if (!user || user.role !== role) return <Navigate to="/welcome" replace />;
+  return <>{children}</>;
+}
 
 export default function App() {
-  const { user } = useAuthStore();
-
   return (
     <div className="app-shell">
       <div className="app-frame">
         <Routes>
-          {/* Onboarding */}
           <Route path="/" element={<Splash />} />
           <Route path="/welcome" element={<RoleSelect />} />
           <Route path="/login" element={<Login />} />
 
-          {/* Authenticated placeholders – built next */}
           <Route
-            path="/customer/*"
-            element={user?.role === 'customer' ? <div className="p-6">Customer Home (coming next)</div> : <Navigate to="/welcome" />}
+            path="/customer"
+            element={
+              <RequireRole role="customer">
+                <BrowseBarbers />
+              </RequireRole>
+            }
           />
           <Route
+            path="/customer/*"
+            element={
+              <RequireRole role="customer">
+                <BrowseBarbers />
+              </RequireRole>
+            }
+          />
+
+          <Route
             path="/barber/*"
-            element={user?.role === 'barber' ? <div className="p-6">Barber Home (coming next)</div> : <Navigate to="/welcome" />}
+            element={
+              <RequireRole role="barber">
+                <div className="p-6 pt-16 text-[#1c1b1f]">Barber Home (building next)</div>
+              </RequireRole>
+            }
           />
 
           <Route path="*" element={<Navigate to="/" replace />} />

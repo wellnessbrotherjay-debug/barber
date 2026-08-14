@@ -1,0 +1,63 @@
+1:139 | Rate your barber
+1:329 | Browse Barbers
+1:499 | Map View
+1:559 | Browse Barbers
+1:585 | Verfications
+1:665 | Verfications
+1:750 | Verfications
+1:822 | Verfications
+1:969 | Verfications
+1:1061 | Select Barber
+1:1171 | Booking History
+1:1288 | Availability
+1:1426 | Welcome
+1:1468 | No-show Reported
+1:1524 | Edit Profile
+1:1756 | Incoming Requests
+1:1830 | Report Issue
+1:1880 | Performance Overview
+1:1972 | Pay Booking Fee
+1:2054 | Booking Status
+1:2127 | Booking Status
+1:2201 | Response
+1:2267 | Appointment confirmed
+1:2321 | Booking Request
+1:2400 | Barber
+1:2434 | Pay Booking Fee
+1:2514 | Edit Profile
+1:2639 | Booking sent
+1:2678 | location permission
+1:2712 | Booking Confirmation
+1:2816 | Welcome
+1:2858 | Rejected
+1:2884 | Setup
+1:2942 | Your profile
+1:2999 | Your work photos
+1:3033 | Services
+1:3097 | Where do you work?
+1:3156 |  Jobs-Incoming
+1:3242 |  Jobs-Upcoming
+1:3324 |  Jobs-Past
+1:3467 | Customer Details
+1:3555 | Decline
+1:3602 | Accept booking?
+1:3659 | Booking accepted
+1:3738 | Customer cancelled
+1:3798 | Booking Status
+1:3933 | Booking In Process
+1:3994 | Complete job
+1:4033 | Barber Cancel  Booking
+1:4085 | Reviews
+1:4260 | Wallet
+1:4408 | Navbar
+1:4425 | Navbar
+1:4442 | Navbar
+1:4460 | Navbar
+1:4478 | Navbar
+1:4495 | Navbar
+1:4511 | Navbar
+1:4528 | Navbar
+1:4545 | Verification Status
+1:4583 | Pay booking fee
+1:4818 | Welcome
+1:4861 | Wellcomme-2

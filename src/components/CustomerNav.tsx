@@ -9,7 +9,7 @@ interface Props {
 const items = [
   { key: 'home' as const, label: 'Home', icon: Home, path: '/customer' },
   { key: 'bookings' as const, label: 'Bookings', icon: Scissors, path: '/customer/bookings' },
-  { key: 'notifications' as const, label: 'Alerts', icon: Bell, path: '/customer/notifications' },
+  { key: 'notifications' as const, label: 'Notification', icon: Bell, path: '/customer/notifications' },
   { key: 'profile' as const, label: 'Profile', icon: User, path: '/customer/profile' },
 ];
 

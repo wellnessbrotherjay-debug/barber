@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { LogOut, User, Calendar, Scissors, LayoutDashboard, Bell, Menu, X } from 'lucide-react';
+import { ShorterMark } from '@/components/ShorterLogo';
 import { cn } from '@/lib/utils';
 
 interface LayoutProps {
@@ -55,9 +56,9 @@ export default function AppLayout({ children, title }: LayoutProps) {
       <header className="md:hidden flex items-center justify-between p-4 bg-white border-b sticky top-0 z-50">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <Scissors className="text-white w-5 h-5" />
+            <ShorterMark tone="light" className="w-5" />
           </div>
-          <span className="font-bold text-lg tracking-tight">BarberSync</span>
+          <span className="font-bold text-lg tracking-tight">Shorter</span>
         </div>
         <button onClick={() => setIsMenuOpen(!isMenuOpen)}>
           {isMenuOpen ? <X /> : <Menu />}
@@ -72,9 +73,9 @@ export default function AppLayout({ children, title }: LayoutProps) {
         <div className="flex flex-col h-full">
           <div className="p-6 hidden md:flex items-center gap-3">
             <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-black/10">
-              <Scissors className="text-white w-6 h-6" />
+              <ShorterMark tone="light" className="w-6" />
             </div>
-            <span className="font-bold text-xl tracking-tight">BarberSync</span>
+            <span className="font-bold text-xl tracking-tight">Shorter</span>
           </div>
 
           <nav className="flex-1 px-4 space-y-1 mt-4 md:mt-0">

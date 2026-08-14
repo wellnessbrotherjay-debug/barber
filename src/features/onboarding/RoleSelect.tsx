@@ -1,27 +1,18 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '@/store/useAuthStore';
 import { User, Scissors } from 'lucide-react';
+import { ShorterLogo } from '@/components/ShorterLogo';
+
 
 export default function RoleSelect() {
   const navigate = useNavigate();
-  const { setUser, setSession } = useAuthStore();
   const [selected, setSelected] = useState<'customer' | 'barber' | null>(null);
 
   const handleContinue = () => {
     if (!selected) return;
-
-    // Demo: create mock user and enter app
-    const mockUser = {
-      id: crypto.randomUUID(),
-      full_name: selected === 'customer' ? 'John Customer' : 'Alex Barber',
-      email: `${selected}@demo.app`,
-      role: selected as 'customer' | 'barber',
-      avatar_url: `https://i.pravatar.cc/150?u=${selected}`,
-    };
-    setUser(mockUser);
-    setSession({ access_token: 'mock-token' });
-    navigate(selected === 'customer' ? '/customer' : '/barber');
+    // Route to real signup with the chosen role pre-selected — no account
+    // exists yet, so this must never log the user in directly.
+    navigate('/signup', { state: { role: selected } });
   };
 
   return (
@@ -31,12 +22,9 @@ export default function RoleSelect() {
 
       {/* Header */}
       <div className="flex flex-col items-center gap-4 px-5 pt-6">
-        <div className="w-[100px] h-[100px] rounded-lg bg-[#f2f1fa] flex items-center justify-center">
-          <svg width="42" height="38" viewBox="0 0 42 38" fill="none">
-            <rect x="4" y="8" width="34" height="24" rx="4" fill="#D4D2E3" />
-            <path d="M14 22l5-6 4 5 5-7 6 8" stroke="#A09CAB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx="16" cy="14" r="2.5" fill="#A09CAB" />
-          </svg>
+        {/* board frame 11 has an empty 100x100 image placeholder here — brand lockup fills it */}
+        <div className="w-[100px] h-[100px] flex items-center justify-center">
+          <ShorterLogo className="h-[26px]" />
         </div>
         <div className="text-center">
           <h1 className="text-[24px] font-bold text-[#1c1b1f]">Welcome</h1>

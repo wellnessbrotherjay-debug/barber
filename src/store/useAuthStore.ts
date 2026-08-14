@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { clearToken } from '@/lib/api';
 
 export type UserRole = 'customer' | 'barber' | 'admin';
 
@@ -9,6 +10,8 @@ interface User {
   email: string;
   role: UserRole;
   avatar_url?: string;
+  onboarding_completed?: boolean;
+  is_verified?: boolean;
 }
 
 interface AuthState {
@@ -30,7 +33,7 @@ export const useAuthStore = create<AuthState>()(
       setUser: (user) => set({ user }),
       setSession: (session) => set({ session }),
       setLoading: (isLoading) => set({ isLoading }),
-      logout: () => set({ user: null, session: null }),
+      logout: () => { clearToken(); set({ user: null, session: null }); },
     }),
     {
       name: 'barbersync-auth',

@@ -1,57 +1,370 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ChevronLeft, Clock, MapPin, Check, MessageSquare, Phone } from 'lucide-react';
 import BarberNav from '@/components/BarberNav';
+import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/store/useAuthStore';
 
 interface Props {
   tab: 'incoming' | 'upcoming' | 'past';
 }
 
-const JOBS = {
-  incoming: [
-    { id: '1', customer: 'John D.', service: 'Signature Fade', time: 'Requested 5 min ago', price: 45 },
-    { id: '2', customer: 'Mike R.', service: 'Beard Trim', time: 'Requested 20 min ago', price: 25 },
-  ],
-  upcoming: [
-    { id: '3', customer: 'Alex P.', service: 'Full Service', time: 'Today 4:00 PM', price: 65 },
-  ],
-  past: [
-    { id: '4', customer: 'Chris L.', service: 'Buzz Cut', time: 'Yesterday', price: 20 },
-    { id: '5', customer: 'Sam K.', service: 'Fade', time: 'Mar 22', price: 45 },
-  ],
-};
+export interface Job {
+  id: string;
+  status: string;
+  booking_date: string;
+  start_time: string;
+  payment_status: string;
+  total_amount: number;
+  notes: string | null;
+  users: { full_name: string; email: string };
+  services: { name: string; price: number; duration_minutes: number };
+  barber_profiles: { shop_name: string | null; address_text: string | null };
+}
+
+const TABS = [
+  { key: 'incoming' as const, label: 'Incoming', path: '/barber/jobs/incoming' },
+  { key: 'upcoming' as const, label: 'Upcoming', path: '/barber/jobs/upcoming' },
+  { key: 'past' as const, label: 'Past', path: '/barber/jobs/past' },
+];
+
+const PAST_FILTERS = [
+  { key: 'all' as const, label: 'All' },
+  { key: 'completed' as const, label: 'Completed' },
+  { key: 'cancelled' as const, label: 'Cancelled' },
+  { key: 'no_show' as const, label: 'No-Show' },
+];
+
+const ONLINE_PREF_KEY = 'barberSync_onlinePref';
+
+function jobTab(status: string): 'incoming' | 'upcoming' | 'past' {
+  if (status === 'pending') return 'incoming';
+  if (status === 'completed' || status === 'cancelled' || status === 'no_show') return 'past';
+  return 'upcoming';
+}
+
+function statusChipLabel(tab: Props['tab'], status: string): string {
+  if (tab === 'incoming') return 'Incoming';
+  if (tab === 'upcoming') return 'Accepted';
+  if (status === 'completed') return 'Completed';
+  if (status === 'no_show') return 'No-show';
+  return 'Cancelled';
+}
+
+export async function fetchBarberJobs(userId: string): Promise<Job[]> {
+  const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/barber/bookings`, {
+    headers: {
+      'X-Session-Token': `1:${userId}`,
+      Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}`,
+      'X-User-ID': userId,
+    },
+  });
+  if (!response.ok) throw new Error(`Failed to fetch jobs: ${response.status}`);
+  return response.json() as Promise<Job[]>;
+}
+
+/* Status chip — Figma 1:3209: bg #f8f8f8 pill, 3px dot, 10px #514e59 */
+function StatusChip({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-1 bg-[#f8f8f8] rounded-full px-3 py-1.5 shrink-0">
+      <span className="w-[3px] h-[3px] rounded-full bg-[#514e59]" />
+      <span className="text-[10px] leading-3 font-medium text-[#514e59]">{label}</span>
+    </div>
+  );
+}
+
+/* Dashed hairline — Figma dashed vector divider */
+function DashedDivider() {
+  return <div className="w-full border-t-[1.5px] border-dashed border-[#e3e1ec]" />;
+}
 
 export default function BarberJobs({ tab }: Props) {
   const navigate = useNavigate();
-  const tabs = [
-    { key: 'incoming' as const, label: 'Incoming', path: '/barber/jobs/incoming' },
-    { key: 'upcoming' as const, label: 'Upcoming', path: '/barber/jobs/upcoming' },
-    { key: 'past' as const, label: 'Past', path: '/barber/jobs/past' },
-  ];
+  const user = useAuthStore((s) => s.user);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [online, setOnline] = useState(() => localStorage.getItem(ONLINE_PREF_KEY) !== 'false');
+  const [pastFilter, setPastFilter] = useState<'all' | 'completed' | 'cancelled' | 'no_show'>('all');
+
+  useEffect(() => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        const data = await fetchBarberJobs(user.id);
+        if (!cancelled) setJobs(data);
+      } catch (err) {
+        if (!cancelled) setError(`${err}`);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  function toggleOnline() {
+    const next = !online;
+    setOnline(next);
+    localStorage.setItem(ONLINE_PREF_KEY, String(next));
+  }
+
+  const incomingCount = jobs.filter((j) => jobTab(j.status) === 'incoming').length;
+  let filtered = jobs.filter((j) => jobTab(j.status) === tab);
+  if (tab === 'past' && pastFilter !== 'all') {
+    filtered = filtered.filter((j) => j.status === pastFilter);
+  }
+
+  const headline = tab === 'incoming'
+    ? { title: 'New booking requests', sub: 'Respond quickly to improve your visibility' }
+    : tab === 'upcoming'
+    ? { title: 'Upcoming jobs', sub: 'Accepted bookings appear here' }
+    : { title: 'Past jobs', sub: 'Review your completed and cancelled work' };
 
   return (
     <div className="min-h-screen bg-white pb-[88px]">
-      <div className="px-5 pt-14 pb-4"><h1 className="text-[16px] font-bold">Jobs</h1></div>
-      <div className="px-5 flex gap-2 mb-4">
-        {tabs.map((t) => (
-          <button key={t.key} type="button" onClick={() => navigate(t.path)}
-            className={`px-4 py-2 rounded-full text-xs font-semibold ${
-              tab === t.key ? 'bg-[#1c1b1f] text-white' : 'bg-[#f4f5f8] text-[#514e59]'
-            }`}>{t.label}</button>
-        ))}
+      {/* Top Navigation Bar — Figma 1:3170 */}
+      <div className="flex items-center justify-center gap-1.5 px-5 py-4 pt-14 bg-white">
+        <button type="button" aria-label="Back" onClick={() => navigate(-1)} className="w-6 h-6 flex items-center justify-center shrink-0">
+          <ChevronLeft className="w-6 h-6 text-[#1c1b1f]" strokeWidth={2} />
+        </button>
+        <p className="flex-1 text-center text-[16px] leading-6 font-bold text-[#1c1b1f]">Jobs</p>
+        <span className="w-6 h-6 shrink-0" />
       </div>
-      <div className="px-5 space-y-3">
-        {JOBS[tab].map((j) => (
-          <button key={j.id} type="button" onClick={() => navigate(tab === 'incoming' ? `/barber/accept/${j.id}` : `/barber/job/${j.id}`)}
-            className="w-full text-left border border-[#d2dbe9] rounded-xl p-4">
-            <div className="flex justify-between">
-              <p className="font-semibold text-sm">{j.customer}</p>
-              <p className="font-bold text-sm">${j.price}</p>
-            </div>
-            <p className="text-xs text-[#a09cab] mt-1">{j.service} · {j.time}</p>
+
+      {/* Online status card — Figma 1:3177 */}
+      <div className="px-5 py-4">
+        <div className="flex items-center justify-between bg-[#fafafa] rounded-[12px] p-3">
+          <div>
+            <p className={cn('text-[14px] leading-5 font-semibold', online ? 'text-[#4ca054]' : 'text-[#a09cab]')}>
+              {online ? 'Online' : 'Offline'}
+            </p>
+            <p className="text-[12px] leading-4 font-semibold text-[#686471] mt-3">
+              {online ? 'You can receive requests' : 'You will not receive new requests'}
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={online}
+            onClick={toggleOnline}
+            className="relative w-[22px] h-[14px] shrink-0"
+          >
+            <span className={cn('absolute left-0 top-[1.3px] w-[21.6px] h-[11.5px] rounded-[6.4px] transition-colors', online ? 'bg-[#5c59e8]' : 'bg-[#d4d2e3]')} />
+            <span
+              className={cn(
+                'absolute top-0 w-[14px] h-[14px] rounded-full bg-white border-[0.64px] transition-all',
+                online ? 'left-[8.3px] border-[#5c59e8]' : 'left-0 border-[#d4d2e3]'
+              )}
+            />
           </button>
-        ))}
-        {JOBS[tab].length === 0 && <p className="text-center text-sm text-[#a09cab] py-8">No jobs here</p>}
+        </div>
       </div>
+
+      {/* Segmented Tabs Bar — Figma 1:3187 */}
+      <div className="px-5 py-4">
+        <div className="flex items-center bg-[#eff1f5] rounded-full p-[3px]">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => navigate(t.path)}
+              className={cn(
+                'flex-1 flex items-center justify-center gap-2 p-3 rounded-full text-[14px] leading-5 text-center transition-colors',
+                tab === t.key ? 'bg-white font-semibold text-[#1c1b1f]' : 'font-medium text-[#676372]'
+              )}
+            >
+              {t.label}
+              {t.key === 'incoming' && incomingCount > 0 && (
+                <span className="inline-flex items-center justify-center w-6 h-6 bg-[#f8f8f8] rounded-full text-[10px] leading-3 font-medium text-[#514e59]">
+                  {incomingCount}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Section headline — Figma 1:3200 */}
+      <div className="px-5 py-4">
+        <h2 className="text-[18px] leading-6 font-bold text-[#1c1b1f]">{headline.title}</h2>
+        <p className="text-[12px] leading-4 font-medium text-[#a09cab] mt-1">{headline.sub}</p>
+      </div>
+
+      {/* Past filters — Figma 1:3367 */}
+      {tab === 'past' && (
+        <div className="px-5 py-4 flex gap-[9px]">
+          {PAST_FILTERS.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setPastFilter(f.key)}
+              className={cn(
+                'px-3 py-2.5 rounded-[8px] text-[12px] leading-4 font-semibold transition-colors',
+                pastFilter === f.key
+                  ? 'bg-[#1c1b1f] text-white'
+                  : 'border-[0.75px] border-[#d2dbe9] text-[#514e59]'
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Job cards */}
+      <div className="px-5 py-4 space-y-4">
+        {loading && <p className="text-center text-sm text-[#a09cab] py-8">Loading jobs…</p>}
+        {error && <p className="text-center text-sm text-red-600 py-8">{error}</p>}
+        {!loading && !error && filtered.map((j) => (
+          <div key={j.id} className="bg-white border-[0.75px] border-[#d2dbe9] rounded-[12px] p-3 flex flex-col gap-3">
+            {/* Card header — name / service + status chip */}
+            <div className="flex items-start justify-between w-full">
+              <div className="flex flex-col gap-1">
+                <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f]">{j.users?.full_name}</p>
+                <p className="text-[12px] leading-4 font-medium text-[#a09cab] truncate max-w-[235px]">{j.services?.name}</p>
+              </div>
+              <StatusChip label={statusChipLabel(tab, j.status)} />
+            </div>
+
+            {tab === 'incoming' && (
+              <>
+                <div className="flex flex-col gap-3 w-full">
+                  <DashedDivider />
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 text-[#1c1b1f]" strokeWidth={2} />
+                    <p className="text-[10px] leading-[14px] font-semibold text-black">
+                      {j.booking_date} <span className="text-[#1c1b1f]">•</span> {j.start_time}
+                    </p>
+                  </div>
+                  <DashedDivider />
+                </div>
+                <div className="flex flex-col gap-3 w-full">
+                  <div className="flex items-start gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-[#1c1b1f] mt-px" strokeWidth={2} />
+                    <div className="flex flex-col gap-1">
+                      <p className="text-[12px] leading-4 font-semibold text-[#1c1b1f]">
+                        {j.barber_profiles?.shop_name || 'In-shop'}
+                      </p>
+                      {j.barber_profiles?.address_text && (
+                        <p className="text-[10px] leading-[14px] font-semibold text-[#a09cab]">{j.barber_profiles.address_text}</p>
+                      )}
+                    </div>
+                  </div>
+                  <DashedDivider />
+                </div>
+                {j.payment_status === 'paid' && (
+                  <div className="flex items-center gap-2 bg-[#f4f5f8] rounded-full p-3 self-start">
+                    <Check className="w-4 h-4 text-[#1c1b1f]" strokeWidth={2} />
+                    <p className="text-[12px] leading-4 font-medium text-[#1c1b1f]">Booking fee paid</p>
+                  </div>
+                )}
+                <div className="bg-[#f4f5f8] rounded-[8px] p-3 w-full">
+                  <p className="text-[12px] leading-4 font-medium text-[#1c1b1f]">
+                    "Haircut payment is handled directly with the customer."
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/barber/job/${j.id}`)}
+                  className="w-full bg-[#1c1b1f] rounded-full px-9 py-[18px] text-[14px] leading-5 font-semibold text-white text-center"
+                >
+                  View
+                </button>
+              </>
+            )}
+
+            {tab === 'upcoming' && (
+              <>
+                <div className="flex items-center gap-1 w-full">
+                  <Clock className="w-3.5 h-3.5 text-[#1c1b1f]" strokeWidth={2} />
+                  <p className="text-[10px] leading-[14px] font-semibold text-black">
+                    {j.booking_date} • {j.start_time}
+                  </p>
+                </div>
+                <div className="flex items-start gap-1 w-full">
+                  <MapPin className="w-3.5 h-3.5 text-[#1c1b1f] mt-px" strokeWidth={2} />
+                  <div className="flex flex-col gap-1">
+                    <p className="text-[12px] leading-4 font-semibold text-[#1c1b1f]">
+                      {j.barber_profiles?.shop_name || 'In-shop'}
+                    </p>
+                    {j.barber_profiles?.address_text && (
+                      <p className="text-[10px] leading-[14px] font-semibold text-[#a09cab]">{j.barber_profiles.address_text}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-2 w-full">
+                  <button
+                    type="button"
+                    disabled
+                    title="Coming soon"
+                    className="flex-1 flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full px-7 py-3.5 text-[14px] leading-5 font-semibold text-[#1c1b1f] disabled:opacity-60"
+                  >
+                    <MessageSquare className="w-5 h-5" strokeWidth={1.8} />
+                    Chat
+                  </button>
+                  <button
+                    type="button"
+                    disabled
+                    title="Coming soon"
+                    className="flex-1 flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full px-7 py-3.5 text-[14px] leading-5 font-semibold text-[#1c1b1f] disabled:opacity-60"
+                  >
+                    <Phone className="w-5 h-5" strokeWidth={1.8} />
+                    Call
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/barber/job/${j.id}`)}
+                  className="w-full bg-[#1c1b1f] rounded-full px-9 py-[18px] text-[14px] leading-5 font-semibold text-white text-center"
+                >
+                  View Job
+                </button>
+              </>
+            )}
+
+            {tab === 'past' && (
+              <>
+                <div className="flex items-center gap-1 w-full">
+                  <Clock className="w-3.5 h-3.5 text-[#1c1b1f]" strokeWidth={2} />
+                  <p className="text-[10px] leading-[14px] font-semibold text-black">
+                    {j.booking_date} • {j.start_time}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 w-full">
+                  <MapPin className="w-3.5 h-3.5 text-[#1c1b1f]" strokeWidth={2} />
+                  <p className="text-[12px] leading-4 font-semibold text-[#1c1b1f]">
+                    {j.barber_profiles?.shop_name || 'In-shop'}
+                  </p>
+                </div>
+                <DashedDivider />
+                <div className="flex items-center justify-between w-full">
+                  <p className="text-[12px] leading-4 font-semibold text-[#848992]">
+                    {j.status === 'completed' && j.payment_status === 'paid'
+                      ? `Booking fee: $${Number(j.total_amount).toFixed(0)}`
+                      : 'No fee earned'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/barber/job/${j.id}`)}
+                    className="text-[12px] leading-4 font-bold text-[#1c1b1f]"
+                  >
+                    View details
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+        {!loading && !error && filtered.length === 0 && (
+          <p className="text-center text-sm text-[#a09cab] py-8">No jobs here</p>
+        )}
+      </div>
+
       <BarberNav active="jobs" />
     </div>
   );

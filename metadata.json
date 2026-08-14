@@ -1,5 +1,5 @@
 {
-  "name": "BarberSync",
-  "description": "A production-ready two-sided barber booking platform with customer, barber, and admin portals.",
+  "name": "Shorter",
+  "description": "Shorter — get a hair cut, wherever, whenever. Two-sided on-demand barber booking with customer, barber, and admin portals.",
   "requestFramePermissions": ["geolocation"]
 }

@@ -18,8 +18,14 @@ export default function CustomerProfile() {
         <p className="text-sm text-[#a09cab]">{user?.email}</p>
       </div>
       <div className="px-5 space-y-2">
-        {['Edit Profile', 'Payment Methods', 'Notifications', 'Help & Support'].map((item) => (
-          <button key={item} type="button" className="w-full text-left px-4 py-4 rounded-xl bg-[#fafaff] font-medium text-sm text-[#1c1b1f]">{item}</button>
+        {[
+          { l: 'Edit Profile', p: '/customer/profile/edit' },
+          { l: 'Payment Methods', p: '/customer/payment-methods' },
+          { l: 'Notifications', p: '/customer/notifications' },
+          { l: 'Help & Support', p: '/customer/help' },
+        ].map((item) => (
+          <button key={item.l} type="button" onClick={() => navigate(item.p)}
+            className="w-full text-left px-4 py-4 rounded-xl bg-[#fafaff] font-medium text-sm text-[#1c1b1f]">{item.l}</button>
         ))}
         <button type="button" onClick={() => { logout(); navigate('/'); }}
           className="w-full flex items-center gap-2 px-4 py-4 rounded-xl text-red-600 font-medium text-sm mt-4">

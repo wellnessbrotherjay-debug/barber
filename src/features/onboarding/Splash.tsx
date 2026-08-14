@@ -1,126 +1,113 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Heart, ChevronsRight } from 'lucide-react';
+import { ShorterLogo } from '@/components/ShorterLogo';
 
-const imgMan =
-  'https://www.figma.com/api/mcp/asset/70c141f8-c160-4107-9f4e-f7410c693949';
-const imgWoman =
-  'https://www.figma.com/api/mcp/asset/0259d7f3-57f4-46d3-a890-85f201ee7750';
-
+// Splash / hero — page 1 of the Shorter Figma board.
+//
+// Layout, geometry and copy come from the board (frame is 393x900; every value
+// below was measured off it). Colour comes from the brand book, which overrides
+// the board's navy #23313E and copper #CF8654 with the black/white palette:
+//   navy circle  -> #000000
+//   copper pills -> black-on-white / white-on-black depending on the surface
+//   photography  -> greyscale
+// Photos and the scissors/comb/hair doodles are the board's own assets,
+// extracted from the Figma export (public/figma/*).
 export default function Splash() {
   const navigate = useNavigate();
 
   return (
-    <div
-      className="relative flex flex-col items-center overflow-hidden px-8 w-full min-h-screen"
-      style={{ background: '#0a0e21' }}
-    >
-      {/* Status bar simulation */}
-      <div className="flex items-center justify-between w-full pt-12 pb-8 px-4">
-        <span className="text-white text-sm font-bold">9:41</span>
-        <div className="flex gap-1.5 items-center opacity-80">
-          <div className="w-4 h-4 rounded-sm bg-white/40" />
-          <div className="w-4 h-4 rounded-sm bg-white/40" />
-          <div className="w-5 h-3 rounded-sm bg-white/60" />
+    <div className="relative w-full bg-white overflow-hidden" style={{ height: 900 }}>
+      {/* Brand lockup — replaces the board's "Barbar" wordmark */}
+      <div className="absolute left-0 right-0 flex justify-center" style={{ top: 62 }}>
+        <ShorterLogo className="h-[26px]" />
+      </div>
+
+      {/* ---- Hero cluster (board: x 7..381, y 134..517) ---- */}
+      <div className="absolute inset-x-0" style={{ top: 0, height: 540 }}>
+        {/* decorative doodles */}
+        <img src="/figma/doodle-comb-scissors.png" alt="" aria-hidden
+             className="absolute opacity-25" style={{ left: 82, top: 137, width: 46 }} />
+        <img src="/figma/doodle-hair.png" alt="" aria-hidden
+             className="absolute opacity-25" style={{ left: 302, top: 104, width: 42 }} />
+        <img src="/figma/doodle-razor.png" alt="" aria-hidden
+             className="absolute opacity-25" style={{ left: 336, top: 322, width: 44 }} />
+        <img src="/figma/doodle-curl.png" alt="" aria-hidden
+             className="absolute opacity-25" style={{ left: 7, top: 268, width: 34 }} />
+
+        {/* main circle — board navy, brand black */}
+        <div className="absolute rounded-full bg-black"
+             style={{ left: 23, top: 167, width: 345, height: 345 }} />
+
+        {/* headline, inside the circle */}
+        <div className="absolute" style={{ left: 158, top: 291, width: 220 }}>
+          <p className="text-white font-bold" style={{ fontSize: 34, lineHeight: '56px', letterSpacing: '-0.5px' }}>
+            Find Your
+          </p>
+          <p className="text-white font-bold" style={{ fontSize: 18, lineHeight: '26px', letterSpacing: '1px' }}>
+            Barber
+          </p>
+        </div>
+
+        {/* barber photos (board assets, greyscale per brand book) */}
+        <img src="/figma/barber-1.png" alt=""
+             className="absolute rounded-full object-cover"
+             style={{ left: 243, top: 147, width: 128, height: 128 }} />
+        <img src="/figma/barber-2.png" alt=""
+             className="absolute rounded-full object-cover"
+             style={{ left: 20, top: 319, width: 119, height: 119 }} />
+
+        {/* #Date — sits on black, so white pill / black text */}
+        <div className="absolute bg-white text-black font-bold flex items-center justify-center rounded-full"
+             style={{ left: 157, top: 226, width: 115, height: 47, fontSize: 17 }}>
+          #Date
+        </div>
+
+        {/* #Cut — sits on white, so black pill / white text */}
+        <div className="absolute bg-black text-white font-bold flex items-center justify-center rounded-full"
+             style={{ left: 36, top: 468, width: 98, height: 47, fontSize: 17 }}>
+          #Cut
+        </div>
+
+        {/* speech bubble */}
+        <div className="absolute bg-white rounded-full flex items-center justify-center shadow-[0_4px_22px_rgba(0,0,0,0.12)]"
+             style={{ left: 128, top: 418, width: 216, height: 48 }}>
+          <span className="text-black font-bold" style={{ fontSize: 15 }}>Say more than “Hey”</span>
         </div>
       </div>
 
-      {/* Floating cards section */}
-      <div className="flex-1 flex flex-col items-center justify-center w-full relative pb-10">
-        {/* Glow */}
-        <div
-          className="absolute inset-x-0 top-1/4 h-1/2 pointer-events-none"
-          style={{
-            background:
-              'radial-gradient(circle at center, rgba(63,94,251,0.15) 0%, transparent 70%)',
-          }}
-        />
-
-        {/* Bottom card (purple/blue) */}
-        <div
-          className="absolute w-[280px] rounded-3xl p-4 flex items-center gap-4 shadow-2xl"
-          style={{
-            background: 'linear-gradient(134deg, #7028e4 0%, #48c6ef 100%)',
-            bottom: '18%',
-            left: '50%',
-            transform: 'translateX(-50%)',
-          }}
-        >
-          <div className="w-16 h-16 rounded-full border-2 border-white/20 overflow-hidden shrink-0">
-            <img src={imgMan} alt="" className="w-full h-full object-cover" />
-          </div>
-          <div>
-            <p className="text-white font-bold text-lg leading-tight">VibeHive</p>
-            <p className="text-white/70 text-xs">Active now</p>
-            <button className="mt-2 bg-white text-black text-[10px] font-bold px-6 py-1.5 rounded-full">
-              Follow
-            </button>
-          </div>
+      {/* ---- Lower block ---- */}
+      <div className="absolute" style={{ left: 20, top: 600, right: 20 }}>
+        <div className="bg-black text-white font-semibold inline-flex items-center justify-center rounded-full"
+             style={{ width: 138, height: 30, fontSize: 14 }}>
+          100% Match
         </div>
 
-        {/* Top card (lime) – rotated */}
-        <div
-          className="relative w-[280px] rounded-3xl p-4 flex items-center gap-4 shadow-2xl z-10"
-          style={{
-            background: 'linear-gradient(135deg, #d4fc79 0%, #96e6a1 100%)',
-            transform: 'rotate(-6deg)',
-          }}
-        >
-          <div className="w-16 h-16 rounded-full border-2 border-white/30 overflow-hidden shrink-0">
-            <img src={imgWoman} alt="" className="w-full h-full object-cover" />
-          </div>
-          <div>
-            <p className="text-gray-900 font-bold text-lg leading-tight">VibeHive</p>
-            <p className="text-gray-700 text-xs">Active now</p>
-            <button className="mt-2 bg-white text-black text-[10px] font-bold px-6 py-1.5 rounded-full shadow-sm">
-              Follow
-            </button>
-          </div>
-        </div>
-
-        {/* Floating icon chips */}
-        <div className="absolute top-[12%] right-[8%] w-10 h-10 rounded-xl bg-white/10 border border-white/10 backdrop-blur flex items-center justify-center rotate-12">
-          <span className="text-white text-lg">👍</span>
-        </div>
-        <div className="absolute top-[38%] left-[-2%] w-10 h-10 rounded-xl bg-white/10 border border-white/10 backdrop-blur flex items-center justify-center -rotate-12">
-          <span className="text-white text-lg">👍</span>
-        </div>
-        <div className="absolute top-[28%] right-[-2%] w-10 h-10 rounded-xl bg-white/10 border border-white/10 backdrop-blur flex items-center justify-center -rotate-[20deg]">
-          <span className="text-white text-lg">🔗</span>
-        </div>
-        <div className="absolute bottom-[22%] left-[5%] w-10 h-10 rounded-xl bg-white/10 border border-white/10 backdrop-blur flex items-center justify-center">
-          <span className="text-white text-lg">🔗</span>
-        </div>
-      </div>
-
-      {/* Typography + CTA */}
-      <div className="flex flex-col items-center gap-10 pb-20 w-full">
-        <h1 className="text-white text-center font-bold text-[36px] leading-[41px] tracking-tight px-4">
-          Connect Beyond
+        <h1 className="text-black font-bold" style={{ fontSize: 38, lineHeight: '50px', marginTop: 20 }}>
+          Get Ready to Meet
           <br />
-          Boundaries
+          Your Barber
         </h1>
 
-        <button
-          onClick={() => navigate('/welcome')}
-          className="flex items-center gap-3 pl-8 pr-3 py-3 rounded-full border border-white/20 bg-white/15 backdrop-blur-md active:scale-95 transition-transform"
-        >
-          <span className="text-white text-lg">Get Start</span>
-          <div className="w-10 h-10 rounded-full bg-white/30 flex items-center justify-center">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M5 12h14M13 6l6 6-6 6"
-                stroke="white"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
-        </button>
+        <p className="text-black" style={{ fontSize: 14, marginTop: 12 }}>
+          Find best barbarr in town.
+        </p>
       </div>
 
-      {/* Home indicator */}
-      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-32 h-1.5 rounded-full bg-white/20" />
+      {/* CTA bar — board copper heart becomes white on black */}
+      <button
+        type="button"
+        onClick={() => navigate('/welcome')}
+        className="absolute bg-black rounded-full flex items-center active:scale-[0.99] transition-transform"
+        style={{ left: 20, top: 813, width: 351, height: 56 }}
+      >
+        <span className="bg-white rounded-full flex items-center justify-center shrink-0"
+              style={{ width: 53, height: 53, marginLeft: 1.5 }}>
+          <Heart className="w-5 h-5 text-black" fill="currentColor" />
+        </span>
+        <span className="flex-1 text-white font-semibold" style={{ fontSize: 15 }}>Get Started</span>
+        <ChevronsRight className="w-6 h-6 text-white mr-5" />
+      </button>
     </div>
   );
 }

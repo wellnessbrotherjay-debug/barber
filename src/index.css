@@ -4,6 +4,10 @@
 @theme {
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
 
+  /* Shorter brand tokens — palette is strictly black & white */
+  --color-primary: #000000;
+  --color-on-primary: #ffffff;
+
   /* Figma design tokens */
   --color-ink: #1c1b1f;
   --color-muted: #a09cab;

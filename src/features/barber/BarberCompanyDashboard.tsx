@@ -106,7 +106,7 @@ export function BarberCompanyDashboard() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
             <h1 className="text-4xl font-bold text-[#1c1b1f]">{company.name}</h1>
-            <Badge variant={company.tier === 'pro' ? 'primary' : 'secondary'}>
+            <Badge variant={company.tier === 'pro' ? 'primary' : 'default'}>
               {company.tier.toUpperCase()}
             </Badge>
           </div>
@@ -142,7 +142,7 @@ export function BarberCompanyDashboard() {
               <div>
                 <p className="text-[#a09cab] text-sm mb-1">Total Revenue</p>
                 <p className="text-3xl font-bold text-[#1c1b1f]">
-                  ${parseFloat(metrics.total_revenue || '0').toFixed(0)}
+                  ${parseFloat(String(metrics.total_revenue ?? 0)).toFixed(0)}
                 </p>
               </div>
               <DollarSign className="w-10 h-10 text-emerald-500" />

@@ -1,26 +1,22 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, ChevronsRight } from 'lucide-react';
-import { ShorterLogo } from '@/components/ShorterLogo';
 
-// Splash / hero — page 1 of the Shorter Figma board.
-//
-// Layout, geometry and copy come from the board (frame is 393x900; every value
-// below was measured off it). Colour comes from the brand book, which overrides
-// the board's navy #23313E and copper #CF8654 with the black/white palette:
-//   navy circle  -> #000000
-//   copper pills -> black-on-white / white-on-black depending on the surface
-//   photography  -> greyscale
-// Photos and the scissors/comb/hair doodles are the board's own assets,
-// extracted from the Figma export (public/figma/*).
+// Splash / hero — page 1 of the Shorter Figma board, replicated literally
+// (locked design per the service agreement, cl. 4.1): navy #23313E circle,
+// copper #CF8654 chips, "Barbar" wordmark and "Find best barbarr in town."
+// copy exactly as drawn. Photos and the scissors/comb/hair doodles are the
+// board's own assets, extracted from the Figma export (public/figma/*).
+const NAVY = '#23313E';
+const COPPER = '#CF8654';
 export default function Splash() {
   const navigate = useNavigate();
 
   return (
     <div className="relative w-full bg-white overflow-hidden" style={{ height: 900 }}>
-      {/* Brand lockup — replaces the board's "Barbar" wordmark */}
-      <div className="absolute left-0 right-0 flex justify-center" style={{ top: 62 }}>
-        <ShorterLogo className="h-[26px]" />
+      {/* Board wordmark */}
+      <div className="absolute left-0 right-0 flex justify-center" style={{ top: 58 }}>
+        <span className="font-bold text-black" style={{ fontSize: 28 }}>Barbar</span>
       </div>
 
       {/* ---- Hero cluster (board: x 7..381, y 134..517) ---- */}
@@ -35,9 +31,9 @@ export default function Splash() {
         <img src="/figma/doodle-curl.png" alt="" aria-hidden
              className="absolute opacity-25" style={{ left: 7, top: 268, width: 34 }} />
 
-        {/* main circle — board navy, brand black */}
-        <div className="absolute rounded-full bg-black"
-             style={{ left: 23, top: 167, width: 345, height: 345 }} />
+        {/* main circle — board navy */}
+        <div className="absolute rounded-full"
+             style={{ left: 23, top: 167, width: 345, height: 345, background: NAVY }} />
 
         {/* headline, inside the circle */}
         <div className="absolute" style={{ left: 158, top: 291, width: 220 }}>
@@ -57,15 +53,15 @@ export default function Splash() {
              className="absolute rounded-full object-cover"
              style={{ left: 20, top: 319, width: 119, height: 119 }} />
 
-        {/* #Date — sits on black, so white pill / black text */}
-        <div className="absolute bg-white text-black font-bold flex items-center justify-center rounded-full"
-             style={{ left: 157, top: 226, width: 115, height: 47, fontSize: 17 }}>
+        {/* #Date — copper pill */}
+        <div className="absolute text-white font-bold flex items-center justify-center rounded-full"
+             style={{ left: 157, top: 226, width: 115, height: 47, fontSize: 17, background: COPPER }}>
           #Date
         </div>
 
-        {/* #Cut — sits on white, so black pill / white text */}
-        <div className="absolute bg-black text-white font-bold flex items-center justify-center rounded-full"
-             style={{ left: 36, top: 468, width: 98, height: 47, fontSize: 17 }}>
+        {/* #Cut — copper pill */}
+        <div className="absolute text-white font-bold flex items-center justify-center rounded-full"
+             style={{ left: 36, top: 468, width: 98, height: 47, fontSize: 17, background: COPPER }}>
           #Cut
         </div>
 
@@ -94,16 +90,16 @@ export default function Splash() {
         </p>
       </div>
 
-      {/* CTA bar — board copper heart becomes white on black */}
+      {/* CTA bar — dark pill with copper heart chip, per board */}
       <button
         type="button"
         onClick={() => navigate('/welcome')}
         className="absolute bg-black rounded-full flex items-center active:scale-[0.99] transition-transform"
         style={{ left: 20, top: 813, width: 351, height: 56 }}
       >
-        <span className="bg-white rounded-full flex items-center justify-center shrink-0"
-              style={{ width: 53, height: 53, marginLeft: 1.5 }}>
-          <Heart className="w-5 h-5 text-black" fill="currentColor" />
+        <span className="rounded-full flex items-center justify-center shrink-0"
+              style={{ width: 53, height: 53, marginLeft: 1.5, background: COPPER }}>
+          <Heart className="w-5 h-5 text-white" fill="currentColor" />
         </span>
         <span className="flex-1 text-white font-semibold" style={{ fontSize: 15 }}>Get Started</span>
         <ChevronsRight className="w-6 h-6 text-white mr-5" />

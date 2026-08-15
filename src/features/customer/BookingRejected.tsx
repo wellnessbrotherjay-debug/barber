@@ -39,23 +39,33 @@ export default function BookingRejected() {
     ? `${formatLongDate(booking.booking_date)} at ${formatTime(booking.start_time)}`
     : 'your requested time';
 
+  // Figma page 17 — icon block sits in the upper third, actions pinned to the bottom.
   return (
-    <div className="min-h-screen bg-white flex flex-col items-center justify-center px-8 text-center">
-      <div className="w-[100px] h-[100px] rounded-[16px] bg-surface flex items-center justify-center mb-6">
-        <XCircle className="w-11 h-11 text-ink" strokeWidth={1.25} />
+    <div className="min-h-screen bg-white flex flex-col items-center px-6 text-center">
+      <div
+        className="w-[136px] h-[136px] rounded-[16px] bg-surface flex items-center justify-center"
+        style={{ marginTop: 180 }}
+      >
+        <XCircle className="w-[52px] h-[52px] text-ink" strokeWidth={1} />
       </div>
-      <h1 className="text-[24px] font-bold text-ink mb-2">Booking rejected</h1>
-      <p className="text-[14px] text-muted mb-10 leading-5">
+      <h1 className="text-[28px] leading-9 font-bold text-ink mt-6">Booking rejected</h1>
+      <p className="text-[15px] text-muted mt-2 leading-6 max-w-[340px]">
         {barberName} couldn't accept your request for {when}. No charges were made to your
         card.
       </p>
 
-      <Button size="lg" onClick={() => navigate('/customer')} className="w-full mb-3">
-        Choose another barber
-      </Button>
-      <button type="button" onClick={() => navigate('/customer')} className="text-sm text-muted font-semibold py-2">
-        Browse all barbers
-      </button>
+      <div className="mt-auto w-full pb-6">
+        <Button size="lg" onClick={() => navigate('/customer')} className="w-full rounded-full py-[18px]">
+          Choose another barber
+        </Button>
+        <button
+          type="button"
+          onClick={() => navigate('/customer')}
+          className="w-full text-[15px] text-muted font-semibold py-4 mt-2"
+        >
+          Browse all barbers
+        </button>
+      </div>
     </div>
   );
 }

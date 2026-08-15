@@ -103,18 +103,25 @@ export default function BookingConfirmed() {
           </div>
         )}
 
-        <Card className="p-4 flex items-start gap-3 bg-surface border-0">
-          <DollarSign className="w-5 h-5 text-ink flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-semibold text-ink mb-1">Important Note: Offline Payment</p>
-            <p className="text-xs text-muted">
-              {feePaid
-                ? `Your booking fee of $${booking?.total_amount ?? '5.00'} has been received. `
-                : 'Your booking fee will be collected to confirm this slot. '}
-              You can now message your barber to coordinate. The haircut payment itself is
-              handled directly with the barber at the time of service.
-            </p>
+        {/* Figma page 32 — offline payment note card */}
+        <Card className="p-4 bg-surface border-0">
+          <div className="flex items-center gap-3">
+            <span className="w-11 h-11 rounded-[10px] bg-white flex items-center justify-center shrink-0">
+              <DollarSign className="w-5 h-5 text-ink" strokeWidth={1.8} />
+            </span>
+            <p className="text-[16px] font-bold text-ink">Important Note: Offline Payment</p>
           </div>
+          <p className="text-[14px] text-ink leading-6 mt-4">
+            {feePaid ? (
+              <>Your booking fee of <span className="font-bold">${Number(booking?.total_amount ?? 5).toFixed(2)}</span> has been received. You can now chat with your barber.</>
+            ) : (
+              'Your booking fee will be collected to confirm this slot.'
+            )}
+          </p>
+          <p className="text-[14px] font-bold text-ink leading-6 mt-4">
+            The haircut payment will be handled directly with the barber at the time of the
+            service.
+          </p>
         </Card>
 
         <div className="flex flex-col gap-3">
@@ -122,17 +129,17 @@ export default function BookingConfirmed() {
             type="button"
             disabled
             title="Chat is coming soon — not built yet"
-            className="w-full flex items-center justify-center gap-2 bg-surface rounded-[14px] py-4 font-semibold text-muted opacity-70 cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full py-4 text-[15px] font-semibold text-ink"
           >
-            <MessageCircle className="w-4 h-4" /> Chat
+            <MessageCircle className="w-5 h-5" strokeWidth={1.8} /> Chat
           </button>
           <button
             type="button"
             disabled
             title="Call is coming soon — not built yet"
-            className="w-full flex items-center justify-center gap-2 bg-surface rounded-[14px] py-4 font-semibold text-muted opacity-70 cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full py-4 text-[15px] font-semibold text-ink"
           >
-            <Phone className="w-4 h-4" /> Call
+            <Phone className="w-5 h-5" strokeWidth={1.8} /> Call
           </button>
         </div>
       </div>

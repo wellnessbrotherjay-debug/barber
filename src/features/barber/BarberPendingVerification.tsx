@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ShieldCheck, ShieldAlert, CheckCircle2, FileText, Info, Image as ImageIcon } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { ArrowLeft, ShieldCheck, ShieldAlert, CheckCircle2, FileText, Info, Image as ImageIcon, CircleX } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { authFetch } from '@/lib/api';
 
@@ -31,8 +32,10 @@ function StatusPill({ label }: { label: string }) {
 // real data from GET /api/barber/status + GET /api/barber/verification/documents.
 export default function BarberPendingVerification() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuthStore();
   const [isVerified, setIsVerified] = useState<boolean>(!!user?.is_verified);
+  const [reviewInProgress, setReviewInProgress] = useState<boolean>(false);
   const [docs, setDocs] = useState<SubmittedDoc[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -46,7 +49,10 @@ export default function BarberPendingVerification() {
         ]);
         if (statusRes.ok) {
           const status = await statusRes.json();
-          if (!cancelled) setIsVerified(!!status.is_verified);
+          if (!cancelled) {
+            setIsVerified(!!status.is_verified);
+            setReviewInProgress(!!status.review_in_progress);
+          }
         }
         if (docsRes.ok) {
           const docBody = await docsRes.json();
@@ -150,6 +156,44 @@ export default function BarberPendingVerification() {
           >
             Back to Dashboard
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // In-progress state (Figma page 28 — "Review in Progress")
+  // Shown when the API reports an active review, or via ?state=in-progress.
+  // ------------------------------------------------------------------
+  if (reviewInProgress || searchParams.get('state') === 'in-progress') {
+    return (
+      <div className="min-h-screen bg-white flex flex-col">
+        <div className="flex items-center justify-center gap-1.5 px-5 py-4">
+          <button type="button" aria-label="Back" onClick={() => navigate('/barber/jobs')} className="w-6 h-6 flex items-center justify-center shrink-0">
+            <ArrowLeft className="w-5 h-5 text-ink" />
+          </button>
+          <h1 className="flex-1 text-center text-[16px] leading-6 font-bold text-ink">Verification Status</h1>
+          <span className="w-6 h-6 shrink-0" />
+        </div>
+
+        <div className="px-5 pt-24 flex flex-col items-center text-center gap-6">
+          <div className="w-[124px] h-[124px] bg-[#f2f1fa] rounded-[12px] flex items-center justify-center">
+            <CircleX className="w-[46px] h-[46px] text-ink" strokeWidth={1.3} />
+          </div>
+          <div className="flex flex-col gap-2 items-center">
+            <h2 className="text-[28px] leading-9 font-bold text-ink">Review in Progress</h2>
+            <p className="text-[14px] leading-5 font-medium text-muted max-w-[330px]">
+              Our team is currently reviewing your documents. This usually takes 24–48 hours.
+            </p>
+          </div>
+        </div>
+
+        {/* Estimated completion card — Figma page 28 */}
+        <div className="px-5 pt-10">
+          <div className="bg-white border-[0.75px] border-[#d2dbe9] rounded-[12px] px-4 py-5 flex items-center justify-between">
+            <p className="text-[16px] leading-6 font-bold text-ink">Estimated completion:</p>
+            <p className="text-[14px] leading-5 font-medium text-muted">Today by 5:00 PM</p>
+          </div>
         </div>
       </div>
     );

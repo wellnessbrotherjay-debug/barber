@@ -20,6 +20,10 @@ import BookingConfirmed from '@/features/customer/BookingConfirmed';
 import BookingRejected from '@/features/customer/BookingRejected';
 import NoBarbersAvailable from '@/features/customer/NoBarbersAvailable';
 import BarberArriving from '@/features/customer/BarberArriving';
+import BarberProfileTabs from '@/features/customer/BarberProfileTabs';
+import BookingRequestStatus from '@/features/customer/BookingRequestStatus';
+import BarberDeclined from '@/features/customer/BarberDeclined';
+import AppointmentConfirmed from '@/features/customer/AppointmentConfirmed';
 import BookingHistory from '@/features/customer/BookingHistory';
 import PayFee from '@/features/customer/PayFee';
 import CustomerProfile from '@/features/customer/CustomerProfile';
@@ -35,6 +39,8 @@ import JobDetail from '@/features/barber/JobDetail';
 import AcceptBooking from '@/features/barber/AcceptBooking';
 import DeclineBooking from '@/features/barber/DeclineBooking';
 import CancelJob from '@/features/barber/CancelJob';
+import CustomerCancelled from '@/features/barber/CustomerCancelled';
+import IncomingRequest from '@/features/barber/IncomingRequest';
 import BarberJobArriving from '@/features/barber/BarberJobArriving';
 import CompleteJob from '@/features/barber/CompleteJob';
 import NoShowReport from '@/features/barber/NoShowReport';
@@ -165,6 +171,10 @@ export default function App() {
           <Route path="/customer/booking-confirmed/:id" element={<RequireRole role="customer"><BookingConfirmed /></RequireRole>} />
           <Route path="/customer/booking-rejected/:id" element={<RequireRole role="customer"><BookingRejected /></RequireRole>} />
           <Route path="/customer/arriving/:id" element={<RequireRole role="customer"><BarberArriving /></RequireRole>} />
+          <Route path="/customer/barber/:id/profile" element={<RequireRole role="customer"><BarberProfileTabs /></RequireRole>} />
+          <Route path="/customer/request-status/:id" element={<RequireRole role="customer"><BookingRequestStatus /></RequireRole>} />
+          <Route path="/customer/declined/:id" element={<RequireRole role="customer"><BarberDeclined /></RequireRole>} />
+          <Route path="/customer/appointment-confirmed/:id" element={<RequireRole role="customer"><AppointmentConfirmed /></RequireRole>} />
           <Route path="/customer/no-barbers" element={<RequireRole role="customer"><NoBarbersAvailable /></RequireRole>} />
           <Route path="/customer/pay/:id" element={<RequireRole role="customer"><PayFee /></RequireRole>} />
           <Route path="/customer/bookings" element={<RequireRole role="customer"><BookingHistory /></RequireRole>} />
@@ -187,6 +197,8 @@ export default function App() {
           <Route path="/barber/accept/:id" element={<RequireRole role="barber"><RequireOnboardedBarber><AcceptBooking /></RequireOnboardedBarber></RequireRole>} />
           <Route path="/barber/decline/:id" element={<RequireRole role="barber"><RequireOnboardedBarber><DeclineBooking /></RequireOnboardedBarber></RequireRole>} />
           <Route path="/barber/cancel/:id" element={<RequireRole role="barber"><RequireOnboardedBarber><CancelJob /></RequireOnboardedBarber></RequireRole>} />
+          <Route path="/barber/cancelled/:id" element={<RequireRole role="barber"><RequireOnboardedBarber><CustomerCancelled /></RequireOnboardedBarber></RequireRole>} />
+          <Route path="/barber/request/:id" element={<RequireRole role="barber"><RequireOnboardedBarber><IncomingRequest /></RequireOnboardedBarber></RequireRole>} />
           <Route path="/barber/arriving/:id" element={<RequireRole role="barber"><RequireOnboardedBarber><BarberJobArriving /></RequireOnboardedBarber></RequireRole>} />
           <Route path="/barber/complete/:id" element={<RequireRole role="barber"><RequireOnboardedBarber><CompleteJob /></RequireOnboardedBarber></RequireRole>} />
           <Route path="/barber/no-show/:id" element={<RequireRole role="barber"><RequireOnboardedBarber><NoShowReport /></RequireOnboardedBarber></RequireRole>} />

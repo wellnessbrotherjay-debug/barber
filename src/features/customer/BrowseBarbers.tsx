@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Star, ImageIcon, SearchX, Clock } from 'lucide-react';
+import { Star, ImageIcon, Clock } from 'lucide-react';
 import CustomerNav from '@/components/CustomerNav';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -96,12 +96,12 @@ export default function BrowseBarbers() {
       {/* Barbers List */}
       <div className="flex-1 px-5 flex flex-col gap-3 overflow-y-auto">
         {barbers.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-14 h-14 rounded-full bg-surface flex items-center justify-center mb-3">
-              <SearchX className="w-7 h-7 text-muted" />
+          /* Empty state — Figma page 16: surface image placeholder + single bold line */
+          <div className="flex flex-col items-center justify-center text-center" style={{ marginTop: 180 }}>
+            <div className="w-[136px] h-[136px] rounded-[16px] bg-surface flex items-center justify-center">
+              <ImageIcon className="w-11 h-11 text-muted" />
             </div>
-            <p className="text-sm font-semibold text-ink">No barbers available right now</p>
-            <p className="text-xs text-muted mt-1">Check back soon or try again later.</p>
+            <p className="text-[20px] leading-7 font-bold text-ink mt-9">No barbers available right now</p>
           </div>
         )}
         {barbers.map((barber) => (

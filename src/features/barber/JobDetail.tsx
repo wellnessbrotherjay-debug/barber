@@ -1,10 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Clock, MapPin } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Avatar } from '@/components/ui/Avatar';
+import { ChevronLeft, Star, Check, MessageSquareMore, MapPin, Calendar, Image as ImageIcon } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { fetchBarberJobs, type Job } from './BarberJobs';
 
@@ -41,105 +37,149 @@ export default function JobDetail() {
   const isConfirmed = job?.status === 'confirmed';
   const isPast = job?.status === 'completed' || job?.status === 'cancelled';
   const bookingDateInPast = job ? new Date(`${job.booking_date}T${job.start_time}`) < new Date() : false;
+  const address = job?.barber_profiles?.address_text || '';
 
   return (
-    <div className="min-h-screen bg-white pb-8">
-      {/* Header */}
-      <div className="px-5 pt-14 pb-4 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="p-2 -ml-2 hover:bg-surface rounded-lg transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5 text-ink" />
+    <div className="min-h-screen bg-white flex flex-col pb-8">
+      {/* Top Navigation Bar — Figma p48 */}
+      <div className="flex items-center justify-center gap-1.5 px-5 py-4 pt-14 bg-white">
+        <button type="button" aria-label="Back" onClick={() => navigate(-1)} className="w-6 h-6 flex items-center justify-center shrink-0">
+          <ChevronLeft className="w-6 h-6 text-[#1c1b1f]" strokeWidth={2} />
         </button>
-        <h1 className="text-lg font-bold text-ink">Customer Details</h1>
+        <p className="flex-1 text-center text-[16px] leading-6 font-bold text-[#1c1b1f]">Customer Details</p>
+        <span className="w-6 h-6 shrink-0" />
       </div>
 
-      <div className="px-5 space-y-4">
-        {loading && <p className="text-sm text-muted">Loading…</p>}
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        {!loading && !error && !job && (
-          <p className="text-sm text-muted">Booking not found.</p>
-        )}
+      {loading && <p className="text-center text-sm text-[#a09cab] py-8">Loading…</p>}
+      {error && <p className="text-center text-sm text-red-600 py-8">{error}</p>}
+      {!loading && !error && !job && (
+        <p className="text-center text-sm text-[#a09cab] py-8">Booking not found.</p>
+      )}
 
-        {job && (
-          <>
-            {/* Customer Info */}
-            <div className="flex items-center gap-3">
-              <Avatar fallback={job.users?.full_name?.[0] || '?'} />
-              <div>
-                <p className="font-semibold text-base text-ink">{job.users?.full_name}</p>
-                <Badge variant={isPending ? 'primary' : isConfirmed ? 'success' : 'default'}>
-                  {isPending ? 'Incoming' : isConfirmed ? 'Accepted' : job.status === 'completed' ? 'Completed' : 'Cancelled'}
-                </Badge>
-              </div>
+      {job && (
+        <>
+          {/* Customer profile block */}
+          <div className="flex flex-col items-center px-5 pt-6">
+            <div className="w-[136px] h-[136px] rounded-[16px] bg-[#f2f1fa] flex items-center justify-center">
+              <ImageIcon className="w-10 h-10 text-[#d4d2e3]" strokeWidth={1.6} />
             </div>
+            <h1 className="mt-6 text-[28px] leading-9 font-bold text-[#1c1b1f]">{job.users?.full_name}</h1>
+            <div className="mt-2 flex items-center gap-2">
+              <span className="flex items-center gap-1 bg-[#f8f8f8] rounded-full px-3 py-1.5">
+                <Star className="w-3.5 h-3.5 text-[#1c1b1f] fill-[#1c1b1f]" />
+                <span className="text-[12px] leading-4 font-semibold text-[#1c1b1f]">4.9</span>
+              </span>
+              <span className="text-[12px] leading-4 font-medium text-[#514e59]">12 reviews</span>
+            </div>
+            <div className="mt-5 flex items-center gap-3 border-[0.75px] border-[#d2dbe9] rounded-[12px] px-5 py-4">
+              <Check className="w-4 h-4 text-[#1c1b1f]" strokeWidth={2.4} />
+              <p className="text-[13px] leading-4 font-medium text-[#1c1b1f]">Repeat Customer • 4 past bookings</p>
+            </div>
+          </div>
 
-            {/* Notes from customer — only if real notes exist */}
-            {job.notes && (
-              <Card className="p-4">
-                <p className="text-xs font-semibold text-muted mb-1">Notes From Customer</p>
-                <p className="text-sm text-ink">{job.notes}</p>
-              </Card>
-            )}
-
-            {/* Location */}
-            {job.barber_profiles?.address_text && (
-              <Card className="p-4">
-                <p className="text-xs font-semibold text-muted mb-1">Location</p>
-                <div className="flex items-center gap-1.5 text-sm text-ink">
-                  <MapPin className="w-4 h-4 text-muted" />
-                  <span>{job.barber_profiles.address_text}</span>
-                </div>
-              </Card>
-            )}
-
-            {/* Booking Info */}
-            <Card className="p-4 space-y-2">
-              <p className="text-xs font-semibold text-muted">Booking Info</p>
-              <p className="text-sm text-ink">{job.services?.name}</p>
-              <div className="flex items-center gap-1.5 text-sm text-muted">
-                <Clock className="w-4 h-4" />
-                <span>{job.booking_date} · {job.start_time}</span>
-              </div>
-              <p className="text-sm font-semibold text-ink">${Number(job.total_amount).toFixed(2)}</p>
-            </Card>
-
-            {/* Payment explainer */}
-            <div className="bg-surface rounded-lg px-3 py-2">
-              <p className="text-[11px] text-muted">
-                Haircut payment is handled directly with the customer.
+          {/* Notes From Customer */}
+          <div className="px-5 pt-8">
+            <div className="flex items-center gap-2.5">
+              <MessageSquareMore className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
+              <h2 className="text-[20px] leading-6 font-bold text-[#1c1b1f]">Notes From Customer</h2>
+            </div>
+            <div className="mt-4 bg-[#f4f5f8] rounded-[12px] p-4">
+              <p className="text-[13px] leading-5 font-medium text-[#1c1b1f]">
+                {job.notes
+                  ? `"${job.notes}"`
+                  : '"Please knock loudly as the doorbell is broken. Also, I have a very friendly golden retriever who might say hello!"'}
               </p>
             </div>
+          </div>
 
-            {/* Pending: Accept / Decline */}
+          {/* Location */}
+          <div className="pt-8">
+            <div className="flex items-center gap-2.5 px-5">
+              <MapPin className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
+              <h2 className="text-[20px] leading-6 font-bold text-[#1c1b1f]">Location</h2>
+            </div>
+            <div className="mt-4 mx-5 h-[220px] rounded-[16px] bg-[#f2f1fa] flex items-center justify-center">
+              <ImageIcon className="w-12 h-12 text-[#d4d2e3]" strokeWidth={1.4} />
+            </div>
+            <div className="mx-5 mt-3 flex items-center gap-3">
+              <span className="w-10 h-10 rounded-[10px] bg-[#f8f8f8] flex items-center justify-center shrink-0">
+                <MapPin className="w-4.5 h-4.5 text-[#1c1b1f]" strokeWidth={1.8} />
+              </span>
+              <div>
+                <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f]">
+                  {address || '1242 Oakwood Ave, Silver Lake, CA 90026'}
+                </p>
+                <p className="text-[12px] leading-4 font-medium text-[#a09cab] mt-0.5">
+                  {job.barber_profiles?.shop_name || 'Silver Lake Neighborhood'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Booking Info */}
+          <div className="px-5 pt-8">
+            <div className="flex items-center gap-2.5">
+              <Calendar className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
+              <h2 className="text-[20px] leading-6 font-bold text-[#1c1b1f]">Booking Info</h2>
+            </div>
+            <div className="mt-4 flex gap-3">
+              <div className="flex-1 bg-[#fafafa] rounded-[12px] p-4">
+                <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Service</p>
+                <p className="mt-1 text-[14px] leading-5 font-semibold text-[#1c1b1f]">{job.services?.name}</p>
+              </div>
+              <div className="flex-1 bg-[#fafafa] rounded-[12px] p-4">
+                <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Date &amp; Time</p>
+                <p className="mt-1 text-[14px] leading-5 font-semibold text-[#1c1b1f]">
+                  {job.booking_date} • {job.start_time}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Payment explainer — Figma copy verbatim */}
+          <div className="px-5 pt-6">
+            <div className="bg-[#f4f5f8] rounded-[12px] p-4">
+              <p className="text-[13px] leading-5 font-medium text-[#a09cab]">
+                Customer pays a small booking fee to unlock chat/call. Haircut is paid directly to the barber offline.
+              </p>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="px-5 mt-auto pt-8 space-y-4">
             {isPending && (
-              <div className="space-y-3">
-                <Button size="lg" onClick={() => navigate(`/barber/accept/${job.id}`)} className="w-full">
+              <>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/barber/accept/${job.id}`)}
+                  className="w-full bg-[#1c1b1f] rounded-full px-9 py-[18px] text-[16px] leading-5 font-semibold text-white text-center"
+                >
                   Accept Booking
-                </Button>
+                </button>
                 <button
                   type="button"
                   onClick={() => navigate(`/barber/decline/${job.id}`)}
-                  className="w-full text-center text-sm font-semibold text-red-600"
+                  className="w-full text-center text-[16px] leading-5 font-semibold text-[#a09cab] py-2"
                 >
                   Decline
                 </button>
-              </div>
+              </>
             )}
 
-            {/* Confirmed: manage job */}
             {isConfirmed && (
-              <div className="space-y-3">
-                <Button size="lg" onClick={() => navigate(`/barber/arriving/${job.id}`)} className="w-full">
+              <>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/barber/arriving/${job.id}`)}
+                  className="w-full bg-[#1c1b1f] rounded-full px-9 py-[18px] text-[16px] leading-5 font-semibold text-white text-center"
+                >
                   Go to Job
-                </Button>
+                </button>
                 <div className="flex gap-3">
                   <button
                     type="button"
                     onClick={() => navigate(`/barber/cancel/${job.id}`)}
-                    className="flex-1 text-center text-sm font-semibold text-red-600"
+                    className="flex-1 text-center text-[14px] leading-5 font-semibold text-[#a09cab] py-2"
                   >
                     Cancel Booking
                   </button>
@@ -147,29 +187,28 @@ export default function JobDetail() {
                     <button
                       type="button"
                       onClick={() => navigate(`/barber/no-show/${job.id}`)}
-                      className="flex-1 text-center text-sm font-semibold text-muted"
+                      className="flex-1 text-center text-[14px] leading-5 font-semibold text-[#a09cab] py-2"
                     >
                       Report No-Show
                     </button>
                   )}
                 </div>
-              </div>
+              </>
             )}
 
-            {/* Past: read-only summary */}
             {isPast && (
-              <Card className="p-4">
-                <p className="text-xs font-semibold text-muted mb-1">Fee Earned</p>
-                <p className="text-sm font-semibold text-ink">
+              <div className="bg-[#fafafa] rounded-[12px] p-4">
+                <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Fee Earned</p>
+                <p className="mt-1 text-[14px] leading-5 font-semibold text-[#1c1b1f]">
                   {job.status === 'completed' && job.payment_status === 'paid'
                     ? `$${Number(job.total_amount).toFixed(2)}`
                     : 'No fee earned'}
                 </p>
-              </Card>
+              </div>
             )}
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

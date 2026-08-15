@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ChevronLeft,
   Scissors,
@@ -103,10 +103,121 @@ function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
+// Board page 30 — "Authorizes Payment". A distinct pre-checkout state of this
+// screen: summary + fee breakdown + saved card, reached with ?view=authorize.
+// Confirming drops the param and hands off to the real Stripe checkout below.
+function AuthorizesPayment({ onConfirm }: { onConfirm: () => void }) {
+  const navigate = useNavigate();
+  return (
+    <div className="min-h-screen bg-white pb-8 flex flex-col">
+      {/* Header */}
+      <div className="bg-white flex items-center gap-1.5 px-5 py-4 pt-14">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="w-6 h-6 flex items-center justify-center shrink-0"
+          aria-label="Back"
+        >
+          <ChevronLeft className="w-5 h-5 text-[#1c1b1f]" />
+        </button>
+        <p className="flex-1 text-center text-[16px] font-bold leading-6 text-[#1c1b1f]">
+          Authorizes Payment
+        </p>
+        <span className="w-6 h-6 shrink-0" />
+      </div>
+
+      {/* Appointment summary */}
+      <div className="px-5 mt-2">
+        <div className="bg-[#fafafa] rounded-[12px] p-4 flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <IconTile>
+              <Scissors className="w-4 h-4 text-[#1c1b1f]" />
+            </IconTile>
+            <div className="flex flex-col gap-1">
+              <p className="text-[11px] font-medium leading-[14px] text-[#a09cab]">
+                Classic Fade &amp; Beard
+              </p>
+              <p className="text-[13px] font-semibold leading-4 text-[#1c1b1f]">with Marcus V.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <IconTile>
+              <Calendar className="w-4 h-4 text-[#1c1b1f]" />
+            </IconTile>
+            <div className="flex flex-col gap-1">
+              <p className="text-[11px] font-medium leading-[14px] text-[#a09cab]">Oct 24</p>
+              <p className="text-[13px] font-semibold leading-4 text-[#1c1b1f]">2:30 PM</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Breakdown + payment method */}
+      <div className="px-5 mt-4">
+        <div className="rounded-[16px] border-[0.75px] border-[#d2dbe9] bg-white p-4">
+          <div className="flex items-center justify-between py-2">
+            <p className="text-[13px] font-semibold text-[#1c1b1f]">Service Total</p>
+            <p className="text-[13px] font-bold text-[#1c1b1f]">$45.00</p>
+          </div>
+          <div className="border-t border-dashed border-[#d2dbe9]" />
+          <div className="flex items-center justify-between py-2">
+            <p className="text-[13px] font-semibold text-[#1c1b1f]">Booking Fee</p>
+            <p className="text-[13px] font-bold text-[#1c1b1f]">$20.00</p>
+          </div>
+          <div className="border-t border-dashed border-[#d2dbe9]" />
+          <div className="flex items-center justify-between py-2">
+            <p className="text-[13px] font-semibold text-[#1c1b1f]">Due at shop</p>
+            <p className="text-[13px] font-bold text-[#1c1b1f]">$25.00</p>
+          </div>
+          <div className="border-t border-dashed border-[#d2dbe9]" />
+
+          <div className="bg-[#f8f8f8] rounded-[10px] px-4 py-4 mt-3">
+            <p className="text-[13px] font-medium text-[#1c1b1f]">
+              &ldquo;We&rsquo;ll only charge after the barber accepts.&rdquo;
+            </p>
+          </div>
+
+          <p className="text-[16px] font-bold text-[#1c1b1f] mt-5">Select Payment Method</p>
+          <div className="rounded-[12px] border-[0.75px] border-[#d2dbe9] bg-white p-4 mt-3 flex items-center gap-3">
+            <div className="bg-[#f8f8f8] rounded-[8px] w-[38px] h-[38px] flex items-center justify-center shrink-0">
+              <CreditCard className="w-4 h-4 text-[#1c1b1f]" />
+            </div>
+            <p className="flex-1 text-[14px] font-bold text-[#1c1b1f] tracking-wide">
+              &bull;&bull;&bull;&bull; 4242
+            </p>
+            <button
+              type="button"
+              onClick={() => toast.info('Card management is coming soon')}
+              className="text-[13px] font-medium text-[#a09cab]"
+            >
+              Change
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* CTA */}
+      <div className="mt-auto px-5 pt-10 flex flex-col gap-1">
+        <button
+          type="button"
+          onClick={onConfirm}
+          className="w-full bg-[#1c1b1f] text-white rounded-[999px] px-9 py-[18px] text-[14px] font-semibold leading-5 text-center active:scale-[0.99] transition-transform"
+        >
+          Authorizes Booking Fee ($20)
+        </button>
+        <p className="w-full px-9 py-[18px] text-[14px] font-semibold leading-5 text-[#a09cab] text-center">
+          Secure Payment via Stripe
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function PayFee() {
   const { id: bookingId } = useParams();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
+  const [searchParams, setSearchParams] = useSearchParams();
   const stripe = useMemo(() => getStripe(), []);
 
   const [loading, setLoading] = useState(true);
@@ -166,6 +277,20 @@ export default function PayFee() {
   function handleSuccess() {
     toast.success('Booking fee paid!');
     navigate('/customer/bookings');
+  }
+
+  // Page-30 review state: confirming clears the param, revealing the real
+  // Stripe checkout so the actual authorization still happens for real.
+  if (searchParams.get('view') === 'authorize') {
+    return (
+      <AuthorizesPayment
+        onConfirm={() => {
+          const next = new URLSearchParams(searchParams);
+          next.delete('view');
+          setSearchParams(next, { replace: true });
+        }}
+      />
+    );
   }
 
   return (

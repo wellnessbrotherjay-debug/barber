@@ -1,8 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Navigation, ShieldCheck } from 'lucide-react';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
+import {
+  ChevronLeft,
+  CheckCircle2,
+  MessageSquare,
+  Phone,
+  Calendar,
+  Clock,
+  MapPin,
+  Star,
+  ImageIcon,
+} from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 
 interface Booking {
@@ -12,14 +20,36 @@ interface Booking {
   total_amount: number;
   booking_date: string;
   start_time: string;
-  barber_profiles: { display_name: string; shop_name?: string };
-  services: { name: string; price: number };
+  barber_profiles: {
+    id?: string;
+    display_name: string;
+    shop_name?: string;
+    address_text?: string;
+    rating_avg?: number | string;
+    service_mode?: 'in_shop' | 'mobile' | 'both';
+  };
+  services: { name: string; price: number; duration_minutes?: number };
 }
 
-// Post-confirmation "job in progress" screen for the customer. Honesty note:
-// the backend has no real live location/ETA feed for a barber en route, so
-// this intentionally shows a generic "your barber is on the way" state and a
-// static placeholder map area rather than a fabricated countdown or arrival time.
+function DashedDivider() {
+  return <div className="w-full border-t-[1.5px] border-dashed border-[#e3e1ec]" />;
+}
+
+function formatTime(value: string): string {
+  const [h, m] = (value || '').split(':');
+  const hour = Number(h);
+  if (!Number.isFinite(hour)) return value;
+  return `${hour % 12 === 0 ? 12 : hour % 12}:${m ?? '00'} ${hour >= 12 ? 'PM' : 'AM'}`;
+}
+
+function formatDate(value: string): string {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+}
+
+// Figma page 63 — Booking Status (confirmed): fee captured hero, Chat/Call,
+// Job Summary rows, price breakdown, barber card, cancel/reschedule actions.
 export default function BarberArriving() {
   const { id: bookingId } = useParams();
   const navigate = useNavigate();
@@ -30,7 +60,11 @@ export default function BarberArriving() {
     if (!user?.id || !bookingId) return;
     let cancelled = false;
     fetch(`${import.meta.env.VITE_API_URL || ''}/api/bookings`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}`, 'X-Session-Token': `1:${user.id}`, 'X-User-ID': user.id },
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}`,
+        'X-Session-Token': `1:${user.id}`,
+        'X-User-ID': user.id,
+      },
     })
       .then((r) => (r.ok ? r.json() : []))
       .then((data: Booking[]) => {
@@ -40,62 +74,173 @@ export default function BarberArriving() {
     return () => { cancelled = true; };
   }, [bookingId, user?.id]);
 
+  const barber = booking?.barber_profiles;
+  const firstName = (barber?.display_name || 'your barber').split(' ')[0];
   const feeAmount = booking?.total_amount ?? 5;
   const serviceTotal = booking?.services?.price ?? 0;
   const remaining = Math.max(serviceTotal - feeAmount, 0);
+  const address = barber?.address_text;
 
   return (
-    <div className="min-h-screen bg-white pb-8">
-      <div className="px-5 pt-14 pb-4 flex items-center gap-3">
-        <button type="button" onClick={() => navigate(-1)} className="p-2 -ml-2 hover:bg-surface rounded-lg transition-colors">
-          <ArrowLeft className="w-5 h-5 text-ink" />
+    <div className="min-h-screen bg-white pb-10">
+      {/* Header */}
+      <div className="flex items-center px-6 pt-16 pb-4">
+        <button type="button" aria-label="Back" onClick={() => navigate(-1)}>
+          <ChevronLeft className="w-6 h-6 text-ink" strokeWidth={2.25} />
         </button>
-        <h1 className="text-lg font-bold text-ink">Booking confirmed</h1>
+        <p className="flex-1 text-center text-[18px] font-bold text-ink pr-6">Booking Status</p>
       </div>
 
-      <div className="px-5 space-y-5">
-        {/* Static placeholder map — no live tracking backend exists yet */}
-        <div className="w-full h-40 rounded-[16px] bg-surface flex flex-col items-center justify-center gap-2">
-          <Navigation className="w-8 h-8 text-muted" />
-          <p className="text-xs text-muted">Your barber is on the way</p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Badge variant="success">Fee captured</Badge>
-          <span className="text-sm font-semibold text-ink">
-            Your slot is locked in with {booking?.barber_profiles?.display_name || 'your barber'}
+      <div className="px-6">
+        {/* Hero card — Fee captured */}
+        <div className="bg-surface rounded-[24px] px-6 py-10 flex flex-col items-center text-center">
+          <div className="w-[120px] h-[120px] rounded-[16px] bg-white flex items-center justify-center">
+            <CheckCircle2 className="w-[46px] h-[46px] text-ink" strokeWidth={1} />
+          </div>
+          <h1 className="text-[28px] font-bold text-ink mt-8">Booking confirmed</h1>
+          <p className="text-[15px] text-muted mt-1">Your slot is locked in with {firstName}.</p>
+          <span className="bg-ink text-white text-[14px] font-semibold px-6 py-3 rounded-full mt-5">
+            Fee captured
           </span>
         </div>
 
-        <Card className="p-4 space-y-2">
-          <p className="text-sm font-semibold text-ink mb-1">Job Summary</p>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted">Service Total</span>
-            <span className="font-semibold text-ink">${serviceTotal}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted">Booking Fee (Captured)</span>
-            <span className="font-semibold text-ink">${feeAmount}</span>
-          </div>
-          <div className="flex justify-between text-sm border-t border-border pt-2 mt-2">
-            <span className="text-muted">Remaining at Shop</span>
-            <span className="font-semibold text-ink">${remaining}</span>
-          </div>
-        </Card>
+        {/* Chat / Call */}
+        <div className="flex gap-4 mt-6">
+          <button
+            type="button"
+            className="flex-1 flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full py-4 text-[16px] font-semibold text-ink"
+          >
+            <MessageSquare className="w-5 h-5" strokeWidth={1.8} /> Chat
+          </button>
+          <button
+            type="button"
+            className="flex-1 flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full py-4 text-[16px] font-semibold text-ink"
+          >
+            <Phone className="w-5 h-5" strokeWidth={1.8} /> Call
+          </button>
+        </div>
 
+        {/* Job Summary */}
+        <h2 className="text-[22px] font-bold text-ink mt-8">Job Summary</h2>
+
+        <div className="flex items-center gap-4 mt-5">
+          <span className="w-12 h-12 rounded-[12px] bg-surface flex items-center justify-center shrink-0">
+            <Calendar className="w-5 h-5 text-ink" strokeWidth={1.8} />
+          </span>
+          <span>
+            <span className="block text-[16px] font-semibold text-ink">
+              {booking?.services?.name || '—'}
+            </span>
+            <span className="block text-[13px] text-muted mt-0.5">
+              {booking?.services?.duration_minutes ?? 60} mins
+            </span>
+          </span>
+        </div>
+
+        <div className="mt-5"><DashedDivider /></div>
+
+        <div className="flex items-center gap-2.5 py-4">
+          <Clock className="w-4 h-4 text-ink" strokeWidth={1.8} />
+          <span className="text-[16px] font-semibold text-ink">
+            {booking ? formatTime(booking.start_time) : '—'}
+          </span>
+        </div>
+        <DashedDivider />
+        <div className="flex items-center gap-2.5 py-4">
+          <Calendar className="w-4 h-4 text-ink" strokeWidth={1.8} />
+          <span className="text-[16px] font-semibold text-ink">
+            {booking ? formatDate(booking.booking_date) : '—'}
+          </span>
+        </div>
+        <DashedDivider />
+        <div className="py-4">
+          <div className="flex items-start gap-2.5">
+            <MapPin className="w-4 h-4 text-ink mt-1" strokeWidth={1.8} />
+            <div>
+              <p className="text-[16px] font-semibold text-ink">
+                {address || barber?.shop_name || 'In-shop'}
+              </p>
+              {address && (
+                <a
+                  href={`https://maps.google.com/?q=${encodeURIComponent(address)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block text-[11px] font-semibold tracking-wide text-muted mt-1.5"
+                >
+                  OPEN IN MAPS
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+        <DashedDivider />
+
+        {/* Price breakdown — dashed bordered card */}
+        <div className="border-[1.5px] border-dashed border-[#e3e1ec] rounded-[16px] px-4 mt-5">
+          <div className="flex items-center justify-between py-4">
+            <span className="text-[14px] text-ink">Service Total</span>
+            <span className="text-[15px] font-bold text-ink">${Number(serviceTotal).toFixed(2)}</span>
+          </div>
+          <DashedDivider />
+          <div className="flex items-center justify-between py-4">
+            <span className="text-[14px] text-ink">Booking Fee (Captured)</span>
+            <span className="text-[15px] font-bold text-ink">-${Number(feeAmount).toFixed(2)}</span>
+          </div>
+          <DashedDivider />
+          <div className="flex items-center justify-between py-4">
+            <span className="text-[17px] font-bold text-ink">Remaining at Shop</span>
+            <span className="text-[17px] font-bold text-ink">${Number(remaining).toFixed(2)}</span>
+          </div>
+        </div>
+
+        {/* Barber card */}
+        <div className="border-[0.75px] border-[#d2dbe9] rounded-[20px] p-4 mt-6">
+          <div className="flex gap-4">
+            <div className="w-[110px] h-[110px] rounded-[12px] bg-surface flex items-center justify-center shrink-0">
+              <ImageIcon className="w-8 h-8 text-[#d4d2e3]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[18px] font-bold text-ink truncate">{barber?.display_name || '—'}</p>
+              <p className="flex items-center gap-2 text-[13px] mt-1.5">
+                <Star className="w-4 h-4 fill-ink text-ink" />
+                <span className="font-bold text-ink">{barber?.rating_avg ?? '—'}</span>
+                <span className="text-muted">• 2.1 km</span>
+              </p>
+              <p className="text-[13px] text-ink mt-1.5">
+                {barber?.service_mode === 'mobile'
+                  ? 'Comes to you'
+                  : barber?.service_mode === 'both'
+                    ? 'In-shop • Comes to you'
+                    : 'In-shop'}
+              </p>
+              <p className="flex items-center gap-1.5 text-[13px] text-muted mt-1.5">
+                <Clock className="w-3.5 h-3.5" /> Available now
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => barber?.id && navigate(`/customer/barber/${barber.id}`)}
+            className="w-full bg-ink text-white text-[14px] font-semibold py-4 rounded-full mt-4"
+          >
+            View Profile
+          </button>
+        </div>
+
+        {/* Actions */}
         <button
           type="button"
           onClick={() => navigate('/customer/bookings')}
-          className="w-full text-sm font-semibold text-ink py-3 text-left"
+          className="w-full bg-ink text-white text-[16px] font-semibold py-[20px] rounded-full mt-7"
         >
           Need to cancel or reschedule?
         </button>
         <button
           type="button"
           onClick={() => navigate('/customer/help')}
-          className="w-full flex items-center gap-2 text-sm font-semibold text-muted py-1"
+          className="w-full py-4 text-[15px] font-semibold text-muted text-center"
         >
-          <ShieldCheck className="w-4 h-4" /> View Cancellation Policy
+          View Cancellation Policy
         </button>
       </div>
     </div>

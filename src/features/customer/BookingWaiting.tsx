@@ -1,9 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Clock, ChevronLeft, ImageIcon } from 'lucide-react';
+import { Clock, ChevronLeft, ImageIcon, Scissors, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { useAuthStore } from '@/store/useAuthStore';
 
 // Booking countdown / waiting-for-barber-response screen (Figma flow step 3).
@@ -120,34 +118,92 @@ export default function BookingWaiting() {
   const dashOffset = circumference * (1 - progress);
 
   if (phase === 'no_response') {
+    // Figma page 37 — "No response - Re-searching": ring with scissors, payment
+    // status card, requested-time / radius rows, Cancel Search.
+    const now = new Date();
+    const hh = now.getHours() % 12 === 0 ? 12 : now.getHours() % 12;
+    const requestedTime = `Today, ${hh}:${String(now.getMinutes()).padStart(2, '0')} ${now.getHours() >= 12 ? 'PM' : 'AM'}`;
     return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center px-8 text-center">
-        <div className="w-16 h-16 rounded-full bg-surface flex items-center justify-center mb-4">
-          <Clock className="w-8 h-8 text-muted" />
+      <div className="min-h-screen bg-white flex flex-col pb-8">
+        <div className="flex items-center px-6 pt-16 pb-2">
+          <button type="button" aria-label="Back" onClick={() => navigate(-1)}>
+            <ChevronLeft className="w-6 h-6 text-ink" strokeWidth={2.25} />
+          </button>
         </div>
-        <h1 className="text-2xl font-bold text-ink mb-2">No response</h1>
-        <p className="text-sm text-muted mb-1">
-          {barberName || 'This barber'} hasn't responded to your request in time.
-        </p>
-        <p className="text-xs text-muted mb-8">Your card was not charged.</p>
 
-        <Card className="w-full p-4 mb-6 text-left space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted">Payment status</span>
-            <span className="font-semibold text-ink">Not charged</span>
+        <div className="px-6 flex-1">
+          {/* ring with scissors icon */}
+          <div className="relative w-[220px] h-[220px] mx-auto mt-4">
+            <svg viewBox="0 0 180 180" className="w-full h-full -rotate-90">
+              <circle cx="90" cy="90" r={radius} fill="none" stroke="#e9e8ef" strokeWidth="10" />
+              <circle
+                cx="90"
+                cy="90"
+                r={radius}
+                fill="none"
+                stroke="#000000"
+                strokeWidth="10"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={circumference * 0.18}
+              />
+            </svg>
+            <div className="absolute inset-4 rounded-full bg-[#f8f7fc] flex items-center justify-center">
+              <Scissors className="w-14 h-14 text-ink" strokeWidth={1.5} />
+            </div>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted">Requested time</span>
-            <span className="font-semibold text-ink">Just now</span>
-          </div>
-        </Card>
 
-        <Button size="lg" onClick={() => navigate('/customer')} className="w-full mb-3">
-          Choose another barber
-        </Button>
-        <button type="button" onClick={handleCancel} className="text-sm text-muted font-semibold py-2">
-          Cancel search
-        </button>
+          <h1 className="text-[24px] font-bold text-ink text-center mt-8">No response</h1>
+          <p className="text-[14px] text-muted text-center mt-1">
+            Sending your request to another nearby barber…
+          </p>
+
+          {/* Payment status card — copy per board */}
+          <div className="bg-[#f6f7fb] rounded-[16px] p-4 mt-8 flex items-center gap-3">
+            <span className="w-11 h-11 rounded-full bg-white flex items-center justify-center shrink-0">
+              <ImageIcon className="w-5 h-5 text-muted" />
+            </span>
+            <span>
+              <span className="block text-[16px] font-bold text-ink">Payment Status</span>
+              <span className="block text-[14px] text-muted mt-0.5">
+                Aauthorizes active <span className="italic">(Pending)</span>
+              </span>
+            </span>
+          </div>
+
+          <div className="border-[0.75px] border-[#d2dbe9] rounded-[16px] mt-5">
+            <div className="flex items-center justify-between px-4 py-3.5">
+              <span className="flex items-center gap-2 text-[14px] text-muted">
+                <Clock className="w-4 h-4" /> Requested Time
+              </span>
+              <span className="text-[15px] font-bold text-ink">{requestedTime}</span>
+            </div>
+            <div className="border-t-[1.5px] border-dashed border-[#e3e1ec] mx-4" />
+            <div className="flex items-center justify-between px-4 py-3.5">
+              <span className="flex items-center gap-2 text-[14px] text-muted">
+                <MapPin className="w-4 h-4" /> Radius
+              </span>
+              <span className="text-[15px] font-bold text-ink">Expanding to 5km…</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 mt-8">
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="w-full bg-ink text-white text-[16px] font-semibold py-[20px] rounded-full"
+          >
+            Cancel Search
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/customer')}
+            className="w-full py-4 text-[15px] font-semibold text-muted"
+          >
+            Choose another barber
+          </button>
+        </div>
       </div>
     );
   }

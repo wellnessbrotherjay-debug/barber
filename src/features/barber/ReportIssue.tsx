@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ShieldAlert } from 'lucide-react';
+import { ChevronLeft, Scissors, Users, FileText } from 'lucide-react';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/Button';
 import { authFetch } from '@/lib/api';
 
 type ReportedType = 'barber' | 'customer';
 
+const TYPES: { key: ReportedType; label: string; icon: typeof Scissors }[] = [
+  { key: 'barber', label: 'Barber', icon: Scissors },
+  { key: 'customer', label: 'Customer', icon: Users },
+];
+
 export default function ReportIssue() {
   const navigate = useNavigate();
-  const [reportedType, setReportedType] = useState<ReportedType>('customer');
+  const [reportedType, setReportedType] = useState<ReportedType>('barber');
   const [comments, setComments] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -37,57 +41,82 @@ export default function ReportIssue() {
   }
 
   return (
-    <div className="min-h-screen bg-white pb-10">
-      <div className="px-5 pt-14 pb-4 flex items-center gap-3">
-        <button type="button" onClick={() => navigate(-1)} className="p-2 -ml-2">
-          <ArrowLeft className="w-5 h-5" />
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* Top Navigation Bar — Figma page 60 */}
+      <div className="flex items-center justify-center gap-1.5 px-5 py-4 pt-14 bg-white">
+        <button type="button" aria-label="Back" onClick={() => navigate(-1)} className="w-6 h-6 flex items-center justify-center shrink-0">
+          <ChevronLeft className="w-6 h-6 text-[#1c1b1f]" strokeWidth={2} />
         </button>
-        <h1 className="text-[16px] font-bold">Report an Issue</h1>
+        <p className="flex-1 text-center text-[16px] leading-6 font-bold text-[#1c1b1f]">Report Issue</p>
+        <span className="w-6 h-6 shrink-0" />
       </div>
 
-      <div className="px-5 flex flex-col items-center text-center mb-6">
-        <div className="w-14 h-14 rounded-full bg-[#1c1b1f] flex items-center justify-center mb-3">
-          <ShieldAlert className="w-7 h-7 text-white" />
+      <form onSubmit={handleSubmit} className="flex-1 flex flex-col">
+        {/* Safety First headline */}
+        <div className="px-5 py-4">
+          <h2 className="text-[20px] leading-7 font-bold text-[#1c1b1f]">Safety First</h2>
+          <p className="text-[14px] leading-5 font-medium text-[#a09cab] mt-1 max-w-[320px]">
+            Select who you'd like to report and provide details about the incident.
+          </p>
         </div>
-        <h2 className="text-lg font-bold">Safety First</h2>
-        <p className="text-sm text-[#a09cab] mt-1 max-w-[280px]">
-          Select who you'd like to report and provide details about the incident.
-        </p>
-      </div>
 
-      <form onSubmit={handleSubmit} className="px-5 space-y-5">
-        <div>
-          <p className="text-sm font-semibold mb-2">I want to report a:</p>
-          <div className="flex bg-[#f2f1fa] rounded-full p-1">
-            {(['barber', 'customer'] as ReportedType[]).map((type) => (
+        {/* I want to report a: */}
+        <div className="px-5 py-4">
+          <h3 className="text-[18px] leading-6 font-bold text-[#1c1b1f]">I want to report a:</h3>
+        </div>
+        <div className="px-5 grid grid-cols-2 gap-3">
+          {TYPES.map((t) => {
+            const selected = reportedType === t.key;
+            const Icon = t.icon;
+            return (
               <button
-                key={type}
+                key={t.key}
                 type="button"
-                onClick={() => setReportedType(type)}
-                className={`flex-1 py-2 rounded-full text-sm font-semibold capitalize transition-colors ${
-                  reportedType === type ? 'bg-[#1c1b1f] text-white' : 'text-[#6c6a75]'
+                onClick={() => setReportedType(t.key)}
+                className={`rounded-[12px] px-4 py-6 flex flex-col items-center gap-3 transition-colors ${
+                  selected ? 'bg-[#1c1b1f]' : 'bg-[#fafafa]'
                 }`}
               >
-                {type}
+                <span className="w-[42px] h-[42px] bg-white rounded-[8px] flex items-center justify-center">
+                  <Icon className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
+                </span>
+                <span className={`text-[16px] leading-6 font-semibold ${selected ? 'text-white' : 'text-[#1c1b1f]'}`}>
+                  {t.label}
+                </span>
               </button>
-            ))}
+            );
+          })}
+        </div>
+
+        {/* Additional Comments */}
+        <div className="px-5 pt-8 pb-2">
+          <p className="text-[16px] leading-6 font-semibold text-[#1c1b1f]">Additional Comments</p>
+        </div>
+        <div className="px-5">
+          <div className="border-[0.75px] border-[#d2dbe9] rounded-[12px] p-4 flex items-start gap-2">
+            <FileText className="w-5 h-5 text-[#a09cab] mt-0.5 shrink-0" strokeWidth={1.8} />
+            <textarea
+              placeholder="Describe the issue in detail"
+              value={comments}
+              onChange={(e) => setComments(e.target.value)}
+              rows={7}
+              className="flex-1 bg-transparent text-[14px] leading-5 font-medium text-[#1c1b1f] placeholder:text-[#a09cab] resize-none outline-none"
+            />
           </div>
         </div>
 
-        <div>
-          <p className="text-sm font-semibold mb-2">Additional Comments</p>
-          <textarea
-            placeholder="Describe the issue in detail"
-            value={comments}
-            onChange={(e) => setComments(e.target.value)}
-            rows={6}
-            className="w-full px-4 py-3 bg-[#fafaff] rounded-xl text-sm resize-none"
-          />
-        </div>
+        <div className="flex-1" />
 
-        <Button type="submit" size="lg" className="w-full" disabled={submitting}>
-          {submitting ? 'Submitting…' : 'Submit Report'}
-        </Button>
+        {/* Submit Report — Figma page 60 bottom CTA */}
+        <div className="px-5 pb-8 pt-4">
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full bg-[#1c1b1f] rounded-full px-9 py-[18px] text-[14px] leading-5 font-semibold text-white text-center disabled:opacity-60"
+          >
+            {submitting ? 'Submitting…' : 'Submit Report'}
+          </button>
+        </div>
       </form>
     </div>
   );

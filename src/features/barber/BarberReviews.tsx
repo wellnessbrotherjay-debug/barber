@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Star } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ChevronLeft, Star, UserRound } from 'lucide-react';
 import BarberNav from '@/components/BarberNav';
-import { Card } from '@/components/ui/Card';
 import { authFetch } from '@/lib/api';
 
 interface Review {
@@ -31,6 +31,7 @@ function relativeTime(iso: string): string {
 }
 
 export default function BarberReviews() {
+  const navigate = useNavigate();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -79,84 +80,107 @@ export default function BarberReviews() {
   const countDisplay = ratingCount ?? reviews.length;
 
   return (
-    <div className="min-h-screen bg-white pb-[88px]">
-      <div className="px-5 pt-14 pb-4 flex items-center justify-between">
-        <h1 className="text-lg font-bold text-ink">Reviews</h1>
-        <div className="flex items-center gap-1 bg-[#f2f1fa] px-3 py-1.5 rounded-full">
-          <Star className="w-4 h-4 fill-ink text-ink" />
-          <span className="text-sm font-bold text-ink">{avgDisplay}</span>
+    <div className="min-h-screen bg-white pb-[180px]">
+      {/* Top Navigation Bar — Figma page 57 */}
+      <div className="flex items-center justify-center gap-1.5 px-5 py-4 pt-14 bg-white">
+        <button type="button" aria-label="Back" onClick={() => navigate(-1)} className="w-6 h-6 flex items-center justify-center shrink-0">
+          <ChevronLeft className="w-6 h-6 text-[#1c1b1f]" strokeWidth={2} />
+        </button>
+        <p className="flex-1 text-center text-[16px] leading-6 font-bold text-[#1c1b1f]">Reviews</p>
+        <span className="w-6 h-6 shrink-0" />
+      </div>
+
+      {/* Reviews headline row */}
+      <div className="px-5 py-4 flex items-start justify-between">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-[18px] leading-6 font-bold text-[#1c1b1f]">Reviews</h2>
+          <p className="text-[12px] leading-4 font-medium text-[#a09cab]">
+            Based on {countDisplay} review{countDisplay === 1 ? '' : 's'}
+          </p>
+        </div>
+        <div className="flex items-center gap-1 bg-[#f8f8f8] rounded-full px-3 py-1.5">
+          <Star className="w-3.5 h-3.5 fill-[#1c1b1f] text-[#1c1b1f]" />
+          <span className="text-[12px] leading-4 font-bold text-[#1c1b1f]">{avgDisplay}</span>
         </div>
       </div>
 
       {loading ? (
-        <p className="text-center text-sm text-muted py-8">Loading…</p>
+        <p className="text-center text-sm text-[#a09cab] py-8">Loading…</p>
       ) : (
         <>
-          <div className="px-5 flex flex-col items-center mb-6">
-            <p className="text-5xl font-bold text-ink">{avgDisplay}</p>
-            <div className="flex gap-1 mt-2">
+          {/* Average rating block */}
+          <div className="px-5 py-4 flex flex-col items-center gap-2">
+            <p className="text-[28px] leading-9 font-bold text-[#1c1b1f]">{avgDisplay}</p>
+            <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Average Rating</p>
+            <div className="flex gap-2 mt-1">
               {Array.from({ length: 5 }).map((_, i) => (
                 <Star
                   key={i}
-                  className={`w-5 h-5 ${i < Math.round(Number(avgDisplay)) ? 'fill-ink text-ink' : 'text-[#d8d6e0]'}`}
+                  className={`w-7 h-7 ${i < Math.round(Number(avgDisplay)) ? 'fill-[#a4a1af] text-[#a4a1af]' : 'fill-[#e5e3ee] text-[#e5e3ee]'}`}
                 />
               ))}
             </div>
-            <p className="text-sm text-muted mt-1">Based on {countDisplay} review{countDisplay === 1 ? '' : 's'}</p>
           </div>
 
-          <div className="px-5 space-y-2 mb-6">
+          {/* Star distribution bars */}
+          <div className="px-5 py-4 flex flex-col gap-6">
             {distribution.map((d, i) => {
               const starLabel = 5 - i;
               return (
-                <div key={starLabel} className="flex items-center gap-2">
-                  <span className="text-xs text-muted w-6">{starLabel}★</span>
-                  <div className="flex-1 h-2 rounded-full bg-[#f2f1fa] overflow-hidden">
-                    <div className="h-full bg-ink" style={{ width: `${d.pct}%` }} />
+                <div key={starLabel} className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[14px] leading-5 font-semibold text-[#1c1b1f]">{starLabel}★</span>
+                    <span className="bg-[#f8f8f8] rounded-full px-3 py-1.5 text-[10px] leading-3 font-medium text-[#514e59]">{d.pct}%</span>
                   </div>
-                  <span className="text-xs text-muted w-9 text-right">{d.pct}%</span>
+                  <div className="w-full h-2 rounded-full bg-[#f1efe9] overflow-hidden">
+                    <div className="h-full rounded-full bg-[#1c1b1f]" style={{ width: `${d.pct}%` }} />
+                  </div>
                 </div>
               );
             })}
           </div>
 
-          <div className="px-5">
-            <h2 className="font-semibold text-sm mb-3">Recent Feedback</h2>
-            <div className="space-y-3">
-              {reviews.length === 0 && <p className="text-center text-sm text-muted py-8">No reviews yet</p>}
-              {reviews.slice(0, visibleCount).map((r) => (
-                <Card key={r.id} className="p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-full bg-[#f2f1fa] flex items-center justify-center text-xs font-semibold text-ink flex-shrink-0">
-                      {(r.customer_name || 'C').charAt(0).toUpperCase()}
+          {/* Recent Feedback */}
+          <div className="px-5 py-4">
+            <h2 className="text-[18px] leading-6 font-bold text-[#1c1b1f]">Recent Feedback</h2>
+          </div>
+          <div className="px-5 space-y-3">
+            {reviews.length === 0 && <p className="text-center text-sm text-[#a09cab] py-8">No reviews yet</p>}
+            {reviews.slice(0, visibleCount).map((r) => (
+              <div key={r.id} className="bg-white border-[0.75px] border-[#d2dbe9] rounded-[12px] p-3 flex flex-col gap-2">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-[#a4a1af] flex items-center justify-center shrink-0">
+                      <UserRound className="w-5 h-5 text-white" fill="currentColor" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start">
-                        <p className="font-semibold text-sm text-ink">{r.customer_name || 'Customer'}</p>
-                        <span className="text-xs text-muted whitespace-nowrap ml-2">{relativeTime(r.created_at)}</span>
-                      </div>
-                      <div className="flex gap-0.5 my-1">
-                        {Array.from({ length: r.rating }).map((_, j) => (
-                          <Star key={j} className="w-3 h-3 fill-ink text-ink" />
-                        ))}
-                      </div>
-                      {r.comment && <p className="text-xs text-muted leading-relaxed">"{r.comment}"</p>}
-                    </div>
+                    <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f]">{r.customer_name || 'Customer'}</p>
                   </div>
-                </Card>
-              ))}
-            </div>
+                  <span className="text-[12px] leading-4 font-medium text-[#a09cab] whitespace-nowrap">{relativeTime(r.created_at)}</span>
+                </div>
+                <div className="flex gap-1.5 pl-12">
+                  {Array.from({ length: Math.max(0, Math.min(5, Math.round(r.rating))) }).map((_, j) => (
+                    <Star key={j} className="w-5 h-5 fill-[#a4a1af] text-[#a4a1af]" />
+                  ))}
+                </div>
+                {r.comment && (
+                  <p className="text-[12px] leading-4 font-medium text-[#a09cab]">"{r.comment}"</p>
+                )}
+              </div>
+            ))}
+          </div>
 
-            {visibleCount < reviews.length && (
+          {/* See All Reviews — Figma page 57 bottom CTA */}
+          {visibleCount < reviews.length && (
+            <div className="px-5 pt-6">
               <button
                 type="button"
                 onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
-                className="w-full mt-4 text-center text-sm font-semibold text-ink py-3 rounded-full bg-[#f2f1fa]"
+                className="w-full bg-[#1c1b1f] rounded-full px-9 py-[18px] text-[14px] leading-5 font-semibold text-white text-center"
               >
                 See All Reviews
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </>
       )}
 

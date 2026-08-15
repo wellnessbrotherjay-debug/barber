@@ -91,24 +91,19 @@ export default function BarbersMap() {
 
       {selected && (
         <div className="absolute left-4 right-4" style={{ bottom: 96 }}>
-          <div className="bg-white rounded-[16px] p-4 shadow-[0px_8px_28px_rgba(0,0,0,0.16)]">
+          <div className="bg-white rounded-[20px] p-4 border-[0.75px] border-[#d2dbe9] shadow-[0px_8px_28px_rgba(0,0,0,0.08)]">
             <div className="flex gap-4">
-              <div className="w-[86px] h-[86px] rounded-[12px] bg-surface flex items-center justify-center shrink-0">
-                <ImageIcon className="w-7 h-7 text-muted" />
+              <div className="w-[110px] h-[110px] rounded-[12px] bg-surface flex items-center justify-center shrink-0">
+                <ImageIcon className="w-8 h-8 text-[#d4d2e3]" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[17px] font-semibold text-ink truncate">{selected.display_name}</p>
-                <div className="flex items-center gap-2 mt-1 text-[13px]">
+                <p className="text-[18px] font-bold text-ink truncate">{selected.display_name}</p>
+                <div className="flex items-center gap-2 mt-1.5 text-[13px]">
                   <Star className="w-4 h-4 fill-ink text-ink" />
-                  <span className="font-semibold text-ink">{selected.rating_avg}</span>
-                  {km !== null && (
-                    <>
-                      <span className="text-muted">•</span>
-                      <span className="text-muted font-medium">{km.toFixed(1)} km</span>
-                    </>
-                  )}
+                  <span className="font-bold text-ink">{selected.rating_avg}</span>
+                  {km !== null && <span className="text-muted">• {km.toFixed(1)} km</span>}
                 </div>
-                <p className="text-[13px] text-ink mt-1">
+                <p className="text-[13px] text-ink mt-1.5">
                   {selected.service_mode === 'mobile'
                     ? 'Comes to you'
                     : selected.service_mode === 'both'
@@ -116,7 +111,7 @@ export default function BarbersMap() {
                       : 'In-shop'}
                 </p>
                 {selected.is_active && (
-                  <p className="flex items-center gap-1.5 text-[13px] text-muted mt-1">
+                  <p className="flex items-center gap-1.5 text-[13px] text-muted mt-1.5">
                     <Clock className="w-3.5 h-3.5" />
                     Available now
                   </p>
@@ -124,13 +119,13 @@ export default function BarbersMap() {
               </div>
             </div>
 
-            <Button
-              size="lg"
-              className="w-full mt-4 text-sm"
+            <button
+              type="button"
               onClick={() => navigate(`/customer/barber/${selected.id}`)}
+              className="w-full bg-ink text-white text-[14px] font-semibold py-4 rounded-full mt-4"
             >
               View Profile
-            </Button>
+            </button>
           </div>
         </div>
       )}

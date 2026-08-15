@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, MapPin, Navigation, Phone } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
+import { ChevronLeft, Clock, MapPin, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/store/useAuthStore';
 import { fetchBarberJobs, type Job } from './BarberJobs';
 
+/* Barber Arriving — Figma p54 */
 export default function BarberJobArriving() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -33,89 +32,106 @@ export default function BarberJobArriving() {
     return () => { cancelled = true; };
   }, [id, user?.id]);
 
+  const customerName = job?.users?.full_name || 'Customer';
   const address = job?.barber_profiles?.address_text || '';
   const mapsUrl = address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
     : null;
 
   return (
-    <div className="min-h-screen bg-white pb-8">
-      <div className="px-5 pt-14 pb-4 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="p-2 -ml-2 hover:bg-surface rounded-lg transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5 text-ink" />
+    <div className="min-h-screen bg-white flex flex-col pb-8">
+      {/* Top Navigation Bar */}
+      <div className="flex items-center justify-center gap-1.5 px-5 py-4 pt-14 bg-white">
+        <button type="button" aria-label="Back" onClick={() => navigate(-1)} className="w-6 h-6 flex items-center justify-center shrink-0">
+          <ChevronLeft className="w-6 h-6 text-[#1c1b1f]" strokeWidth={2} />
         </button>
-        <h1 className="text-lg font-bold text-ink">On the way</h1>
+        <p className="flex-1 text-center text-[16px] leading-6 font-bold text-[#1c1b1f]">Barber Arriving</p>
+        <span className="w-6 h-6 shrink-0" />
       </div>
 
-      <div className="px-5 space-y-4">
-        {loading && <p className="text-sm text-muted">Loading…</p>}
+      {loading && <p className="text-center text-sm text-[#a09cab] py-4">Loading…</p>}
 
-        {/* Placeholder map area */}
-        <div className="w-full h-40 rounded-[12px] bg-surface flex items-center justify-center">
-          <Navigation className="w-8 h-8 text-muted" />
+      {/* Map placeholder */}
+      <div className="mx-5 mt-2 h-[380px] rounded-[16px] bg-[#f2f1fa] flex items-center justify-center">
+        <ImageIcon className="w-14 h-14 text-[#d4d2e3]" strokeWidth={1.4} />
+      </div>
+
+      {/* Estimated Arrival — dark banner */}
+      <div className="mx-5 mt-6 flex items-center justify-between bg-[#1c1b1f] rounded-[16px] px-5 py-4">
+        <div>
+          <p className="text-[13px] leading-4 font-medium text-[#a09cab]">Estimated Arrival</p>
+          <p className="mt-1 text-[18px] leading-6 font-bold text-white">14 mins</p>
         </div>
+        <span className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0">
+          <Clock className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
+        </span>
+      </div>
 
-        <Card className="p-4">
-          <p className="text-xs font-semibold text-muted mb-1">Estimated Arrival</p>
-          <p className="text-sm text-ink">On the way</p>
-        </Card>
+      {/* Customer Address */}
+      <div className="px-5 pt-8">
+        <h2 className="text-[20px] leading-6 font-bold text-[#1c1b1f]">Customer Address</h2>
+        <div className="mt-4 flex items-center gap-3">
+          <span className="w-11 h-11 rounded-[10px] bg-[#f8f8f8] flex items-center justify-center shrink-0">
+            <MapPin className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
+          </span>
+          <div>
+            <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f]">{customerName}</p>
+            {address && (
+              <p className="text-[12px] leading-4 font-medium text-[#a09cab] mt-0.5">{address}</p>
+            )}
+          </div>
+        </div>
+      </div>
 
-        {address && (
-          <Card className="p-4">
-            <p className="text-xs font-semibold text-muted mb-1">Customer Address</p>
-            <div className="flex items-center gap-1.5 text-sm text-ink">
-              <MapPin className="w-4 h-4 text-muted" />
-              <span>{address}</span>
-            </div>
-          </Card>
-        )}
-
-        <div className="flex gap-2">
+      {/* Running late */}
+      <div className="px-5 pt-8">
+        <h2 className="text-[20px] leading-6 font-bold text-[#1c1b1f]">Running late</h2>
+        <div className="mt-4 flex gap-3">
           <button
             type="button"
             onClick={() => toast.message('Note sent: running 10 mins late')}
-            className="flex-1 h-9 rounded-pill border border-border text-xs font-medium text-ink"
+            className="flex-1 text-left border-[0.75px] border-[#d2dbe9] rounded-[12px] p-4"
           >
-            Running 10 mins late
+            <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f]">10 mins</p>
+            <p className="text-[12px] leading-4 font-medium text-[#a09cab] mt-1">Send quick note</p>
           </button>
           <button
             type="button"
             onClick={() => toast.message('Note sent: running 20+ mins late')}
-            className="flex-1 h-9 rounded-pill border border-border text-xs font-medium text-ink"
+            className="flex-1 text-left border-[0.75px] border-[#d2dbe9] rounded-[12px] p-4"
           >
-            Running 20+ mins late
+            <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f]">20+ mins</p>
+            <p className="text-[12px] leading-4 font-medium text-[#a09cab] mt-1">Inform Customer</p>
           </button>
         </div>
+      </div>
 
-        {mapsUrl && (
-          <Button size="lg" variant="secondary" onClick={() => window.open(mapsUrl, '_blank', 'noopener,noreferrer')} className="w-full">
-            Open in Google Maps
-          </Button>
-        )}
-
+      {/* Actions */}
+      <div className="px-5 mt-auto pt-8">
+        <button
+          type="button"
+          onClick={() => mapsUrl && window.open(mapsUrl, '_blank', 'noopener,noreferrer')}
+          disabled={!mapsUrl}
+          className="w-full bg-[#1c1b1f] rounded-full px-9 py-[18px] text-[16px] leading-5 font-semibold text-white text-center disabled:opacity-60"
+        >
+          Open in Google Maps
+        </button>
         <button
           type="button"
           disabled
           title="Coming soon"
-          className="w-full h-11 rounded-pill border border-border text-sm font-medium text-muted opacity-50 cursor-not-allowed flex items-center justify-center gap-2"
+          className="w-full mt-4 text-center text-[16px] leading-5 font-semibold text-[#a09cab] py-2 disabled:opacity-90"
         >
-          <Phone className="w-4 h-4" />
-          Call {job?.users?.full_name || 'Customer'} (coming soon)
+          Call {customerName}
         </button>
-
         {job && (
-          <div className="flex gap-3">
-            <Button size="md" onClick={() => navigate(`/barber/complete/${job.id}`)} className="flex-1">
-              Mark Complete
-            </Button>
-            <Button size="md" variant="destructive" onClick={() => navigate(`/barber/cancel/${job.id}`)} className="flex-1">
-              Cancel
-            </Button>
-          </div>
+          <button
+            type="button"
+            onClick={() => navigate(`/barber/complete/${job.id}`)}
+            className="w-full mt-2 text-center text-[14px] leading-5 font-semibold text-[#1c1b1f] py-2"
+          >
+            Mark Complete
+          </button>
         )}
       </div>
     </div>

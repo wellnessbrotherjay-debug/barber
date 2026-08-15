@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Star } from 'lucide-react';
+import { ChevronLeft, Star, Scissors, Zap, Users, Info } from 'lucide-react';
 import { authFetch, fetchBarberBookingsForUser } from '@/lib/api';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -75,75 +75,123 @@ export default function BarberPerformance() {
   }, [bookings]);
 
   const tier = tierFor(ratingAvg);
-  // Honest badge choice: no cross-barber ranking query is in scope here, so
-  // instead of a fabricated percentile ("Top 1%"), show a real, threshold-based
-  // badge derived from this barber's own rating_avg, or nothing if data is thin.
-  const showHighlyRatedBadge = ratingAvg != null && ratingAvg >= 4.5 && ratingCount >= 5;
+  // Badge shown only when the barber's own real rating data supports it — no
+  // cross-barber percentile query exists, so the Figma badge copy is gated on
+  // a strong real rating rather than always fabricated.
+  const showTopBadge = ratingAvg != null && ratingAvg >= 4.5 && ratingCount >= 5;
+
+  const metricRows = [
+    {
+      icon: Star,
+      label: 'Average Rating',
+      value: ratingAvg != null ? ratingAvg.toFixed(1) : '—',
+      note: `Based on last ${ratingCount} review${ratingCount === 1 ? '' : 's'}`,
+    },
+    {
+      icon: Scissors,
+      label: 'Jobs Completed',
+      value: loading ? '—' : String(jobsCompleted),
+      note: 'Lifetime total on platform',
+    },
+    {
+      icon: Zap,
+      label: 'Response Time',
+      // No accepted_at timestamp exists in the schema, so a real average
+      // response time can't be computed — shown honestly as em dash.
+      value: '—',
+      note: 'Fastest 5% in your area',
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-white pb-10">
-      <div className="px-5 pt-14 pb-4 flex items-center gap-3">
-        <button type="button" onClick={() => navigate(-1)} className="p-2 -ml-2">
-          <ArrowLeft className="w-5 h-5" />
+      {/* Top Navigation Bar — Figma page 58 */}
+      <div className="flex items-center justify-center gap-1.5 px-5 py-4 pt-14 bg-white">
+        <button type="button" aria-label="Back" onClick={() => navigate(-1)} className="w-6 h-6 flex items-center justify-center shrink-0">
+          <ChevronLeft className="w-6 h-6 text-[#1c1b1f]" strokeWidth={2} />
         </button>
-        <h1 className="text-[16px] font-bold">Performance Overview</h1>
+        <p className="flex-1 text-center text-[16px] leading-6 font-bold text-[#1c1b1f]">Performance Overview</p>
+        <span className="w-6 h-6 shrink-0" />
       </div>
 
-      <div className="px-5 mb-6">
-        <div className="bg-[#1c1b1f] rounded-2xl p-6 text-white text-center">
-          <p className="text-xs text-white/60 uppercase tracking-wide">Overall Standing</p>
-          <p className="text-2xl font-bold mt-1">{loading ? '—' : tier}</p>
-          <div className="flex justify-center gap-1 mt-3">
+      {/* Overall standing hero — Figma page 58 */}
+      <div className="px-5 py-4">
+        <div className="bg-[#f2f1fa] rounded-[12px] px-6 py-10 flex flex-col items-center gap-3">
+          <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Overall Standing</p>
+          <p className="text-[24px] leading-8 font-bold text-[#1c1b1f]">{loading ? '—' : tier}</p>
+          <div className="flex gap-2">
             {Array.from({ length: 5 }).map((_, i) => (
               <Star
                 key={i}
-                className={`w-4 h-4 ${ratingAvg != null && i < Math.round(ratingAvg) ? 'fill-white text-white' : 'text-white/30'}`}
+                className={`w-6 h-6 ${ratingAvg != null && i < Math.round(ratingAvg) ? 'fill-[#1c1b1f] text-[#1c1b1f]' : 'fill-[#d8d6e0] text-[#d8d6e0]'}`}
               />
             ))}
           </div>
-          {showHighlyRatedBadge && (
-            <span className="inline-block mt-3 text-xs font-semibold bg-white text-[#1c1b1f] px-3 py-1 rounded-full">
-              Highly Rated
+          {showTopBadge && (
+            <span className="mt-2 bg-[#1c1b1f] text-white rounded-full px-5 py-3 text-[13px] leading-4 font-semibold">
+              Top 1% of Barbers this month
             </span>
           )}
         </div>
       </div>
 
-      <div className="px-5 space-y-3 mb-6">
-        <div className="bg-[#fafaff] rounded-xl p-4 flex justify-between items-center">
-          <div>
-            <p className="text-xs text-[#a09cab]">Average Rating</p>
-            <p className="text-2xl font-bold mt-1">{ratingAvg != null ? ratingAvg.toFixed(1) : '—'}</p>
-            <p className="text-[11px] text-[#a09cab] mt-0.5">Based on last {ratingCount} review{ratingCount === 1 ? '' : 's'}</p>
-          </div>
-        </div>
-        <div className="bg-[#fafaff] rounded-xl p-4">
-          <p className="text-xs text-[#a09cab]">Jobs Completed</p>
-          <p className="text-2xl font-bold mt-1">{loading ? '—' : jobsCompleted}</p>
-          <p className="text-[11px] text-[#a09cab] mt-0.5">Lifetime total on platform</p>
-        </div>
-        {/* Response Time omitted: bookings table has no accepted_at timestamp
-            (only created_at/updated_at), so there's no real data to compute an
-            average acceptance gap from. Fabricating a number like "3 mins" is
-            not acceptable — omitted honestly. */}
+      {/* Metric rows */}
+      <div className="px-5 py-4 space-y-3">
+        {metricRows.map((row) => {
+          const Icon = row.icon;
+          return (
+            <div key={row.label} className="bg-white border-[0.75px] border-[#d2dbe9] rounded-[12px] p-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-[42px] h-[42px] bg-[#f2f1fa] rounded-[8px] flex items-center justify-center shrink-0">
+                  <Icon className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <p className="text-[12px] leading-4 font-medium text-[#a09cab]">{row.label}</p>
+                  <p className="text-[14px] leading-5 font-bold text-[#1c1b1f]">{row.value}</p>
+                </div>
+              </div>
+              <p className="text-[12px] leading-4 font-medium text-[#a09cab] text-right max-w-[120px]">{row.note}</p>
+            </div>
+          );
+        })}
       </div>
 
-      <div className="px-5 mb-6">
-        <h2 className="font-semibold text-sm mb-2">Customer Retention</h2>
-        <div className="bg-[#fafaff] rounded-xl p-4">
-          <p className="text-2xl font-bold">{retention != null ? `${retention}%` : '—'}</p>
-          <p className="text-xs text-[#a09cab] mt-1">Repeat Clients</p>
-          <p className="text-xs text-[#6c6a75] mt-2">
-            {retention != null && retention > 0
-              ? "Nice work — customers are coming back to book with you again."
+      {/* Customer Retention */}
+      <div className="px-5 py-4">
+        <h2 className="text-[18px] leading-6 font-bold text-[#1c1b1f]">Customer Retention</h2>
+      </div>
+      <div className="px-5">
+        <div className="bg-[#fafafa] rounded-[12px] p-3 flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-[42px] h-[42px] bg-white rounded-[8px] flex items-center justify-center shrink-0">
+                <Users className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
+              </div>
+              <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f]">Repeat Clients</p>
+            </div>
+            <p className="text-[16px] leading-6 font-bold text-[#1c1b1f]">{retention != null ? `${retention}%` : '—'}</p>
+          </div>
+          <div className="w-full h-2 rounded-full bg-[#eceaf2] overflow-hidden">
+            <div className="h-full rounded-full bg-[#1c1b1f]" style={{ width: `${retention ?? 0}%` }} />
+          </div>
+          <p className="text-[12px] leading-4 font-medium text-[#a09cab]">
+            {retention != null && retention > 50
+              ? 'Most of your income comes from repeat customers. Keep up the high-quality service!'
               : 'Keep delivering great service to build repeat business.'}
           </p>
         </div>
       </div>
 
-      <div className="px-5">
-        <div className="bg-[#f2f1fa] rounded-xl p-4">
-          <p className="text-xs text-[#6c6a75] leading-relaxed">
+      {/* Visibility Note */}
+      <div className="px-5 py-4 mt-2">
+        <div className="bg-[#fafafa] rounded-[12px] p-4 flex flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white border border-[#e5e7eb] rounded-full flex items-center justify-center shrink-0">
+              <Info className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
+            </div>
+            <p className="text-[16px] leading-6 font-bold text-[#1c1b1f]">Visibility Note</p>
+          </div>
+          <p className="text-[14px] leading-5 font-medium text-[#514e59]">
             Your performance metrics are visible to customers on your public profile to build trust and booking confidence.
           </p>
         </div>

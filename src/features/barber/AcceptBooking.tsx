@@ -1,10 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Phone } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Scissors, Clock, Phone, Star, Calendar, MapPin, MessageSquareMore, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Avatar } from '@/components/ui/Avatar';
 import { useAuthStore } from '@/store/useAuthStore';
 import { fetchBarberJobs, type Job } from './BarberJobs';
 
@@ -61,105 +58,193 @@ export default function AcceptBooking() {
     }
   }
 
+  /* Booking accepted — Figma p51 */
   if (accepted && job) {
+    const address = job.barber_profiles?.address_text;
     return (
-      <div className="min-h-screen bg-white pb-8">
-        <div className="px-5 pt-14 pb-4">
-          <h1 className="text-lg font-bold text-ink">Booking accepted</h1>
-          <p className="text-sm text-muted mt-1">Chat and call are now unlocked.</p>
+      <div className="min-h-screen bg-white flex flex-col pb-8">
+        <div className="flex items-center justify-center gap-1.5 px-5 py-4 pt-14 bg-white">
+          <button type="button" aria-label="Back" onClick={() => navigate('/barber/jobs/upcoming')} className="w-6 h-6 flex items-center justify-center shrink-0">
+            <ChevronLeft className="w-6 h-6 text-[#1c1b1f]" strokeWidth={2} />
+          </button>
+          <p className="flex-1 text-center text-[16px] leading-6 font-bold text-[#1c1b1f]">Accept Booking</p>
+          <span className="w-6 h-6 shrink-0" />
         </div>
 
-        <div className="px-5 space-y-4">
-          <Card className="p-4 flex items-center gap-3">
-            <Avatar fallback={job.users?.full_name?.[0] || '?'} />
-            <div>
-              <p className="font-semibold text-sm text-ink">{job.users?.full_name}</p>
-              <p className="text-xs text-muted">{job.services?.name}</p>
+        <div className="flex flex-col items-center px-5 pt-6">
+          <div className="w-[136px] h-[136px] rounded-[16px] bg-[#f2f1fa] flex items-center justify-center">
+            <ImageIcon className="w-10 h-10 text-[#d4d2e3]" strokeWidth={1.6} />
+          </div>
+          <h1 className="mt-6 text-[28px] leading-9 font-bold text-[#1c1b1f]">Booking accepted</h1>
+          <p className="mt-1 text-[14px] leading-5 font-medium text-[#a09cab]">Chat and call are now unlocked.</p>
+        </div>
+
+        {/* Customer */}
+        <div className="px-5 pt-8">
+          <h2 className="text-[20px] leading-6 font-bold text-[#1c1b1f]">Customer</h2>
+          <div className="mt-4 flex items-center gap-4 border-[0.75px] border-[#d2dbe9] rounded-[12px] p-4">
+            <div className="w-14 h-14 rounded-[12px] bg-[#f2f1fa] flex items-center justify-center shrink-0">
+              <ImageIcon className="w-6 h-6 text-[#d4d2e3]" strokeWidth={1.6} />
             </div>
-          </Card>
+            <div>
+              <p className="text-[15px] leading-5 font-semibold text-[#1c1b1f]">{job.users?.full_name}</p>
+              <div className="mt-1 flex items-center gap-1.5">
+                <Star className="w-3.5 h-3.5 text-[#1c1b1f] fill-[#1c1b1f]" />
+                <p className="text-[12px] leading-4 font-medium text-[#514e59]">4.9 • 42 jobs completed</p>
+              </div>
+            </div>
+          </div>
+        </div>
 
-          <Card className="p-4 space-y-2">
-            <p className="text-xs font-semibold text-muted">Job Summary</p>
-            <p className="text-sm text-ink">{job.booking_date} · {job.start_time}</p>
-            {job.barber_profiles?.address_text && (
-              <p className="text-sm text-muted">{job.barber_profiles.address_text}</p>
-            )}
-          </Card>
+        {/* Job Summary */}
+        <div className="px-5 pt-8">
+          <h2 className="text-[20px] leading-6 font-bold text-[#1c1b1f]">Job Summary</h2>
+          <div className="mt-4 space-y-4">
+            <div className="flex items-center gap-3">
+              <span className="w-11 h-11 rounded-[10px] bg-[#f8f8f8] flex items-center justify-center shrink-0">
+                <Calendar className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
+              </span>
+              <div>
+                <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f]">{job.services?.name}</p>
+                <p className="text-[12px] leading-4 font-medium text-[#a09cab] mt-0.5">
+                  {job.booking_date} • {job.start_time}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="w-11 h-11 rounded-[10px] bg-[#f8f8f8] flex items-center justify-center shrink-0">
+                <MapPin className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
+              </span>
+              <div>
+                <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f]">In-Person</p>
+                {address && (
+                  <p className="text-[12px] leading-4 font-medium text-[#a09cab] mt-0.5">{address}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
 
-          <div className="bg-surface rounded-lg px-3 py-2">
-            <p className="text-[11px] text-muted">
-              Haircut payment is handled directly with the customer.
+        {/* View Job location */}
+        <button
+          type="button"
+          onClick={() => navigate(`/barber/arriving/${job.id}`)}
+          className="mx-5 mt-8 flex items-center justify-between"
+        >
+          <span className="text-[18px] leading-6 font-bold text-[#1c1b1f]">View Job location</span>
+          <ChevronRight className="w-5 h-5 text-[#1c1b1f]" strokeWidth={2} />
+        </button>
+
+        <div className="px-5 pt-6">
+          <div className="bg-[#f4f5f8] rounded-[12px] p-4">
+            <p className="text-[13px] leading-5 font-medium text-[#a09cab]">
+              Customer pays a small booking fee to unlock chat/call. Haircut is paid directly to the barber offline.
             </p>
           </div>
+        </div>
 
+        <div className="px-5 mt-auto pt-8 flex items-center gap-4">
           <button
             type="button"
             onClick={() => navigate(`/barber/cancel/${job.id}`)}
-            className="w-full text-center text-sm font-semibold text-red-600"
+            className="flex-1 bg-[#1c1b1f] rounded-full px-9 py-[18px] text-[16px] leading-5 font-semibold text-white text-center"
           >
             Cancel Booking
           </button>
-
           <button
             type="button"
             disabled
             title="Coming soon"
-            className="w-full h-11 rounded-pill border border-border text-sm font-medium text-muted opacity-50 cursor-not-allowed flex items-center justify-center gap-2"
+            aria-label="Call customer"
+            className="w-[58px] h-[58px] rounded-full border-[0.75px] border-[#d2dbe9] flex items-center justify-center shrink-0 disabled:opacity-70"
           >
-            <Phone className="w-4 h-4" />
-            Call (coming soon)
+            <Phone className="w-5 h-5 text-[#a09cab]" strokeWidth={1.8} />
           </button>
-
-          <Button size="lg" variant="secondary" onClick={() => navigate('/barber/jobs/upcoming')} className="w-full">
-            Done
-          </Button>
         </div>
       </div>
     );
   }
 
+  /* Accept booking? — Figma p50 */
   return (
-    <div className="min-h-screen bg-white pb-8">
-      {/* Header */}
-      <div className="px-5 pt-14 pb-4 flex items-center gap-3">
+    <div className="min-h-screen bg-white flex flex-col pb-8">
+      <div className="flex items-center justify-center gap-1.5 px-5 py-4 pt-14 bg-white">
+        <button type="button" aria-label="Back" onClick={() => navigate(-1)} className="w-6 h-6 flex items-center justify-center shrink-0">
+          <ChevronLeft className="w-6 h-6 text-[#1c1b1f]" strokeWidth={2} />
+        </button>
+        <p className="flex-1 text-center text-[16px] leading-6 font-bold text-[#1c1b1f]">Accept booking?</p>
+        <span className="w-6 h-6 shrink-0" />
+      </div>
+
+      <div className="px-5 pt-4">
+        {loading && <p className="text-sm text-[#a09cab]">Loading…</p>}
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        {!loading && !error && !job && <p className="text-sm text-[#a09cab]">Booking not found.</p>}
+
+        {job && (
+          <div className="bg-[#fafafa] rounded-[16px] p-4 space-y-5">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-[10px] bg-[#f2f1fa] flex items-center justify-center shrink-0">
+                <ImageIcon className="w-5 h-5 text-[#d4d2e3]" strokeWidth={1.6} />
+              </div>
+              <div>
+                <p className="text-[15px] leading-5 font-semibold text-[#1c1b1f]">Customer</p>
+                <p className="text-[12px] leading-4 font-medium text-[#a09cab] mt-1">{job.users?.full_name}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="w-12 h-12 rounded-[10px] bg-white flex items-center justify-center shrink-0">
+                <Scissors className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
+              </span>
+              <div>
+                <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Service</p>
+                <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f] mt-0.5">{job.services?.name}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="w-12 h-12 rounded-[10px] bg-white flex items-center justify-center shrink-0">
+                <Clock className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
+              </span>
+              <div>
+                <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Time</p>
+                <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f] mt-0.5">
+                  {job.booking_date} {job.start_time}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Notes From Customer */}
+      <div className="px-5 pt-8">
+        <div className="flex items-center gap-2.5">
+          <MessageSquareMore className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
+          <h2 className="text-[20px] leading-6 font-bold text-[#1c1b1f]">Notes From Customer</h2>
+        </div>
+        <div className="mt-4 bg-[#f4f5f8] rounded-[12px] p-4">
+          <p className="text-[13px] leading-5 font-medium text-[#1c1b1f]">
+            {job?.notes || 'Chat and call will unlock after acceptance.'}
+          </p>
+        </div>
+      </div>
+
+      <div className="px-5 mt-auto pt-8">
+        <button
+          type="button"
+          onClick={handleAccept}
+          disabled={!job || submitting}
+          className="w-full bg-[#1c1b1f] rounded-full px-9 py-[18px] text-[16px] leading-5 font-semibold text-white text-center disabled:opacity-60"
+        >
+          {submitting ? 'Accepting…' : 'Accept'}
+        </button>
         <button
           type="button"
           onClick={() => navigate(-1)}
-          className="p-2 -ml-2 hover:bg-surface rounded-lg transition-colors"
+          className="w-full mt-4 text-center text-[16px] leading-5 font-semibold text-[#a09cab] py-2"
         >
-          <ArrowLeft className="w-5 h-5 text-ink" />
-        </button>
-        <h1 className="text-lg font-bold text-ink">Accept booking?</h1>
-      </div>
-
-      <div className="px-5 space-y-4">
-        {loading && <p className="text-sm text-muted">Loading…</p>}
-        {error && <p className="text-sm text-red-600">{error}</p>}
-
-        {job && (
-          <Card className="p-4 space-y-2">
-            <p className="font-semibold text-ink">{job.users?.full_name}</p>
-            <p className="text-sm text-muted">{job.services?.name} · ${Number(job.total_amount).toFixed(2)}</p>
-            <p className="text-xs text-muted">{job.booking_date} {job.start_time}</p>
-            {job.notes && (
-              <div className="bg-surface rounded-lg px-3 py-2 mt-2">
-                <p className="text-[11px] font-semibold text-muted mb-0.5">Notes From Customer</p>
-                <p className="text-xs text-ink">{job.notes}</p>
-              </div>
-            )}
-          </Card>
-        )}
-        {!loading && !error && !job && (
-          <p className="text-sm text-muted">Booking not found.</p>
-        )}
-
-        <Button size="lg" onClick={handleAccept} disabled={!job || submitting} className="w-full">
-          {submitting ? 'Accepting…' : 'Accept'}
-        </Button>
-
-        <Button size="lg" variant="outline" onClick={() => navigate(-1)} className="w-full">
           Go back
-        </Button>
+        </button>
       </div>
     </div>
   );

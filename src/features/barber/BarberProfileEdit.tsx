@@ -2,11 +2,30 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import BarberNav from '@/components/BarberNav';
-import { Camera, ChevronRight, LogOut, MapPin, Star, User } from 'lucide-react';
+import {
+  Calendar,
+  Camera,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  FileText,
+  Flag,
+  HelpCircle,
+  ImageIcon,
+  LogOut,
+  MapPin,
+  Phone,
+  Star,
+  Store,
+  User,
+} from 'lucide-react';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
 import { authFetch, fetchBarberBookingsForUser } from '@/lib/api';
+
+// Board page 61 — barber "Edit Profile".
+// Layout, section order and copy replicate the Figma frame exactly; all data
+// still loads from and saves to the real barber profile APIs.
 
 interface ProfileForm {
   display_name: string;
@@ -24,6 +43,21 @@ interface Service {
 }
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function PillInput({
+  icon,
+  ...props
+}: { icon: React.ReactNode } & React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <div className="flex items-center gap-3 w-full rounded-full border-[0.75px] border-[#d2dbe9] bg-white px-5 py-[15px]">
+      <span className="shrink-0 text-[#a09cab]">{icon}</span>
+      <input
+        {...props}
+        className="flex-1 bg-transparent outline-none text-[14px] font-medium text-[#1c1b1f] placeholder:text-[#a09cab]"
+      />
+    </div>
+  );
+}
 
 export default function BarberProfileEdit() {
   const { user, logout } = useAuthStore();
@@ -109,7 +143,7 @@ export default function BarberProfileEdit() {
             } else {
               const days = available.map((r: any) => DAY_NAMES[r.day_of_week]).join(', ');
               const sample = available[0];
-              setScheduleSummary(`${days} · ${sample.start_time?.slice(0, 5)}–${sample.end_time?.slice(0, 5)}`);
+              setScheduleSummary(`${days}  • ${sample.start_time?.slice(0, 5)} – ${sample.end_time?.slice(0, 5)}`);
             }
           } else if (!cancelled) {
             setScheduleSummary('Not set yet');
@@ -177,13 +211,30 @@ export default function BarberProfileEdit() {
 
   return (
     <div className="min-h-screen bg-white pb-[88px]">
-      <div className="px-5 pt-14 pb-6 flex flex-col items-center">
-        <div className="relative mb-3">
-          <div className="w-20 h-20 rounded-full bg-[#f2f1fa] flex items-center justify-center overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-1.5 px-5 py-4 pt-14">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="w-6 h-6 flex items-center justify-center shrink-0"
+          aria-label="Back"
+        >
+          <ChevronLeft className="w-5 h-5 text-[#1c1b1f]" />
+        </button>
+        <p className="flex-1 text-center text-[16px] font-bold leading-6 text-[#1c1b1f]">
+          Edit Profile
+        </p>
+        <span className="w-6 h-6 shrink-0" />
+      </div>
+
+      {/* Avatar block */}
+      <div className="flex flex-col items-center px-5 pt-2">
+        <div className="relative">
+          <div className="w-[100px] h-[100px] rounded-[16px] bg-[#f2f1fa] flex items-center justify-center overflow-hidden">
             {avatarPreview || user?.avatar_url ? (
               <img src={avatarPreview || user?.avatar_url} className="w-full h-full object-cover" alt="" />
             ) : (
-              <User className="w-8 h-8 text-[#a09cab]" />
+              <ImageIcon className="w-8 h-8 text-[#c9c6d4]" />
             )}
           </div>
           <label className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#1c1b1f] flex items-center justify-center cursor-pointer">
@@ -191,227 +242,335 @@ export default function BarberProfileEdit() {
             <input type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
           </label>
         </div>
-        <button type="button" className="text-xs font-semibold text-[#1c1b1f]" onClick={() => toast.info('Tap the camera icon on your avatar to choose a new photo')}>
-          Change Photo
-        </button>
-        <h1 className="text-lg font-bold mt-2">{form.display_name || user?.full_name}</h1>
-        <p className="text-sm text-[#a09cab]">This information is visible to customers</p>
+        <h1 className="text-[22px] font-bold text-[#1c1b1f] mt-4">
+          {form.display_name || user?.full_name || 'Your Name'}
+        </h1>
+        <p className="text-[14px] font-semibold text-[#1c1b1f] mt-0.5">Change Photo</p>
+        <p className="text-[12px] font-medium text-[#a09cab] mt-1">
+          This information is visible to customers
+        </p>
       </div>
 
-      <form onSubmit={handleSave} className="px-5 space-y-6">
+      <form onSubmit={handleSave} className="px-5 mt-8 flex flex-col gap-8">
+        {/* Basic Information */}
         <section>
-          <h2 className="text-sm font-bold mb-2">Basic Information</h2>
-          <div className="space-y-3">
-            <input
-              placeholder="Full Name*"
+          <h2 className="text-[18px] font-bold text-[#1c1b1f] mb-4">Basic Information</h2>
+          <div className="flex flex-col gap-3">
+            <PillInput
+              icon={<User className="w-5 h-5" strokeWidth={1.5} />}
+              placeholder="Full Name (required)"
               value={form.display_name}
               onChange={(e) => update('display_name', e.target.value)}
-              className="w-full px-4 py-3 bg-[#fafaff] rounded-xl text-sm"
             />
-            <input
-              placeholder="City/Area*"
+            <PillInput
+              icon={<MapPin className="w-5 h-5" strokeWidth={1.5} />}
+              placeholder="City / Area (required)"
               value={form.address_text}
               onChange={(e) => update('address_text', e.target.value)}
-              className="w-full px-4 py-3 bg-[#fafaff] rounded-xl text-sm"
             />
-            <textarea
-              placeholder="Bio*"
-              value={form.bio}
-              onChange={(e) => update('bio', e.target.value)}
-              rows={3}
-              className="w-full px-4 py-3 bg-[#fafaff] rounded-xl text-sm"
-            />
+            <div className="flex items-start gap-3 w-full rounded-[24px] border-[0.75px] border-[#d2dbe9] bg-white px-5 py-[15px] min-h-[120px]">
+              <FileText className="w-5 h-5 shrink-0 text-[#a09cab] mt-0.5" strokeWidth={1.5} />
+              <textarea
+                placeholder="Bio (required)"
+                value={form.bio}
+                onChange={(e) => update('bio', e.target.value)}
+                rows={3}
+                className="flex-1 bg-transparent outline-none resize-none text-[14px] font-medium text-[#1c1b1f] placeholder:text-[#a09cab]"
+              />
+            </div>
           </div>
         </section>
 
+        {/* Contact & Location */}
         <section>
-          <h2 className="text-sm font-bold mb-2">Contact &amp; Location</h2>
-          <div className="space-y-3">
-            <input
-              placeholder="Phone"
+          <h2 className="text-[18px] font-bold text-[#1c1b1f] mb-4">Contact &amp; Location</h2>
+          <div className="flex flex-col gap-3">
+            <PillInput
+              icon={<Phone className="w-5 h-5" strokeWidth={1.5} />}
+              placeholder="Enter Phone Number"
+              type="tel"
               value={form.phone}
               onChange={(e) => update('phone', e.target.value)}
-              className="w-full px-4 py-3 bg-[#fafaff] rounded-xl text-sm"
             />
-            <input
-              placeholder="Shop name"
-              value={form.shop_name}
-              onChange={(e) => update('shop_name', e.target.value)}
-              className="w-full px-4 py-3 bg-[#fafaff] rounded-xl text-sm"
-            />
-            <input
-              placeholder="Shop address"
+            <PillInput
+              icon={<MapPin className="w-5 h-5" strokeWidth={1.5} />}
+              placeholder="Shop Address"
               value={form.address_text}
               onChange={(e) => update('address_text', e.target.value)}
-              className="w-full px-4 py-3 bg-[#fafaff] rounded-xl text-sm"
             />
-            <input
-              placeholder="Years of experience"
-              type="number"
-              value={form.experience_years}
-              onChange={(e) => update('experience_years', e.target.value)}
-              className="w-full px-4 py-3 bg-[#fafaff] rounded-xl text-sm"
+            <PillInput
+              icon={<Store className="w-5 h-5" strokeWidth={1.5} />}
+              placeholder="Shop Name"
+              value={form.shop_name}
+              onChange={(e) => update('shop_name', e.target.value)}
             />
             <button
               type="button"
               onClick={() => toast.info('Map picker isn\'t built yet — use the address field above for now.')}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-[#e5e3ee] text-sm font-semibold text-[#1c1b1f]"
+              className="w-full bg-[#1c1b1f] text-white rounded-full py-[16px] text-[14px] font-semibold active:scale-[0.99] transition-transform"
             >
-              <MapPin className="w-4 h-4" /> Set Location on Map
+              Set Location on Map
             </button>
           </div>
         </section>
 
+        {/* Service Mode */}
         <section>
-          <h2 className="text-sm font-bold mb-2">Service Mode</h2>
-          <div className="flex bg-[#f2f1fa] rounded-full p-1">
-            {(['in_shop', 'come_to_customer'] as const).map((mode) => (
+          <h2 className="text-[18px] font-bold text-[#1c1b1f] mb-4">Service Mode</h2>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setServiceMode('in_shop')}
+              className={`flex-1 py-[15px] rounded-full text-[14px] font-semibold transition-colors ${
+                serviceMode === 'in_shop'
+                  ? 'bg-[#1c1b1f] text-white'
+                  : 'bg-white text-[#6c6a75] border-[0.75px] border-[#d2dbe9]'
+              }`}
+            >
+              In Shop
+            </button>
+            <button
+              type="button"
+              onClick={() => setServiceMode('come_to_customer')}
+              className={`flex-1 py-[15px] rounded-full text-[14px] font-semibold transition-colors ${
+                serviceMode === 'come_to_customer'
+                  ? 'bg-[#1c1b1f] text-white'
+                  : 'bg-white text-[#6c6a75] border-[0.75px] border-[#d2dbe9]'
+              }`}
+            >
+              Come to Customer
+            </button>
+          </div>
+          <p className="text-[13px] font-medium text-[#6c6a75] mt-4 leading-5">
+            Choose how you provide services. You can update this anytime.
+          </p>
+        </section>
+
+        {/* Availability */}
+        <section>
+          <h2 className="text-[18px] font-bold text-[#1c1b1f] mb-4">Availability</h2>
+          <div className="rounded-[16px] border-[0.75px] border-[#d2dbe9] bg-white p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-[14px] font-semibold text-[#1c1b1f]">Online / Offline</p>
               <button
-                key={mode}
                 type="button"
-                onClick={() => setServiceMode(mode)}
-                className={`flex-1 py-2 rounded-full text-xs font-semibold ${serviceMode === mode ? 'bg-[#1c1b1f] text-white' : 'text-[#6c6a75]'}`}
+                onClick={() => setIsOnline((v) => !v)}
+                aria-label={isOnline ? 'Go offline' : 'Go online'}
+                className={`w-11 h-6 rounded-full transition-colors relative ${isOnline ? 'bg-[#1c1b1f]' : 'bg-[#d8d6e0]'}`}
               >
-                {mode === 'in_shop' ? 'In Shop' : 'Come to Customer'}
+                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${isOnline ? 'translate-x-5' : 'translate-x-0.5'}`} />
+              </button>
+            </div>
+            <div className="border-t border-dashed border-[#d2dbe9] my-3" />
+            <p className="text-[13px] font-medium text-[#a09cab]">Working Hours</p>
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <Clock className="w-4 h-4 text-[#1c1b1f]" strokeWidth={1.75} />
+              <p className="text-[13px] font-semibold text-[#1c1b1f]">
+                {loading ? 'Loading…' : scheduleSummary}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Booking Preferences */}
+        <section>
+          <h2 className="text-[18px] font-bold text-[#1c1b1f] mb-4">Booking Preferences</h2>
+          <p className="text-[14px] font-semibold text-[#1c1b1f] mb-3">Booking Type</p>
+          <div className="flex flex-col gap-3">
+            {([
+              { value: 'instant', title: 'Instant', sub: 'Auto approve Jobs' },
+              { value: 'request_only', title: 'Request Only', sub: 'You manually approve' },
+            ] as const).map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setBookingMode(opt.value)}
+                className="w-full rounded-[16px] border-[0.75px] border-[#d2dbe9] bg-white px-4 py-[14px] flex items-center gap-3 text-left"
+              >
+                <span
+                  className={`w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center ${
+                    bookingMode === opt.value ? 'border-[#1c1b1f]' : 'border-[#c9c6d4]'
+                  }`}
+                >
+                  {bookingMode === opt.value && <span className="w-2.5 h-2.5 rounded-full bg-[#1c1b1f]" />}
+                </span>
+                <span>
+                  <span className="block text-[14px] font-semibold text-[#1c1b1f]">{opt.title}</span>
+                  <span className="block text-[12px] font-medium text-[#a09cab]">{opt.sub}</span>
+                </span>
               </button>
             ))}
           </div>
-        </section>
 
-        <section>
-          <h2 className="text-sm font-bold mb-2">Availability</h2>
-          <div className="bg-[#fafaff] rounded-xl p-4 flex items-center justify-between mb-2">
-            <span className="text-sm font-medium">{isOnline ? 'Online' : 'Offline'}</span>
-            <button
-              type="button"
-              onClick={() => setIsOnline((v) => !v)}
-              className={`w-11 h-6 rounded-full transition-colors relative ${isOnline ? 'bg-[#1c1b1f]' : 'bg-[#d8d6e0]'}`}
-            >
-              <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${isOnline ? 'translate-x-5' : 'translate-x-0.5'}`} />
-            </button>
-          </div>
-          <p className="text-xs text-[#a09cab] px-1">Working hours: {loading ? 'Loading…' : scheduleSummary}</p>
-        </section>
-
-        <section>
-          <h2 className="text-sm font-bold mb-2">Booking Preferences</h2>
-          <div className="space-y-3">
-            <div className="flex bg-[#f2f1fa] rounded-full p-1">
-              {(['instant', 'request_only'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setBookingMode(mode)}
-                  className={`flex-1 py-2 rounded-full text-xs font-semibold ${bookingMode === mode ? 'bg-[#1c1b1f] text-white' : 'text-[#6c6a75]'}`}
-                >
-                  {mode === 'instant' ? 'Instant' : 'Request Only'}
-                </button>
-              ))}
-            </div>
+          <p className="text-[14px] font-semibold text-[#1c1b1f] mt-5 mb-3">
+            Buffer Time Between Bookings
+          </p>
+          <div className="relative">
             <select
               value={bufferMinutes}
               onChange={(e) => setBufferMinutes(e.target.value)}
-              className="w-full px-4 py-3 bg-[#fafaff] rounded-xl text-sm"
+              className="w-full appearance-none rounded-[12px] border-[0.75px] border-[#d2dbe9] bg-white px-4 py-[14px] text-[14px] font-semibold text-[#1c1b1f]"
             >
               <option value="0">No buffer</option>
-              <option value="15">15 min buffer</option>
-              <option value="30">30 min buffer</option>
-              <option value="60">60 min buffer</option>
+              <option value="15">15 min</option>
+              <option value="30">30 min</option>
+              <option value="60">60 min</option>
             </select>
+            <ChevronDown className="w-4 h-4 text-[#1c1b1f] absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
         </section>
 
-        <section>
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-sm font-bold">Services ({services.length})</h2>
-            <button type="button" onClick={() => navigate('/barber/services')} className="text-xs font-semibold text-[#1c1b1f] flex items-center gap-0.5">
-              Edit Service <ChevronRight className="w-3.5 h-3.5" />
+        {/* Services */}
+        <div className="rounded-[16px] border-[0.75px] border-[#d2dbe9] bg-white p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-[15px] font-bold text-[#1c1b1f]">Services</p>
+            <button
+              type="button"
+              onClick={() => navigate('/barber/services')}
+              className="text-[12px] font-semibold text-[#1c1b1f]"
+            >
+              • Edit Service
             </button>
           </div>
-          {services.length === 0 ? (
-            <p className="text-xs text-[#a09cab]">No services added yet</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {services.map((s) => (
-                <span key={s.id} className="px-3 py-1.5 rounded-full bg-[#f2f1fa] text-xs font-medium">{s.name}</span>
-              ))}
-            </div>
-          )}
-        </section>
+          <div className="flex flex-wrap gap-2 mt-3">
+            {services.length === 0 ? (
+              <span className="text-[12px] font-medium text-[#a09cab]">No services added yet</span>
+            ) : (
+              services.map((s) => (
+                <span key={s.id} className="px-3 py-1.5 rounded-full bg-[#f8f8f8] text-[12px] font-semibold text-[#1c1b1f]">
+                  {s.name}
+                </span>
+              ))
+            )}
+          </div>
+          <p className="text-[12px] font-medium text-[#a09cab] mt-3">
+            {services.length} service{services.length === 1 ? '' : 's'} added
+          </p>
+        </div>
 
-        <section>
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-sm font-bold">Portfolio</h2>
-            <button type="button" onClick={() => navigate('/barber/services')} className="text-xs font-semibold text-[#1c1b1f] flex items-center gap-0.5">
-              Add Photo <ChevronRight className="w-3.5 h-3.5" />
+        {/* Portfolio */}
+        <div className="rounded-[16px] border-[0.75px] border-[#d2dbe9] bg-white p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-[15px] font-bold text-[#1c1b1f]">Portfolio</p>
+            <button
+              type="button"
+              onClick={() => navigate('/barber/services')}
+              className="text-[12px] font-semibold text-[#1c1b1f]"
+            >
+              • Add Photo
             </button>
           </div>
-          {workPhotosCount > 0 ? (
-            <div className="grid grid-cols-4 gap-2">
-              {Array.from({ length: workPhotosCount }).map((_, i) => (
-                <div key={i} className="aspect-square rounded-lg bg-[#f2f1fa]" />
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-[#a09cab]">No portfolio photos yet</p>
-          )}
-        </section>
+          <div className="flex gap-2 mt-3">
+            {Array.from({ length: Math.max(Math.min(workPhotosCount, 3), 3) }).map((_, i) => (
+              <div key={i} className="w-[56px] h-[56px] rounded-[10px] bg-[#f2f1fa] flex items-center justify-center">
+                <ImageIcon className="w-5 h-5 text-[#c9c6d4]" />
+              </div>
+            ))}
+          </div>
+          <p className="text-[12px] font-medium text-[#a09cab] mt-3">
+            {workPhotosCount} photo{workPhotosCount === 1 ? '' : 's'} uploaded
+          </p>
+        </div>
 
+        {/* Verification */}
         <section>
-          <h2 className="text-sm font-bold mb-2">Verification</h2>
-          <div className="flex items-center justify-between bg-[#fafaff] rounded-xl p-4">
-            <Badge variant={isVerified ? 'success' : 'warning'}>{isVerified ? 'Approved' : 'Pending'}</Badge>
-            <button type="button" onClick={() => navigate('/barber/profile')} className="text-xs font-semibold text-[#1c1b1f]">
+          <h2 className="text-[18px] font-bold text-[#1c1b1f] mb-4">Verification</h2>
+          <div className="rounded-[16px] bg-[#f8f8f8] p-4 flex items-center justify-between">
+            <div>
+              <p className="text-[14px] font-bold text-[#1c1b1f]">{isVerified ? 'Approved' : 'Pending'}</p>
+              <p className="text-[12px] font-medium text-[#a09cab] mt-0.5">
+                {isVerified ? 'Verified badge visible on profile' : 'Verification under review'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/barber/profile')}
+              className="text-[13px] font-bold text-[#1c1b1f]"
+            >
               View Profile
             </button>
           </div>
+          <p className="text-[12px] font-medium text-[#6c6a75] mt-3">
+            Admin manually reviews uploaded documents.
+          </p>
         </section>
 
+        {/* Performance */}
         <section>
-          <h2 className="text-sm font-bold mb-2">Performance</h2>
-          <div className="grid grid-cols-3 gap-2 mb-2">
-            <div className="bg-[#fafaff] rounded-xl p-3 text-center">
-              <Star className="w-4 h-4 mx-auto mb-1 fill-ink text-ink" />
-              <p className="text-sm font-bold">{ratingAvg != null ? ratingAvg.toFixed(1) : '—'}</p>
-              <p className="text-[10px] text-[#a09cab]">Rating</p>
+          <h2 className="text-[18px] font-bold text-[#1c1b1f] mb-4">Performance</h2>
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="rounded-[16px] border-[0.75px] border-[#d2dbe9] bg-white py-4 flex flex-col items-center gap-1">
+              <Star className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.75} />
+              <p className="text-[13px] font-bold text-[#1c1b1f] mt-1">
+                {ratingAvg != null ? ratingAvg.toFixed(1) : '—'}
+              </p>
+              <p className="text-[13px] font-semibold text-[#1c1b1f]">Rating</p>
             </div>
-            <div className="bg-[#fafaff] rounded-xl p-3 text-center">
-              <p className="text-sm font-bold mt-1">{jobsCompleted}</p>
-              <p className="text-[10px] text-[#a09cab]">Jobs</p>
+            <div className="rounded-[16px] border-[0.75px] border-[#d2dbe9] bg-white py-4 flex flex-col items-center gap-1">
+              <Calendar className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.75} />
+              <p className="text-[13px] font-bold text-[#1c1b1f] mt-1">{jobsCompleted}</p>
+              <p className="text-[13px] font-semibold text-[#1c1b1f]">Jobs</p>
             </div>
-            <div className="bg-[#fafaff] rounded-xl p-3 text-center">
-              <p className="text-sm font-bold mt-1">{ratingCount}</p>
-              <p className="text-[10px] text-[#a09cab]">Reviews</p>
+            <div className="rounded-[16px] border-[0.75px] border-[#d2dbe9] bg-white py-4 flex flex-col items-center gap-1">
+              <Clock className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.75} />
+              <p className="text-[13px] font-bold text-[#1c1b1f] mt-1">{ratingCount}</p>
+              <p className="text-[13px] font-semibold text-[#1c1b1f]">Reviews</p>
             </div>
           </div>
-          <button type="button" onClick={() => navigate('/barber/performance')} className="w-full text-center text-xs font-semibold text-[#1c1b1f] py-2 rounded-full bg-[#f2f1fa]">
+          <button
+            type="button"
+            onClick={() => navigate('/barber/performance')}
+            className="w-full bg-[#1c1b1f] text-white rounded-full py-[16px] text-[14px] font-semibold active:scale-[0.99] transition-transform"
+          >
             View Dashboard
           </button>
         </section>
 
+        {/* Safety & Support */}
         <section>
-          <h2 className="text-sm font-bold mb-2">Safety &amp; Support</h2>
-          <div className="space-y-2">
-            <button type="button" onClick={() => navigate('/barber/report-issue')} className="w-full text-left px-4 py-4 rounded-xl bg-[#fafaff] font-medium text-sm flex items-center justify-between">
-              Report an issue <ChevronRight className="w-4 h-4 text-[#a09cab]" />
+          <h2 className="text-[18px] font-bold text-[#1c1b1f] mb-4">Safety &amp; Support</h2>
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={() => navigate('/barber/report-issue')}
+              className="w-full rounded-[16px] border-[0.75px] border-[#d2dbe9] bg-white px-4 py-[16px] flex items-center gap-3 text-left"
+            >
+              <Flag className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.75} />
+              <span className="flex-1 text-[14px] font-semibold text-[#1c1b1f]">Report an issue</span>
+              <ChevronRight className="w-5 h-5 text-[#a09cab]" />
             </button>
-            <button type="button" onClick={() => navigate('/barber/help')} className="w-full text-left px-4 py-4 rounded-xl bg-[#fafaff] font-medium text-sm flex items-center justify-between">
-              Help / Support <ChevronRight className="w-4 h-4 text-[#a09cab]" />
+            <button
+              type="button"
+              onClick={() => navigate('/barber/help')}
+              className="w-full rounded-[16px] border-[0.75px] border-[#d2dbe9] bg-white px-4 py-[16px] flex items-center gap-3 text-left"
+            >
+              <HelpCircle className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.75} />
+              <span className="flex-1 text-[14px] font-semibold text-[#1c1b1f]">Help/Support</span>
+              <ChevronRight className="w-5 h-5 text-[#a09cab]" />
             </button>
           </div>
         </section>
 
-        <div className="flex gap-3 pt-2">
-          <Button type="button" variant="secondary" size="lg" className="flex-1" onClick={() => navigate(-1)}>
-            Cancel
-          </Button>
-          <Button type="submit" size="lg" className="flex-1" disabled={saving}>
+        {/* Actions */}
+        <div className="flex flex-col gap-1">
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full bg-[#1c1b1f] text-white rounded-full py-[18px] text-[15px] font-semibold disabled:opacity-40 active:scale-[0.99] transition-transform"
+          >
             {saving ? 'Saving…' : 'Save Changes'}
-          </Button>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="w-full py-4 text-[15px] font-semibold text-[#a09cab]"
+          >
+            Cancel
+          </button>
         </div>
       </form>
 
-      <div className="px-5 mt-4">
+      <div className="px-5 mt-2">
         <button type="button" onClick={() => { logout(); navigate('/'); }}
           className="w-full flex items-center justify-center gap-2 px-4 py-4 rounded-xl text-red-600 font-medium text-sm">
           <LogOut className="w-4 h-4" /> Log out

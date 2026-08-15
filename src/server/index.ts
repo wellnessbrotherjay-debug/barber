@@ -1016,6 +1016,7 @@ app.get('/api/barbers', async (req: Request, res: Response) => {
         bp.is_verified,
         bp.is_active,
         bp.service_mode,
+        bp.work_photos,
         json_build_object(
           'full_name', u.full_name,
           'email', u.email,
@@ -1057,6 +1058,7 @@ app.get('/api/barbers/:id', async (req: Request, res: Response) => {
         bp.rating_count,
         bp.shop_name,
         bp.address_text,
+        bp.work_photos,
         json_build_object(
           'full_name', u.full_name,
           'email', u.email,

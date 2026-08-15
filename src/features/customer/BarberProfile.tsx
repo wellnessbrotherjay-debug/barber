@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ChevronLeft,
+  ChevronRight,
   Share,
   Bookmark,
   MoreHorizontal,
@@ -10,6 +11,7 @@ import {
   Store,
   Truck,
   CircleCheck,
+  X,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -22,6 +24,8 @@ interface BarberDetail {
   address_text: string | null;
   shop_name?: string | null;
   is_active?: boolean;
+  work_photos?: string[] | null;
+  users?: { full_name?: string | null; avatar_url?: string | null } | null;
   services?: { id: string | null; name: string | null; price: number | null; duration_minutes: number | null }[];
 }
 
@@ -34,6 +38,8 @@ export default function BarberProfile() {
   const [barber, setBarber] = useState<BarberDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Index into work_photos of the photo open in the fullscreen viewer; null = closed.
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -78,14 +84,20 @@ export default function BarberProfile() {
   }
 
   const fee = 20; // flat booking fee shown on the board ($20)
+  const photos = (barber.work_photos ?? []).filter(Boolean);
+  const heroUrl = barber.users?.avatar_url || photos[0] || null;
 
   return (
     <div className="min-h-screen bg-surface">
       {/* Hero image area with floating top bar — Figma page 19 */}
-      <div className="relative h-[370px] bg-surface">
-        <div className="absolute inset-0 flex items-center justify-center">
-          <ImageIcon className="w-24 h-24 text-[#d4d2e3]" strokeWidth={1.25} />
-        </div>
+      <div className="relative h-[370px] bg-surface overflow-hidden">
+        {heroUrl ? (
+          <img src={heroUrl} alt={barber.display_name} className="absolute inset-0 w-full h-full object-cover" />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <ImageIcon className="w-24 h-24 text-[#d4d2e3]" strokeWidth={1.25} />
+          </div>
+        )}
         <div className="absolute left-0 right-0 top-0 flex items-center justify-between px-6 pt-16">
           <button type="button" aria-label="Back" onClick={() => navigate(-1)}>
             <ChevronLeft className="w-6 h-6 text-ink" strokeWidth={2.25} />
@@ -153,12 +165,24 @@ export default function BarberProfile() {
           <h2 className="text-[20px] font-bold text-ink">Work Gallery</h2>
           <button type="button" className="text-[13px] font-medium text-muted">View All</button>
         </div>
-        <div className="flex gap-3 mt-4 -mr-6 overflow-hidden">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="w-[164px] h-[164px] rounded-[16px] bg-surface flex items-center justify-center shrink-0">
-              <ImageIcon className="w-9 h-9 text-[#d4d2e3]" />
-            </div>
-          ))}
+        <div className="flex gap-3 mt-4 -mr-6 overflow-x-auto pb-1">
+          {photos.length > 0
+            ? photos.map((url, i) => (
+                <button
+                  key={url}
+                  type="button"
+                  aria-label={`Open work photo ${i + 1}`}
+                  onClick={() => setViewerIndex(i)}
+                  className="w-[164px] h-[164px] rounded-[16px] bg-surface overflow-hidden shrink-0 active:opacity-80"
+                >
+                  <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                </button>
+              ))
+            : [0, 1, 2].map((i) => (
+                <div key={i} className="w-[164px] h-[164px] rounded-[16px] bg-surface flex items-center justify-center shrink-0">
+                  <ImageIcon className="w-9 h-9 text-[#d4d2e3]" />
+                </div>
+              ))}
         </div>
 
         {/* About */}
@@ -192,6 +216,54 @@ export default function BarberProfile() {
           </p>
         </div>
       </div>
+
+      {/* Fullscreen photo viewer */}
+      {viewerIndex !== null && photos[viewerIndex] && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+          role="dialog"
+          aria-label="Work photo viewer"
+          onClick={() => setViewerIndex(null)}
+        >
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={() => setViewerIndex(null)}
+            className="absolute top-14 right-5 w-10 h-10 rounded-full bg-white/15 flex items-center justify-center"
+          >
+            <X className="w-5 h-5 text-white" />
+          </button>
+          <img
+            src={photos[viewerIndex]}
+            alt={`Work photo ${viewerIndex + 1} of ${photos.length}`}
+            className="max-w-full max-h-[80vh] object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+          {photos.length > 1 && (
+            <>
+              <button
+                type="button"
+                aria-label="Previous photo"
+                onClick={(e) => { e.stopPropagation(); setViewerIndex((viewerIndex + photos.length - 1) % photos.length); }}
+                className="absolute left-4 w-10 h-10 rounded-full bg-white/15 flex items-center justify-center"
+              >
+                <ChevronLeft className="w-5 h-5 text-white" />
+              </button>
+              <button
+                type="button"
+                aria-label="Next photo"
+                onClick={(e) => { e.stopPropagation(); setViewerIndex((viewerIndex + 1) % photos.length); }}
+                className="absolute right-4 w-10 h-10 rounded-full bg-white/15 flex items-center justify-center"
+              >
+                <ChevronRight className="w-5 h-5 text-white" />
+              </button>
+              <p className="absolute bottom-10 text-white/70 text-[13px]">
+                {viewerIndex + 1} / {photos.length}
+              </p>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

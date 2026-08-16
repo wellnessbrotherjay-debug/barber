@@ -147,7 +147,8 @@ export default function BrowseBarbers() {
                   ${Number(barber.services?.[0]?.price ?? 0).toFixed(2)}
                 </p>
                 <p className="text-[10px] leading-[14px] font-semibold text-muted">
-                  {distanceFor(barber) ? `${distanceFor(barber)} away` : (barber.address_text?.split(',')[0] || 'Near you')}
+                  {/* formatDistance already reads "1.2 km away" — don't append "away" again. */}
+                  {distanceFor(barber) || (barber.address_text?.split(',')[0] || 'Near you')}
                 </p>
               </div>
             </div>
@@ -164,7 +165,8 @@ export default function BrowseBarbers() {
               {etaFor(barber) && (
                 <div className="flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5 text-[#514e59]" />
-                  <span className="text-[10px] leading-[14px] font-semibold text-[#514e59]">ETA : {etaFor(barber)}</span>
+                  {/* formatEta already reads "ETA : 25-35 min" — no extra prefix. */}
+                  <span className="text-[10px] leading-[14px] font-semibold text-[#514e59]">{etaFor(barber)}</span>
                 </div>
               )}
             </div>

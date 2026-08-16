@@ -9,6 +9,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import Stripe from 'stripe';
 import { tenantMiddleware, requireAdmin, requireEntitlement, requireBarberAuth, closeTenantPools, getTenantPool, getJwtSecret, AuthTokenPayload } from './middleware/tenant';
+import { createUploadsRouter, UPLOAD_DIR } from './routes/uploads';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -95,6 +96,11 @@ app.use(cookieParser());
 // no separate static web server). Must run before tenantMiddleware so asset
 // and SPA-shell requests never require tenant auth.
 app.use(express.static(DIST_DIR));
+
+// Barber-uploaded images. Read-only public serving of the upload directory —
+// all WRITES go through the authenticated, ownership-checked uploads router
+// below; nothing here can create or overwrite a file.
+app.use('/uploads', express.static(UPLOAD_DIR, { fallthrough: true, maxAge: '7d' }));
 
 app.get(/^(?!\/(api|admin|health)).*/, (req: Request, res: Response, next: NextFunction) => {
   if (req.method !== 'GET' || !req.accepts('html')) return next();
@@ -228,6 +234,11 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} (tenant: ${req.tenant?.companyId || 'unknown'})`);
   next();
 });
+
+// Barber image uploads (avatar + work gallery). Mounted after tenantMiddleware
+// so req.tenant is populated; every route inside is requireBarberAuth-guarded
+// and resolves the owning barber server-side from the JWT.
+app.use(createUploadsRouter(requireBarberAuth));
 
 // Health check
 app.get('/health', (req: Request, res: Response) => {
@@ -997,11 +1008,12 @@ app.get('/api/v1/company/barbers', async (req: Request, res: Response) => {
 // CUSTOMER API ROUTES (Customers & Barber Apps)
 // ============================================================================
 
-// GET /api/barbers - List all barbers
-app.get('/api/barbers', async (req: Request, res: Response) => {
-  try {
-    const result = await req.tenant!.pool.query(`
-      SELECT
+// Shared projection for public barber listings. Services come from a scalar
+// subquery rather than a LEFT JOIN + GROUP BY so that LIMIT/OFFSET applies to
+// BARBERS (the join would multiply rows before the limit, and paginating a
+// multiplied set returns partial barbers). The subquery only runs for the rows
+// actually returned in the page.
+const PUBLIC_BARBER_COLUMNS = `
         bp.id,
         bp.user_id,
         bp.display_name,
@@ -1015,30 +1027,116 @@ app.get('/api/barbers', async (req: Request, res: Response) => {
         bp.longitude,
         bp.is_verified,
         bp.is_active,
+        bp.is_online,
         bp.service_mode,
+        bp.service_radius_km,
         bp.work_photos,
         json_build_object(
           'full_name', u.full_name,
           'email', u.email,
           'avatar_url', u.avatar_url
         ) as users,
-        json_agg(json_build_object(
-          'id', s.id,
-          'name', s.name,
-          'description', s.description,
-          'price', s.price,
-          'duration_minutes', s.duration_minutes
-        )) as services
+        COALESCE((
+          SELECT json_agg(json_build_object(
+            'id', s.id,
+            'name', s.name,
+            'description', s.description,
+            'price', s.price,
+            'currency', s.currency,
+            'duration_minutes', s.duration_minutes
+          ) ORDER BY s.price ASC)
+          FROM services s
+          WHERE s.barber_id = bp.id AND s.is_active = true
+        ), '[]'::json) as services`;
+
+/** Clamp a query-string integer into a safe range (guards against ?limit=1e9). */
+function intParam(raw: unknown, def: number, min: number, max: number): number {
+  const n = parseInt(String(raw ?? ''), 10);
+  if (Number.isNaN(n)) return def;
+  return Math.min(max, Math.max(min, n));
+}
+
+// GET /api/barbers — paginated barber list.
+// Pagination is enforced at the DATABASE (LIMIT/OFFSET), never by slicing a
+// full table fetch in JS, so this stays flat as the tenant grows.
+app.get('/api/barbers', async (req: Request, res: Response) => {
+  try {
+    const limit = intParam(req.query.limit, 20, 1, 100);
+    const offset = intParam(req.query.offset, 0, 0, 1_000_000);
+
+    const result = await req.tenant!.pool.query(
+      `SELECT ${PUBLIC_BARBER_COLUMNS}
       FROM barber_profiles bp
       JOIN users u ON bp.user_id = u.id
-      LEFT JOIN services s ON s.barber_id = bp.id
       WHERE bp.is_active = true
-      GROUP BY bp.id, u.id
-      ORDER BY bp.rating_avg DESC
-    `);
+      ORDER BY bp.rating_avg DESC, bp.id
+      LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching barbers:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// GET /api/barbers/nearby?lat=&lng=&radius_km=&limit=&offset=
+//
+// Geographic discovery done IN POSTGRES. Distance is computed with the
+// earthdistance extension; the earth_box() predicate is what lets the GiST
+// index (idx_barber_profiles_earth) prune candidates instead of scanning the
+// whole table, and the precise earth_distance() filter runs only on survivors.
+//
+// Eligibility differs by service mode, per the board:
+//   mobile / both -> the barber travels, so they qualify when the CUSTOMER is
+//                    inside the barber's own service_radius_km.
+//   in_shop       -> the customer travels, so they qualify when the shop is
+//                    inside the customer's requested search radius.
+// Either way distance_km is the real customer->barber great-circle distance
+// and ordering is done by the database.
+//
+// NOTE: must be registered BEFORE '/api/barbers/:id', otherwise Express would
+// match "nearby" as an :id.
+app.get('/api/barbers/nearby', async (req: Request, res: Response) => {
+  try {
+    const lat = parseFloat(String(req.query.lat));
+    const lng = parseFloat(String(req.query.lng));
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+      return res.status(400).json({ error: 'Valid lat and lng query parameters are required' });
+    }
+    const radiusKm = Math.min(200, Math.max(1, parseFloat(String(req.query.radius_km ?? '25')) || 25));
+    const limit = intParam(req.query.limit, 20, 1, 100);
+    const offset = intParam(req.query.offset, 0, 0, 1_000_000);
+    const onlineOnly = String(req.query.online_only ?? '') === 'true';
+
+    // Outer bound for the index probe: the widest distance any row could
+    // qualify at — the customer's search radius or the largest travel radius
+    // a barber may configure (capped at 50km by the profile validation).
+    const boxMeters = Math.max(radiusKm, 50) * 1000;
+
+    const result = await req.tenant!.pool.query(
+      `WITH origin AS (SELECT ll_to_earth($1::float8, $2::float8) AS pt)
+       SELECT ${PUBLIC_BARBER_COLUMNS},
+         round((earth_distance(origin.pt, ll_to_earth(bp.latitude::float8, bp.longitude::float8)) / 1000)::numeric, 2) AS distance_km
+       FROM barber_profiles bp
+       JOIN users u ON bp.user_id = u.id
+       CROSS JOIN origin
+       WHERE bp.is_active = true
+         AND bp.latitude IS NOT NULL AND bp.longitude IS NOT NULL
+         AND ($6::boolean = false OR bp.is_online = true)
+         AND earth_box(origin.pt, $5::float8) @> ll_to_earth(bp.latitude::float8, bp.longitude::float8)
+         AND earth_distance(origin.pt, ll_to_earth(bp.latitude::float8, bp.longitude::float8))
+             <= CASE WHEN bp.service_mode IN ('mobile','both')
+                     THEN GREATEST($3::float8 * 1000, bp.service_radius_km::float8 * 1000)
+                     ELSE $3::float8 * 1000 END
+       ORDER BY distance_km ASC, bp.rating_avg DESC, bp.id
+       LIMIT $4 OFFSET $7`,
+      [lat, lng, radiusKm, limit, boxMeters, onlineOnly, offset]
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching nearby barbers:', error);
     res.status(500).json({ error: (error as Error).message });
   }
 });
@@ -1444,13 +1542,31 @@ app.get('/api/barber/status', requireBarberAuth, async (req: Request, res: Respo
     const pool = req.tenant!.pool;
     const userId = req.tenant!.userId!;
     const result = await pool.query(
-      'SELECT onboarding_completed, is_verified FROM barber_profiles WHERE user_id = $1',
+      `SELECT onboarding_completed, is_verified, is_approved, is_active,
+              onboarding_step, onboarding_completed_at, verification_status,
+              is_online, service_radius_km, buffer_minutes,
+              service_mode, booking_mode, city, region, country
+       FROM barber_profiles WHERE user_id = $1`,
       [userId]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Barber profile not found' });
+    const row = result.rows[0];
     res.json({
-      onboarding_completed: !!result.rows[0].onboarding_completed,
-      is_verified: !!result.rows[0].is_verified,
+      onboarding_completed: !!row.onboarding_completed,
+      is_verified: !!row.is_verified,
+      is_approved: !!row.is_approved,
+      is_active: !!row.is_active,
+      onboarding_step: row.onboarding_step ?? 1,
+      onboarding_completed_at: row.onboarding_completed_at ?? null,
+      verification_status: row.verification_status ?? 'unsubmitted',
+      is_online: !!row.is_online,
+      service_radius_km: row.service_radius_km != null ? Number(row.service_radius_km) : null,
+      buffer_minutes: row.buffer_minutes != null ? Number(row.buffer_minutes) : null,
+      service_mode: row.service_mode ?? null,
+      booking_mode: row.booking_mode ?? null,
+      city: row.city ?? null,
+      region: row.region ?? null,
+      country: row.country ?? null,
     });
   } catch (error) {
     console.error('Error fetching barber status:', error);
@@ -1472,7 +1588,21 @@ app.get('/api/barber/profile', requireBarberAuth, async (req: Request, res: Resp
       [userId]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Barber profile not found' });
-    res.json(result.rows[0]);
+    // bp.* already carries every column (including the migration-002 additions:
+    // service_radius_km, buffer_minutes, is_online, city, region, country,
+    // verification_status, onboarding_step, onboarding_completed_at). Numerics
+    // arrive from pg as strings, so normalise the ones the UI binds to inputs.
+    const row = result.rows[0];
+    res.json({
+      ...row,
+      service_radius_km: row.service_radius_km != null ? Number(row.service_radius_km) : null,
+      buffer_minutes: row.buffer_minutes != null ? Number(row.buffer_minutes) : null,
+      onboarding_step: row.onboarding_step != null ? Number(row.onboarding_step) : 1,
+      verification_status: row.verification_status ?? 'unsubmitted',
+      is_online: !!row.is_online,
+      latitude: row.latitude != null ? Number(row.latitude) : null,
+      longitude: row.longitude != null ? Number(row.longitude) : null,
+    });
   } catch (error) {
     console.error('Error fetching barber profile:', error);
     res.status(500).json({ error: (error as Error).message });
@@ -1556,7 +1686,67 @@ app.put('/api/barber/profile', requireBarberAuth, async (req: Request, res: Resp
       booking_mode,
       latitude,
       longitude,
+      // migration 002 columns — onboarding settings that used to live only in
+      // frontend state and never reached the database.
+      service_radius_km,
+      buffer_minutes,
+      is_online,
+      city,
+      region,
+      country,
+      onboarding_step,
+      // users.phone (not on barber_profiles) — persisted below.
+      phone,
     } = req.body || {};
+
+    // ---- server-side validation (never trust the client) --------------------
+    const SERVICE_MODES = ['in_shop', 'mobile', 'both'];
+    const BOOKING_MODES = ['instant', 'request_only'];
+    if (service_mode != null && !SERVICE_MODES.includes(service_mode)) {
+      return res.status(400).json({ error: `service_mode must be one of ${SERVICE_MODES.join(', ')}` });
+    }
+    if (booking_mode != null && !BOOKING_MODES.includes(booking_mode)) {
+      return res.status(400).json({ error: `booking_mode must be one of ${BOOKING_MODES.join(', ')}` });
+    }
+    if (service_radius_km != null) {
+      const n = Number(service_radius_km);
+      if (!Number.isFinite(n) || n < 1 || n > 50) {
+        return res.status(400).json({ error: 'service_radius_km must be a number between 1 and 50' });
+      }
+    }
+    if (buffer_minutes != null) {
+      const n = Number(buffer_minutes);
+      if (!Number.isInteger(n) || n < 0 || n > 120) {
+        return res.status(400).json({ error: 'buffer_minutes must be an integer between 0 and 120' });
+      }
+    }
+    if (onboarding_step != null) {
+      const n = Number(onboarding_step);
+      if (!Number.isInteger(n) || n < 1 || n > 7) {
+        return res.status(400).json({ error: 'onboarding_step must be an integer between 1 and 7' });
+      }
+    }
+    if (is_online != null && typeof is_online !== 'boolean') {
+      return res.status(400).json({ error: 'is_online must be a boolean' });
+    }
+    if (experience_years != null) {
+      const n = Number(experience_years);
+      if (!Number.isFinite(n) || n < 0 || n > 80) {
+        return res.status(400).json({ error: 'experience_years must be a number between 0 and 80' });
+      }
+    }
+    if (latitude != null) {
+      const n = Number(latitude);
+      if (!Number.isFinite(n) || n < -90 || n > 90) {
+        return res.status(400).json({ error: 'latitude must be between -90 and 90' });
+      }
+    }
+    if (longitude != null) {
+      const n = Number(longitude);
+      if (!Number.isFinite(n) || n < -180 || n > 180) {
+        return res.status(400).json({ error: 'longitude must be between -180 and 180' });
+      }
+    }
 
     const result = await pool.query(
       `UPDATE barber_profiles SET
@@ -1568,19 +1758,83 @@ app.put('/api/barber/profile', requireBarberAuth, async (req: Request, res: Resp
          service_mode = COALESCE($6, service_mode),
          booking_mode = COALESCE($7, booking_mode),
          latitude = COALESCE($9, latitude),
-         longitude = COALESCE($10, longitude)
+         longitude = COALESCE($10, longitude),
+         service_radius_km = COALESCE($11, service_radius_km),
+         buffer_minutes = COALESCE($12, buffer_minutes),
+         is_online = COALESCE($13, is_online),
+         city = COALESCE($14, city),
+         region = COALESCE($15, region),
+         country = COALESCE($16, country),
+         onboarding_step = GREATEST(COALESCE($17, onboarding_step, 1), COALESCE(onboarding_step, 1))
        WHERE id = $8
        RETURNING *`,
-      [shop_name, address_text, bio, display_name, experience_years, service_mode, booking_mode, barberId, latitude, longitude]
+      [
+        shop_name ?? null,
+        address_text ?? null,
+        bio ?? null,
+        display_name ?? null,
+        experience_years ?? null,
+        service_mode ?? null,
+        booking_mode ?? null,
+        barberId,
+        latitude ?? null,
+        longitude ?? null,
+        service_radius_km ?? null,
+        buffer_minutes ?? null,
+        is_online ?? null,
+        city ?? null,
+        region ?? null,
+        country ?? null,
+        onboarding_step ?? null,
+      ]
     );
 
     if (avatar_url) {
       await pool.query('UPDATE users SET avatar_url = $1 WHERE id = $2', [avatar_url, userId]);
     }
+    // Phone lives on users, not barber_profiles.
+    if (typeof phone === 'string' && phone.trim()) {
+      await pool.query('UPDATE users SET phone = $1 WHERE id = $2', [phone.trim(), userId]);
+    }
 
-    res.json(result.rows[0]);
+    const row = result.rows[0];
+    res.json({
+      ...row,
+      service_radius_km: row.service_radius_km != null ? Number(row.service_radius_km) : null,
+      buffer_minutes: row.buffer_minutes != null ? Number(row.buffer_minutes) : null,
+      onboarding_step: row.onboarding_step != null ? Number(row.onboarding_step) : 1,
+      latitude: row.latitude != null ? Number(row.latitude) : null,
+      longitude: row.longitude != null ? Number(row.longitude) : null,
+      is_online: !!row.is_online,
+      phone: typeof phone === 'string' && phone.trim() ? phone.trim() : undefined,
+    });
   } catch (error) {
     console.error('Error updating barber profile:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// PATCH /api/barber/online — flip the logged-in barber's own is_online flag.
+// Body: { is_online: boolean }. Response: { is_online: boolean }.
+app.patch('/api/barber/online', requireBarberAuth, async (req: Request, res: Response) => {
+  try {
+    const pool = req.tenant!.pool;
+    const userId = req.tenant!.userId!;
+    const barberId = await getOwnBarberProfileId(pool, userId);
+    if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
+
+    const { is_online } = req.body || {};
+    if (typeof is_online !== 'boolean') {
+      return res.status(400).json({ error: 'is_online must be a boolean' });
+    }
+
+    const result = await pool.query(
+      'UPDATE barber_profiles SET is_online = $1 WHERE id = $2 RETURNING is_online',
+      [is_online, barberId]
+    );
+    res.json({ is_online: !!result.rows[0].is_online });
+  } catch (error) {
+    console.error('Error updating online status:', error);
     res.status(500).json({ error: (error as Error).message });
   }
 });
@@ -1746,7 +2000,11 @@ app.post('/api/barber/onboarding/complete', requireBarberAuth, async (req: Reque
     }
 
     const result = await pool.query(
-      'UPDATE barber_profiles SET onboarding_completed = true WHERE id = $1 RETURNING *',
+      `UPDATE barber_profiles SET
+         onboarding_completed = true,
+         onboarding_completed_at = NOW(),
+         onboarding_step = 7
+       WHERE id = $1 RETURNING *`,
       [barberId]
     );
     res.json(result.rows[0]);

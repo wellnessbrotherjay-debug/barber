@@ -17,7 +17,7 @@ import {
   Crosshair,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { authFetch } from '@/lib/api';
+import { authFetch, fetchBarberPhotos, uploadGalleryPhotos, type BarberPhoto } from '@/lib/api';
 import { useAuthStore } from '@/store/useAuthStore';
 import BarberServices from './BarberServices';
 import BarberPendingVerification from './BarberPendingVerification';
@@ -191,8 +191,13 @@ export default function BarberOnboarding() {
   // Step 2 — verification documents (filename only, real file input)
   const [docFiles, setDocFiles] = useState<Partial<Record<DocKey, string>>>({});
 
-  // Step 3 — work photos (real file input, count only, no storage)
-  const [photoCount, setPhotoCount] = useState(0);
+  // Step 3 — work photos. Real uploads: files are POSTed to
+  // /api/barber/upload/gallery, stored server-side, and the returned rows are
+  // this barber's actual gallery.
+  const [photos, setPhotos] = useState<BarberPhoto[]>([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const photoCount = photos.length;
 
   // Step 5 — where do you work
   const [serviceMode, setServiceMode] = useState<'in_shop' | 'mobile'>('in_shop');
@@ -209,8 +214,106 @@ export default function BarberOnboarding() {
   const [radiusKm, setRadiusKm] = useState(15);
   const [bufferMin, setBufferMin] = useState(15);
 
+  // Geocoded address components for the shop pin (persisted alongside lat/lng).
+  const [geoCity, setGeoCity] = useState<string | null>(null);
+  const [geoRegion, setGeoRegion] = useState<string | null>(null);
+  const [geoCountry, setGeoCountry] = useState<string | null>(null);
+
   const [missing, setMissing] = useState<string[]>([]);
   const [servicesCount, setServicesCount] = useState<number | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+
+  // ---------------------------------------------------------------------
+  // Rehydrate from the database on mount. A barber who logs out mid-flow
+  // comes back to their saved values AND their saved onboarding_step, so
+  // nothing typed earlier is lost.
+  // ---------------------------------------------------------------------
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [profileRes, scheduleRes] = await Promise.all([
+          authFetch('/api/barber/profile'),
+          authFetch('/api/barber/schedule'),
+        ]);
+        if (cancelled) return;
+
+        if (profileRes.ok) {
+          const p = await profileRes.json();
+          if (cancelled) return;
+          setProfile({
+            display_name: p.display_name || user?.full_name || '',
+            phone: p.phone || '',
+            shop_name: p.shop_name || '',
+            bio: p.bio || '',
+            address_text: p.address_text || '',
+          });
+          if (p.service_mode === 'mobile' || p.service_mode === 'in_shop') setServiceMode(p.service_mode);
+          if (p.address_text) setShopAddress(p.address_text);
+          if (p.latitude != null) setShopLat(Number(p.latitude));
+          if (p.longitude != null) setShopLng(Number(p.longitude));
+          if (p.city) setGeoCity(p.city);
+          if (p.region) setGeoRegion(p.region);
+          if (p.country) setGeoCountry(p.country);
+          if (p.booking_mode === 'instant' || p.booking_mode === 'request_only') setBookingMode(p.booking_mode);
+          if (p.service_radius_km != null) setRadiusKm(Number(p.service_radius_km));
+          if (p.buffer_minutes != null) setBufferMin(Number(p.buffer_minutes));
+          setOnline(!!p.is_online);
+          // work photos are loaded from /api/barber/photos (real rows), not
+          // from the denormalised count.
+          // onboarding_step is 1-7 (Figma numbering); local `step` is 0-6.
+          const savedStep = Number(p.onboarding_step);
+          if (Number.isFinite(savedStep) && savedStep >= 1 && savedStep <= 7) {
+            // Only jump if the user hasn't already navigated while we loaded.
+            setStep((current) => (current === 0 ? savedStep - 1 : current));
+          }
+        }
+
+        if (scheduleRes.ok) {
+          const rows = await scheduleRes.json();
+          if (!cancelled && Array.isArray(rows) && rows.length > 0) {
+            // barber_schedule uses 0=Sunday; the UI grid is Mon..Sun.
+            const days = [false, false, false, false, false, false, false];
+            for (const r of rows) {
+              const uiIndex = (Number(r.day_of_week) + 6) % 7; // Sun(0)->6, Mon(1)->0
+              if (uiIndex >= 0 && uiIndex < 7) days[uiIndex] = !!r.is_available;
+            }
+            setActiveDays(days);
+            const sample = rows.find((r: any) => r.is_available) || rows[0];
+            if (sample?.start_time) setStartTime(String(sample.start_time).slice(0, 5));
+            if (sample?.end_time) setEndTime(String(sample.end_time).slice(0, 5));
+          }
+        }
+      } catch {
+        // Keep defaults — the user can still fill the flow in from scratch.
+      } finally {
+        if (!cancelled) setHydrated(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * Persist how far the barber has got. `step` is the local 0-based index;
+   * onboarding_step in the database is the Figma-visible 1-7 number.
+   * Fire-and-forget: a failed progress ping must never block navigation.
+   */
+  function markStep(localStep: number) {
+    if (!hydrated) return;
+    const value = Math.min(Math.max(localStep + 1, 1), 7);
+    authFetch('/api/barber/profile', {
+      method: 'PUT',
+      body: JSON.stringify({ onboarding_step: value }),
+    }).catch(() => {});
+  }
+
+  function goToStep(next: number) {
+    setStep(next);
+    markStep(next);
+  }
 
   // Live count of this barber's own services, refetched whenever step 6
   // (Finish Setup) is reached, so "at least 1 service" can be enforced
@@ -226,6 +329,23 @@ export default function BarberOnboarding() {
       })
       .catch(() => {
         if (!cancelled) setServicesCount(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [step]);
+
+  // The gallery is real server state, so entering the work-photos step pulls
+  // whatever this barber has already uploaded (e.g. a resumed onboarding).
+  React.useEffect(() => {
+    if (step !== 3) return;
+    let cancelled = false;
+    fetchBarberPhotos()
+      .then((mine) => {
+        if (!cancelled) setPhotos(mine);
+      })
+      .catch(() => {
+        /* leave the gallery empty; upload errors surface inline */
       });
     return () => {
       cancelled = true;
@@ -258,9 +378,11 @@ export default function BarberOnboarding() {
         method: 'PUT',
         body: JSON.stringify({
           display_name: profile.display_name || undefined,
+          phone: profile.phone || undefined,
           shop_name: profile.shop_name || undefined,
           bio: profile.bio || undefined,
           address_text: profile.address_text || undefined,
+          onboarding_step: 3,
         }),
       });
       const body = await response.json();
@@ -280,12 +402,12 @@ export default function BarberOnboarding() {
 
   async function handleSubmitVerification(skip: boolean) {
     if (skip) {
-      setStep(3);
+      goToStep(3);
       return;
     }
     const submittedTypes = DOCS.filter((d) => docFiles[d.key]).map((d) => d.key);
     if (submittedTypes.length === 0) {
-      setStep(3);
+      goToStep(3);
       return;
     }
     setSaving(true);
@@ -297,7 +419,7 @@ export default function BarberOnboarding() {
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || `Failed to submit documents: ${response.status}`);
       toast.success('Documents submitted for review');
-      setStep(3);
+      goToStep(3);
     } catch (err) {
       toast.error(`${err instanceof Error ? err.message : err}`);
     } finally {
@@ -305,29 +427,33 @@ export default function BarberOnboarding() {
     }
   }
 
-  function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    setPhotoCount((prev) => prev + files.length);
+  async function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(e.target.files || []);
+    e.target.value = ''; // let the same file be re-picked after an error
+    if (selected.length === 0) return;
+    if (selected.length > 6) {
+      setPhotoError('You can upload at most 6 photos at a time.');
+      return;
+    }
+    setPhotoError(null);
+    setUploadingPhotos(true);
+    try {
+      const updated = await uploadGalleryPhotos(selected);
+      setPhotos(updated);
+      toast.success(`${selected.length} photo${selected.length === 1 ? '' : 's'} uploaded`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setPhotoError(message);
+      toast.error(message);
+    } finally {
+      setUploadingPhotos(false);
+    }
   }
 
-  async function handleSavePhotos(skip: boolean) {
-    if (!skip && photoCount > 0) {
-      setSaving(true);
-      try {
-        const response = await authFetch('/api/barber/profile/photos', {
-          method: 'PATCH',
-          body: JSON.stringify({ count: photoCount }),
-        });
-        const body = await response.json();
-        if (!response.ok) throw new Error(body.error || `Failed to save photos: ${response.status}`);
-      } catch (err) {
-        toast.error(`${err instanceof Error ? err.message : err}`);
-      } finally {
-        setSaving(false);
-      }
-    }
-    setStep(4);
+  // Each photo is already persisted server-side the moment it is uploaded, so
+  // Continue/Skip simply advances the wizard — there is nothing left to save.
+  function handleSavePhotos(_skip: boolean) {
+    goToStep(4);
   }
 
   async function handleSaveWorkLocation() {
@@ -340,6 +466,11 @@ export default function BarberOnboarding() {
           address_text: serviceMode === 'in_shop' ? shopAddress || profile.address_text || undefined : profile.address_text || undefined,
           latitude: serviceMode === 'in_shop' ? shopLat ?? undefined : undefined,
           longitude: serviceMode === 'in_shop' ? shopLng ?? undefined : undefined,
+          // Only sent when the reverse geocoder actually resolved them.
+          city: geoCity || undefined,
+          region: geoRegion || undefined,
+          country: geoCountry || undefined,
+          onboarding_step: 7,
         }),
       });
       const body = await response.json();
@@ -372,7 +503,13 @@ export default function BarberOnboarding() {
 
       const profileResp = await authFetch('/api/barber/profile', {
         method: 'PUT',
-        body: JSON.stringify({ booking_mode: bookingMode }),
+        body: JSON.stringify({
+          booking_mode: bookingMode,
+          service_radius_km: radiusKm,
+          buffer_minutes: bufferMin,
+          is_online: online,
+          onboarding_step: 7,
+        }),
       });
       if (!profileResp.ok) {
         const b = await profileResp.json().catch(() => ({}));
@@ -449,7 +586,7 @@ export default function BarberOnboarding() {
             { icon: Clock, label: 'Define working hours', to: 6 },
             { icon: Calendar, label: 'Sync your schedule', to: 6 },
           ].map(({ icon: Icon, label, to }) => (
-            <button key={label} type="button" onClick={() => setStep(to)} className="flex gap-3 items-center">
+            <button key={label} type="button" onClick={() => goToStep(to)} className="flex gap-3 items-center">
               <div className="size-[38px] bg-surface-2 rounded-[8px] flex items-center justify-center shrink-0">
                 <Icon className="w-4 h-4 text-ink" />
               </div>
@@ -461,9 +598,9 @@ export default function BarberOnboarding() {
         <div className="flex-1" />
         <BottomActions
           primaryLabel="Start Setup"
-          onPrimary={() => setStep(1)}
+          onPrimary={() => goToStep(1)}
           secondaryLabel="Skip for now"
-          onSecondary={() => setStep(1)}
+          onSecondary={() => goToStep(1)}
           footnote={
             <>
               Minimum setup is required to access the barber dashboard
@@ -633,9 +770,22 @@ export default function BarberOnboarding() {
         <StepHeader step={4} title="Your work photos" onBack={() => setStep(2)} />
         <div className="px-5 py-4 flex justify-center">
           <div className="relative bg-surface rounded-[8px] w-full max-w-[353px] aspect-square">
-            <div className="absolute left-1/2 -translate-x-1/2 top-[72px]">
-              <ImageIcon className="w-[58px] h-[52px] text-[#c9c6da]" />
-            </div>
+            {photoCount === 0 ? (
+              <div className="absolute left-1/2 -translate-x-1/2 top-[72px]">
+                <ImageIcon className="w-[58px] h-[52px] text-[#c9c6da]" />
+              </div>
+            ) : (
+              <div className="absolute left-0 right-0 top-[24px] px-5 grid grid-cols-3 gap-2">
+                {photos.slice(0, 6).map((photo) => (
+                  <img
+                    key={photo.id}
+                    src={photo.url}
+                    alt=""
+                    className="w-full aspect-square object-cover rounded-[8px]"
+                  />
+                ))}
+              </div>
+            )}
             <div className="absolute left-0 right-0 top-[161px] flex flex-col gap-1 items-center justify-center text-center">
               {photoCount === 0 ? (
                 <>
@@ -646,31 +796,35 @@ export default function BarberOnboarding() {
                 </>
               ) : (
                 <p className="text-sm font-semibold leading-5 text-black">
-                  {photoCount} photo{photoCount === 1 ? '' : 's'} selected
+                  {photoCount} photo{photoCount === 1 ? '' : 's'} uploaded
                 </p>
+              )}
+              {photoError && (
+                <p className="text-[10px] font-semibold leading-[14px] text-red-600 px-6">{photoError}</p>
               )}
             </div>
             <input
               ref={photoInputRef}
               type="file"
               multiple
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
               className="hidden"
               onChange={handlePhotoSelect}
             />
             <button
               type="button"
+              disabled={uploadingPhotos}
               onClick={() => photoInputRef.current?.click()}
-              className="absolute left-1/2 -translate-x-1/2 top-[232px] bg-ink text-white rounded-pill px-8 py-4 text-sm font-semibold leading-5 whitespace-nowrap"
+              className="absolute left-1/2 -translate-x-1/2 top-[232px] bg-ink text-white rounded-pill px-8 py-4 text-sm font-semibold leading-5 whitespace-nowrap disabled:opacity-60"
             >
-              Add to Gallery
+              {uploadingPhotos ? 'Uploading…' : 'Add to Gallery'}
             </button>
           </div>
         </div>
         <div className="flex-1" />
         <BottomActions
           primaryLabel={saving ? 'Saving…' : 'Continue'}
-          primaryDisabled={saving}
+          primaryDisabled={saving || uploadingPhotos}
           onPrimary={() => handleSavePhotos(false)}
           secondaryLabel="Skip for now"
           onSecondary={() => handleSavePhotos(true)}
@@ -690,14 +844,27 @@ export default function BarberOnboarding() {
         <div className="fixed bottom-0 left-0 right-0 bg-white px-5 pb-5 pt-2 max-w-md mx-auto flex flex-col gap-1">
           <button
             type="button"
-            onClick={() => setStep(5)}
+            onClick={() => goToStep(5)}
             className="w-full bg-ink text-white rounded-pill px-9 py-[18px] text-sm font-semibold leading-5 text-center"
           >
             Go Online
           </button>
           <button
             type="button"
-            onClick={() => toast.success('Changes saved')}
+            onClick={async () => {
+              // Services are saved to the `services` table as they're added
+              // (BarberServices posts each one). This just confirms what the
+              // server actually holds rather than claiming a phantom save.
+              try {
+                const r = await authFetch('/api/barber/services');
+                const mine = r.ok ? await r.json() : [];
+                const n = Array.isArray(mine) ? mine.length : 0;
+                setServicesCount(n);
+                toast.success(`${n} service${n === 1 ? '' : 's'} saved`);
+              } catch {
+                toast.error('Could not confirm saved services');
+              }
+            }}
             className="w-full rounded-pill px-9 py-[18px] text-sm font-semibold leading-5 text-center text-muted"
           >
             Save Changes
@@ -758,10 +925,13 @@ export default function BarberOnboarding() {
                   <ShopLocationMap
                     latitude={shopLat}
                     longitude={shopLng}
-                    onChange={(lat, lng, address) => {
+                    onChange={(lat, lng, address, parts) => {
                       setShopLat(lat);
                       setShopLng(lng);
                       setShopAddress(address);
+                      if (parts?.city) setGeoCity(parts.city);
+                      if (parts?.region) setGeoRegion(parts.region);
+                      if (parts?.country) setGeoCountry(parts.country);
                     }}
                   />
                 </div>

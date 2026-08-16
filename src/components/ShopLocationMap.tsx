@@ -15,27 +15,46 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
+/** Address components the reverse geocoder can resolve, when it can. */
+export interface AddressParts {
+  city?: string;
+  region?: string;
+  country?: string;
+}
+
 interface Props {
   latitude: number | null;
   longitude: number | null;
-  onChange: (lat: number, lng: number, address: string) => void;
+  onChange: (lat: number, lng: number, address: string, parts?: AddressParts) => void;
 }
 
 const DEFAULT_CENTER: [number, number] = [40.7128, -74.006]; // NYC fallback if no geolocation/pin yet
 
 // Reverse-geocodes via OpenStreetMap's free Nominatim API — no key required,
 // no billing account, nothing to "not be set up".
-async function reverseGeocode(lat: number, lng: number): Promise<string> {
+async function reverseGeocode(
+  lat: number,
+  lng: number
+): Promise<{ address: string; parts: AddressParts }> {
+  const fallback = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
   try {
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&lat=${lat}&lon=${lng}`,
       { headers: { Accept: 'application/json' } }
     );
-    if (!res.ok) return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    if (!res.ok) return { address: fallback, parts: {} };
     const data = await res.json();
-    return data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    const a = data.address || {};
+    return {
+      address: data.display_name || fallback,
+      parts: {
+        city: a.city || a.town || a.village || a.municipality || undefined,
+        region: a.state || a.region || a.county || undefined,
+        country: a.country || undefined,
+      },
+    };
   } catch {
-    return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    return { address: fallback, parts: {} };
   }
 }
 
@@ -66,8 +85,8 @@ export default function ShopLocationMap({ latitude, longitude, onChange }: Props
     markerRef.current = marker;
 
     async function commit(lat: number, lng: number) {
-      const address = await reverseGeocode(lat, lng);
-      onChange(lat, lng, address);
+      const { address, parts } = await reverseGeocode(lat, lng);
+      onChange(lat, lng, address, parts);
     }
 
     marker.on('dragend', () => {
@@ -95,7 +114,7 @@ export default function ShopLocationMap({ latitude, longitude, onChange }: Props
         const { latitude: lat, longitude: lng } = pos.coords;
         markerRef.current?.setLatLng([lat, lng]);
         mapRef.current?.setView([lat, lng], 16);
-        reverseGeocode(lat, lng).then((address) => onChange(lat, lng, address));
+        reverseGeocode(lat, lng).then(({ address, parts }) => onChange(lat, lng, address, parts));
         setLocating(false);
       },
       () => setLocating(false),

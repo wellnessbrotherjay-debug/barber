@@ -33,7 +33,10 @@ function isStaleSessionResponse(status: number, path: string): boolean {
 export async function authFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const token = getToken();
   const headers = new Headers(init.headers || {});
-  if (!headers.has('Content-Type') && init.body) {
+  // Multipart uploads must NOT carry a manual Content-Type — the browser has
+  // to set it itself so the multipart boundary is included.
+  const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData;
+  if (!headers.has('Content-Type') && init.body && !isFormData) {
     headers.set('Content-Type', 'application/json');
   }
   if (token) {
@@ -62,4 +65,62 @@ export async function fetchBarberBookingsForUser(userId: string): Promise<Respon
       'X-User-ID': userId,
     },
   });
+}
+
+// ---------------------------------------------------------------------------
+// Image uploads (avatar + work-photo gallery). These POST multipart/form-data
+// to the real upload endpoints in src/server/routes/uploads.ts; files are
+// stored on the server's local disk and served back from /uploads/...
+// The server derives the owning barber from the JWT, so no ids are sent.
+// ---------------------------------------------------------------------------
+
+export interface BarberPhoto {
+  id: string;
+  url: string;
+  storage_key: string;
+  sort_order: number;
+  caption: string | null;
+  bytes: number | null;
+  mime_type: string | null;
+  created_at: string;
+}
+
+async function errorFrom(response: Response, fallback: string): Promise<string> {
+  try {
+    const body = await response.json();
+    return body?.error || `${fallback} (${response.status})`;
+  } catch {
+    return `${fallback} (${response.status})`;
+  }
+}
+
+export async function uploadAvatar(file: File): Promise<string> {
+  const data = new FormData();
+  data.append('file', file);
+  const response = await authFetch('/api/barber/upload/avatar', { method: 'POST', body: data });
+  if (!response.ok) throw new Error(await errorFrom(response, 'Avatar upload failed'));
+  const body = await response.json();
+  return body.url as string;
+}
+
+export async function uploadGalleryPhotos(files: File[]): Promise<BarberPhoto[]> {
+  const data = new FormData();
+  files.forEach((file) => data.append('files', file));
+  const response = await authFetch('/api/barber/upload/gallery', { method: 'POST', body: data });
+  if (!response.ok) throw new Error(await errorFrom(response, 'Photo upload failed'));
+  const body = await response.json();
+  return (body.photos || []) as BarberPhoto[];
+}
+
+export async function fetchBarberPhotos(): Promise<BarberPhoto[]> {
+  const response = await authFetch('/api/barber/photos');
+  if (!response.ok) throw new Error(await errorFrom(response, 'Could not load photos'));
+  return (await response.json()) as BarberPhoto[];
+}
+
+export async function deleteBarberPhoto(id: string): Promise<BarberPhoto[]> {
+  const response = await authFetch(`/api/barber/photos/${id}`, { method: 'DELETE' });
+  if (!response.ok) throw new Error(await errorFrom(response, 'Could not delete photo'));
+  const body = await response.json();
+  return (body.photos || []) as BarberPhoto[];
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Globe, Zap, Smartphone, Clock, Info } from 'lucide-react';
 import { toast } from 'sonner';
@@ -19,6 +19,68 @@ export default function BarberAvailability() {
   const [buffer, setBuffer] = useState('5m');
   const [saving, setSaving] = useState(false);
 
+  // Load the persisted availability settings so these controls show what the
+  // database actually holds instead of hard-coded defaults.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [profileRes, scheduleRes] = await Promise.all([
+          authFetch('/api/barber/profile'),
+          authFetch('/api/barber/schedule'),
+        ]);
+        if (cancelled) return;
+        if (profileRes.ok) {
+          const p = await profileRes.json();
+          if (cancelled) return;
+          setOnline(!!p.is_online);
+          if (p.booking_mode === 'instant') setBookingMode('instant');
+          else if (p.booking_mode === 'request_only') setBookingMode('request');
+          if (p.service_radius_km != null) setRadius(Number(p.service_radius_km));
+          if (p.buffer_minutes != null) setBuffer(`${Number(p.buffer_minutes)}m`);
+        }
+        if (scheduleRes.ok) {
+          const rows = await scheduleRes.json();
+          if (!cancelled && Array.isArray(rows) && rows.length > 0) {
+            const days = [false, false, false, false, false, false, false];
+            for (const r of rows) {
+              const i = Number(r.day_of_week);
+              if (i >= 0 && i < 7) days[i] = !!r.is_available;
+            }
+            setActiveDays(days);
+            const sample = rows.find((r: any) => r.is_available) || rows[0];
+            if (sample?.start_time) setStartTime(String(sample.start_time).slice(0, 5));
+            if (sample?.end_time) setEndTime(String(sample.end_time).slice(0, 5));
+          }
+        }
+      } catch {
+        // keep defaults
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Online/offline is persisted the moment it's toggled — it's a live
+  // visibility switch, not a form field.
+  const toggleOnline = async () => {
+    const next = !online;
+    setOnline(next);
+    try {
+      const response = await authFetch('/api/barber/online', {
+        method: 'PATCH',
+        body: JSON.stringify({ is_online: next }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || `Failed: ${response.status}`);
+      setOnline(!!body.is_online);
+    } catch (err) {
+      setOnline(!next);
+      toast.error(`${err instanceof Error ? err.message : err}`);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -34,6 +96,21 @@ export default function BarberAvailability() {
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || `Failed to save availability: ${response.status}`);
+
+      // Booking mode / radius / buffer / online live on barber_profiles.
+      const profileResp = await authFetch('/api/barber/profile', {
+        method: 'PUT',
+        body: JSON.stringify({
+          booking_mode: bookingMode === 'instant' ? 'instant' : 'request_only',
+          service_radius_km: radius,
+          buffer_minutes: Number(buffer.replace('m', '')),
+          is_online: online,
+        }),
+      });
+      if (!profileResp.ok) {
+        const b = await profileResp.json().catch(() => ({}));
+        throw new Error(b.error || `Failed to save booking settings: ${profileResp.status}`);
+      }
       toast.success('Availability saved');
       navigate(-1);
     } catch (err) {
@@ -74,7 +151,7 @@ export default function BarberAvailability() {
           </div>
           <button
             type="button"
-            onClick={() => setOnline((v) => !v)}
+            onClick={toggleOnline}
             className="relative h-5 w-8 shrink-0"
             aria-label="Toggle online status"
           >

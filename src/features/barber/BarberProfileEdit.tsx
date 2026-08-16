@@ -21,7 +21,15 @@ import {
   User,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { authFetch, fetchBarberBookingsForUser } from '@/lib/api';
+import {
+  authFetch,
+  deleteBarberPhoto,
+  fetchBarberBookingsForUser,
+  fetchBarberPhotos,
+  uploadAvatar,
+  uploadGalleryPhotos,
+  type BarberPhoto,
+} from '@/lib/api';
 
 // Board page 61 — barber "Edit Profile".
 // Layout, section order and copy replicate the Figma frame exactly; all data
@@ -60,7 +68,7 @@ function PillInput({
 }
 
 export default function BarberProfileEdit() {
-  const { user, logout } = useAuthStore();
+  const { user, logout, setUser } = useAuthStore();
   const navigate = useNavigate();
   const [form, setForm] = useState<ProfileForm>({
     display_name: user?.full_name || '',
@@ -73,9 +81,19 @@ export default function BarberProfileEdit() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Client-side-only photo preview — there is no storage backend for avatars
-  // yet, so nothing is actually uploaded/persisted here.
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  // Avatar: really uploaded to /api/barber/upload/avatar, which persists the
+  // file server-side and writes users.avatar_url. avatarUrl holds the saved
+  // URL returned by that call.
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+
+  // Portfolio: the barber's real work photos from /api/barber/photos.
+  const [photos, setPhotos] = useState<BarberPhoto[]>([]);
+  const [photosUploading, setPhotosUploading] = useState(false);
+  const [photosError, setPhotosError] = useState<string | null>(null);
+  const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
+  const portfolioInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const [serviceMode, setServiceMode] = useState<'in_shop' | 'come_to_customer'>('in_shop');
   const [bookingMode, setBookingMode] = useState<'instant' | 'request_only'>('request_only');
@@ -87,7 +105,6 @@ export default function BarberProfileEdit() {
   const [services, setServices] = useState<Service[]>([]);
   const [barberId, setBarberId] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState(false);
-  const [workPhotosCount, setWorkPhotosCount] = useState(0);
   const [ratingAvg, setRatingAvg] = useState<number | null>(null);
   const [ratingCount, setRatingCount] = useState(0);
   const [jobsCompleted, setJobsCompleted] = useState(0);
@@ -111,7 +128,6 @@ export default function BarberProfileEdit() {
           if (cancelled) return;
           setBarberId(p.id);
           setIsVerified(!!p.is_verified);
-          setWorkPhotosCount(Number(p.work_photos_count || 0));
           setRatingAvg(p.rating_avg != null ? Number(p.rating_avg) : null);
           setRatingCount(Number(p.rating_count || 0));
           setForm({
@@ -122,8 +138,13 @@ export default function BarberProfileEdit() {
             address_text: p.address_text || '',
             phone: p.phone || '',
           });
-          if (p.service_mode === 'come_to_customer' || p.service_mode === 'in_shop') setServiceMode(p.service_mode);
+          // barber_profiles.service_mode is in_shop|mobile|both; this screen's
+          // Figma labels are "In Shop" / "Come to Customer".
+          if (p.service_mode === 'mobile') setServiceMode('come_to_customer');
+          else if (p.service_mode === 'in_shop') setServiceMode('in_shop');
           if (p.booking_mode === 'instant' || p.booking_mode === 'request_only') setBookingMode(p.booking_mode);
+          if (p.buffer_minutes != null) setBufferMinutes(String(Number(p.buffer_minutes)));
+          setIsOnline(!!p.is_online);
 
           if (p.id) {
             const servicesRes = await authFetch('/api/services');
@@ -167,16 +188,81 @@ export default function BarberProfileEdit() {
     };
   }, [user?.id, user?.full_name]);
 
+  // Real portfolio contents for this barber.
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    fetchBarberPhotos()
+      .then((mine) => {
+        if (!cancelled) setPhotos(mine);
+      })
+      .catch(() => {
+        /* portfolio just renders empty; upload errors surface inline */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
   function update<K extends keyof ProfileForm>(key: K, value: ProfileForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    setAvatarPreview(url);
-    toast.info('Preview only — photo storage isn\'t wired up yet, so this won\'t be saved.');
+    setAvatarError(null);
+    setAvatarUploading(true);
+    try {
+      const url = await uploadAvatar(file);
+      setAvatarUrl(url);
+      if (user) setUser({ ...user, avatar_url: url });
+      toast.success('Photo updated');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setAvatarError(message);
+      toast.error(message);
+    } finally {
+      setAvatarUploading(false);
+    }
+  }
+
+  async function handlePortfolioAdd(e: React.ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (selected.length === 0) return;
+    if (selected.length > 6) {
+      setPhotosError('You can upload at most 6 photos at a time.');
+      return;
+    }
+    setPhotosError(null);
+    setPhotosUploading(true);
+    try {
+      setPhotos(await uploadGalleryPhotos(selected));
+      toast.success(`${selected.length} photo${selected.length === 1 ? '' : 's'} uploaded`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setPhotosError(message);
+      toast.error(message);
+    } finally {
+      setPhotosUploading(false);
+    }
+  }
+
+  async function handlePortfolioDelete(id: string) {
+    setPhotosError(null);
+    setDeletingPhotoId(id);
+    try {
+      setPhotos(await deleteBarberPhoto(id));
+      toast.success('Photo removed');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setPhotosError(message);
+      toast.error(message);
+    } finally {
+      setDeletingPhotoId(null);
+    }
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -195,8 +281,11 @@ export default function BarberProfileEdit() {
           bio: form.bio || undefined,
           address_text: form.address_text || undefined,
           experience_years: form.experience_years ? Number(form.experience_years) : undefined,
-          service_mode: serviceMode,
+          phone: form.phone || undefined,
+          service_mode: serviceMode === 'in_shop' ? 'in_shop' : 'mobile',
           booking_mode: bookingMode,
+          buffer_minutes: Number(bufferMinutes),
+          is_online: isOnline,
         }),
       });
       const body = await response.json();
@@ -231,21 +320,36 @@ export default function BarberProfileEdit() {
       <div className="flex flex-col items-center px-5 pt-2">
         <div className="relative">
           <div className="w-[100px] h-[100px] rounded-[16px] bg-[#f2f1fa] flex items-center justify-center overflow-hidden">
-            {avatarPreview || user?.avatar_url ? (
-              <img src={avatarPreview || user?.avatar_url} className="w-full h-full object-cover" alt="" />
+            {avatarUrl || user?.avatar_url ? (
+              <img src={avatarUrl || user?.avatar_url} className="w-full h-full object-cover" alt="" />
             ) : (
               <ImageIcon className="w-8 h-8 text-[#c9c6d4]" />
             )}
           </div>
-          <label className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#1c1b1f] flex items-center justify-center cursor-pointer">
+          <label
+            className={`absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#1c1b1f] flex items-center justify-center ${
+              avatarUploading ? 'opacity-60 cursor-default' : 'cursor-pointer'
+            }`}
+          >
             <Camera className="w-3.5 h-3.5 text-white" />
-            <input type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+              className="hidden"
+              disabled={avatarUploading}
+              onChange={handlePhotoChange}
+            />
           </label>
         </div>
         <h1 className="text-[22px] font-bold text-[#1c1b1f] mt-4">
           {form.display_name || user?.full_name || 'Your Name'}
         </h1>
-        <p className="text-[14px] font-semibold text-[#1c1b1f] mt-0.5">Change Photo</p>
+        <p className="text-[14px] font-semibold text-[#1c1b1f] mt-0.5">
+          {avatarUploading ? 'Uploading…' : 'Change Photo'}
+        </p>
+        {avatarError && (
+          <p className="text-[12px] font-medium text-red-600 mt-1 text-center">{avatarError}</p>
+        )}
         <p className="text-[12px] font-medium text-[#a09cab] mt-1">
           This information is visible to customers
         </p>
@@ -354,7 +458,22 @@ export default function BarberProfileEdit() {
               <p className="text-[14px] font-semibold text-[#1c1b1f]">Online / Offline</p>
               <button
                 type="button"
-                onClick={() => setIsOnline((v) => !v)}
+                onClick={async () => {
+                  const next = !isOnline;
+                  setIsOnline(next);
+                  try {
+                    const response = await authFetch('/api/barber/online', {
+                      method: 'PATCH',
+                      body: JSON.stringify({ is_online: next }),
+                    });
+                    const body = await response.json();
+                    if (!response.ok) throw new Error(body.error || `Failed: ${response.status}`);
+                    setIsOnline(!!body.is_online);
+                  } catch (err) {
+                    setIsOnline(!next);
+                    toast.error(`${err instanceof Error ? err.message : err}`);
+                  }
+                }}
                 aria-label={isOnline ? 'Go offline' : 'Go online'}
                 className={`w-11 h-6 rounded-full transition-colors relative ${isOnline ? 'bg-[#1c1b1f]' : 'bg-[#d8d6e0]'}`}
               >
@@ -452,23 +571,53 @@ export default function BarberProfileEdit() {
         <div className="rounded-[16px] border-[0.75px] border-[#d2dbe9] bg-white p-4">
           <div className="flex items-center justify-between">
             <p className="text-[15px] font-bold text-[#1c1b1f]">Portfolio</p>
+            <input
+              ref={portfolioInputRef}
+              type="file"
+              multiple
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+              className="hidden"
+              onChange={handlePortfolioAdd}
+            />
             <button
               type="button"
-              onClick={() => navigate('/barber/services')}
-              className="text-[12px] font-semibold text-[#1c1b1f]"
+              disabled={photosUploading}
+              onClick={() => portfolioInputRef.current?.click()}
+              className="text-[12px] font-semibold text-[#1c1b1f] disabled:opacity-60"
             >
-              • Add Photo
+              {photosUploading ? '• Uploading…' : '• Add Photo'}
             </button>
           </div>
-          <div className="flex gap-2 mt-3">
-            {Array.from({ length: Math.max(Math.min(workPhotosCount, 3), 3) }).map((_, i) => (
-              <div key={i} className="w-[56px] h-[56px] rounded-[10px] bg-[#f2f1fa] flex items-center justify-center">
+          <div className="flex flex-wrap gap-2 mt-3">
+            {photos.map((photo) => (
+              <div key={photo.id} className="relative w-[56px] h-[56px]">
+                <img
+                  src={photo.url}
+                  alt={photo.caption || ''}
+                  className="w-full h-full rounded-[10px] object-cover bg-[#f2f1fa]"
+                />
+                <button
+                  type="button"
+                  aria-label="Delete photo"
+                  disabled={deletingPhotoId === photo.id}
+                  onClick={() => handlePortfolioDelete(photo.id)}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#1c1b1f] text-white text-[11px] font-bold leading-none flex items-center justify-center disabled:opacity-60"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            {Array.from({ length: Math.max(3 - photos.length, 0) }).map((_, i) => (
+              <div key={`empty-${i}`} className="w-[56px] h-[56px] rounded-[10px] bg-[#f2f1fa] flex items-center justify-center">
                 <ImageIcon className="w-5 h-5 text-[#c9c6d4]" />
               </div>
             ))}
           </div>
+          {photosError && (
+            <p className="text-[12px] font-medium text-red-600 mt-2">{photosError}</p>
+          )}
           <p className="text-[12px] font-medium text-[#a09cab] mt-3">
-            {workPhotosCount} photo{workPhotosCount === 1 ? '' : 's'} uploaded
+            {photos.length} photo{photos.length === 1 ? '' : 's'} uploaded
           </p>
         </div>
 

@@ -35,7 +35,14 @@ export default function BarbersMap() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/barbers`, {
+        // Prefer the geospatial endpoint so the map shows the barbers actually
+        // reachable from the customer, nearest first, filtered and ordered in
+        // Postgres. Falls back to the paginated list with no location fix.
+        const here = getStoredLocation();
+        const path = here
+          ? `/api/barbers/nearby?lat=${here.lat}&lng=${here.lng}&radius_km=25&limit=50`
+          : `/api/barbers?limit=50`;
+        const res = await fetch(`${import.meta.env.VITE_API_URL || ''}${path}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}` },
         });
         const data = (await res.json()) as any;

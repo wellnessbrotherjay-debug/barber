@@ -14,8 +14,15 @@ interface Barber {
   rating_avg: string | number;
   address_text: string | null;
   is_active?: boolean;
+  /** Present only on the geo endpoint — real great-circle km from the customer. */
+  distance_km?: number;
   services?: { id: string | null; name: string | null; price: number | null }[];
 }
+
+/** Page size for barber discovery — pagination happens in SQL, not in the client. */
+const PAGE_SIZE = 20;
+/** How far out to look when the customer has a location fix. */
+const SEARCH_RADIUS_KM = 25;
 
 export default function BrowseBarbers() {
   const navigate = useNavigate();
@@ -25,7 +32,12 @@ export default function BrowseBarbers() {
 
   // Distance/ETA are only shown when BOTH the customer's device location and the
   // barber's stored coordinates exist. No fix -> no number, rather than a guess.
+  //
+  // When we have a location fix the server already returns an authoritative
+  // distance_km (computed in Postgres, see /api/barbers/nearby), so we use that
+  // and only fall back to the local haversine for the no-location listing.
   const kmTo = (b: Barber): number | null => {
+    if (typeof b.distance_km === 'number') return b.distance_km;
     const lat = Number((b as any).latitude);
     const lng = Number((b as any).longitude);
     if (!here || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
@@ -41,7 +53,14 @@ export default function BrowseBarbers() {
     async function fetchBarbers() {
       try {
         setLoading(true);
-        const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/barbers`, {
+        // With a location fix, discovery runs in Postgres: radius filtering,
+        // distance ordering and LIMIT/OFFSET all happen server-side, so the
+        // client never downloads the whole barber table. Without a fix we fall
+        // back to the paginated rating-ordered list.
+        const path = here
+          ? `/api/barbers/nearby?lat=${here.lat}&lng=${here.lng}&radius_km=${SEARCH_RADIUS_KM}&limit=${PAGE_SIZE}`
+          : `/api/barbers?limit=${PAGE_SIZE}`;
+        const response = await fetch(`${import.meta.env.VITE_API_URL || ''}${path}`, {
           headers: {
             'X-Session-Token': `1:${user?.id || 'guest'}`,
             Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}`,
@@ -59,7 +78,7 @@ export default function BrowseBarbers() {
     }
     fetchBarbers();
     return () => { cancelled = true; };
-  }, [user?.id]);
+  }, [user?.id, here]);
 
   if (loading) {
     return (

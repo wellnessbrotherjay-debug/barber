@@ -193,6 +193,18 @@ export default function Signup() {
           </button>
         </form>
 
+        <p className="text-center text-neutral-500 text-xs leading-5 px-2">
+          By creating an account, you agree to our{' '}
+          <button type="button" onClick={() => navigate('/terms')} className="font-semibold text-ink underline">
+            Terms of Service
+          </button>{' '}
+          and{' '}
+          <button type="button" onClick={() => navigate('/privacy')} className="font-semibold text-ink underline">
+            Privacy Policy
+          </button>
+          .
+        </p>
+
         <div className="text-center">
           <p className="text-neutral-500 text-sm">
             Already have an account?{' '}

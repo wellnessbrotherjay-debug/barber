@@ -30,6 +30,7 @@ import {
   uploadGalleryPhotos,
   type BarberPhoto,
 } from '@/lib/api';
+import { DeleteAccountRow } from '@/components/DeleteAccountDialog';
 
 // Board page 61 — barber "Edit Profile".
 // Layout, section order and copy replicate the Figma frame exactly; all data
@@ -697,6 +698,7 @@ export default function BarberProfileEdit() {
               <span className="flex-1 text-[14px] font-semibold text-[#1c1b1f]">Help/Support</span>
               <ChevronRight className="w-5 h-5 text-[#a09cab]" />
             </button>
+            <DeleteAccountRow />
           </div>
         </section>
 

@@ -6,6 +6,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import cookieParser from 'cookie-parser';
 import path from 'path';
+import fsp from 'fs/promises';
 import { fileURLToPath } from 'url';
 import Stripe from 'stripe';
 import { tenantMiddleware, requireAdmin, requireEntitlement, requireBarberAuth, closeTenantPools, getTenantPool, getJwtSecret, AuthTokenPayload } from './middleware/tenant';
@@ -26,10 +27,18 @@ app.use(cors({
   origin: [
     'http://localhost:3000',
     'https://barber.safetykat.com',
-    'https://api.barber.safetykat.com'
+    'https://api.barber.safetykat.com',
+    // Native shells. Capacitor serves the bundled app from a custom scheme, so
+    // requests to this API are cross-origin and must be allowlisted explicitly:
+    // iOS uses capacitor://localhost, Android http://localhost, and older
+    // Ionic/WKWebView builds ionic://localhost.
+    'capacitor://localhost',
+    'ionic://localhost',
+    'http://localhost'
   ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  // PATCH is required by /api/barber/online and /api/barber/photos/reorder.
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-User-ID', 'X-Admin-Role', 'X-Session-Token']
 }));
 // Stripe client — only initialized if a secret key is present in this
@@ -2147,6 +2156,141 @@ app.patch('/admin/companies/:id/barbers/:barberId/verify', requireAdmin, async (
   } catch (error) {
     console.error('Error verifying barber:', error);
     res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// ============================================================================
+// DELETE /api/account — in-app account deletion.
+//
+// Required by App Store Review Guideline 5.1.1(v): an app that lets a user
+// create an account must let them initiate deletion of that account from
+// inside the app.
+//
+// Identity comes exclusively from the verified JWT on req.tenant — the body is
+// only ever read for the { confirm: "DELETE" } re-confirmation token, never for
+// a user id. Works for both 'customer' and 'barber' roles (the customer routes
+// authenticate the same way: req.tenant?.userId, 401 if absent).
+//
+// Active-commitment guard: the real bookings.status CHECK constraint is
+// ('pending','confirmed','cancelled','completed') — see docs/DATABASE_SCHEMA.sql
+// and the accept/complete/cancel handlers above, which write 'confirmed',
+// 'completed' and 'cancelled' respectively. So "still open" == pending|confirmed.
+// ============================================================================
+const ACTIVE_BOOKING_STATUSES = ['pending', 'confirmed'];
+
+app.delete('/api/account', async (req: Request, res: Response) => {
+  const userId = req.tenant?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  if ((req.body || {}).confirm !== 'DELETE') {
+    return res.status(400).json({
+      error: 'Confirmation required',
+      hint: 'Send { "confirm": "DELETE" } to permanently delete this account.',
+    });
+  }
+
+  const pool = req.tenant!.pool;
+  const tenantId = req.tenant!.companyId;
+  const role = req.tenant!.userRole;
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const userRow = await client.query(
+      'SELECT id, email, role FROM users WHERE id = $1 FOR UPDATE',
+      [userId]
+    );
+    if (userRow.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Account not found' });
+    }
+    const effectiveRole = userRow.rows[0].role || role;
+
+    // Resolve the barber profile (if any) — needed both for the commitment
+    // check and to clean up uploaded files after the DB work commits.
+    const profileRow = await client.query(
+      'SELECT id FROM barber_profiles WHERE user_id = $1',
+      [userId]
+    );
+    const barberProfileId: string | null = profileRow.rows[0]?.id ?? null;
+
+    // Business-rule guard: refuse while anything is still open.
+    let active = 0;
+    if (barberProfileId) {
+      const r = await client.query(
+        `SELECT COUNT(*)::int AS n FROM bookings
+          WHERE (customer_id = $1 OR barber_id = $2) AND status = ANY($3::text[])`,
+        [userId, barberProfileId, ACTIVE_BOOKING_STATUSES]
+      );
+      active = r.rows[0].n;
+    } else {
+      const r = await client.query(
+        `SELECT COUNT(*)::int AS n FROM bookings
+          WHERE customer_id = $1 AND status = ANY($2::text[])`,
+        [userId, ACTIVE_BOOKING_STATUSES]
+      );
+      active = r.rows[0].n;
+    }
+
+    if (active > 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({
+        error:
+          effectiveRole === 'barber'
+            ? `You still have ${active} pending or confirmed job${active === 1 ? '' : 's'}. Complete or cancel them before deleting your account.`
+            : `You still have ${active} pending or confirmed booking${active === 1 ? '' : 's'}. Cancel or complete them before deleting your account.`,
+        active_bookings: active,
+      });
+    }
+
+    // Deleting the users row cascades to barber_profiles (and its services,
+    // schedule, work photos, verification documents, reviews) plus bookings,
+    // notifications, payments and reviews written by this user.
+    await client.query('DELETE FROM users WHERE id = $1', [userId]);
+    await client.query('COMMIT');
+
+    // Files come off disk only after the DB work is durably committed, so a
+    // rolled-back delete can never orphan a profile from its images.
+    if (barberProfileId) {
+      const dir = path.join(UPLOAD_DIR, 'barber', String(tenantId), String(barberProfileId));
+      const resolved = path.resolve(dir);
+      const root = path.resolve(UPLOAD_DIR);
+      if (resolved.startsWith(root + path.sep)) {
+        await fsp.rm(resolved, { recursive: true, force: true }).catch((e) => {
+          console.error('Account deletion: failed to remove upload dir', resolved, e);
+        });
+      }
+    }
+
+    // Best-effort audit trail in the shared admin DB. audit_log may not exist
+    // in every environment, so a failure here must never fail the deletion.
+    if (req.adminDb) {
+      await req.adminDb
+        .query(
+          `INSERT INTO audit_log (admin_user_id, action, resource_type, resource_id, changes, ip_address)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [
+            userId,
+            'account.delete',
+            'user',
+            userId,
+            JSON.stringify({ tenant_id: tenantId, role: effectiveRole, self_service: true }),
+            req.ip || null,
+          ]
+        )
+        .catch((e) => console.error('Account deletion: audit_log write skipped:', e.message));
+    }
+
+    return res.json({ deleted: true });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Error deleting account:', error);
+    return res.status(500).json({ error: (error as Error).message });
+  } finally {
+    client.release();
   }
 });
 

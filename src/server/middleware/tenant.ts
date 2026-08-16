@@ -256,6 +256,26 @@ export function requireBarberAuth(req: Request, res: Response, next: NextFunctio
   next();
 }
 
+// Requires any authenticated end user (customer or barber). Use this on routes
+// where BOTH roles legitimately act on the same resource (e.g. cancelling a
+// booking) — the handler must still verify that the caller owns the record.
+export function requireUserAuth(req: Request, res: Response, next: NextFunction) {
+  if (!req.tenant?.userId) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  next();
+}
+
+// Requires an authenticated customer. Booking creation, reviews and payment
+// intents are customer actions; the customer id MUST be taken from the token
+// (req.tenant.userId), never from the request body.
+export function requireCustomerAuth(req: Request, res: Response, next: NextFunction) {
+  if (!req.tenant?.userId || req.tenant.userRole !== 'customer') {
+    return res.status(401).json({ error: 'Customer authentication required' });
+  }
+  next();
+}
+
 export function requireEntitlement(feature: string) {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (!req.tenant || req.tenant.isAdmin) {

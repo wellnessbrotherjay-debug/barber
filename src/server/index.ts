@@ -9,7 +9,7 @@ import path from 'path';
 import fsp from 'fs/promises';
 import { fileURLToPath } from 'url';
 import Stripe from 'stripe';
-import { tenantMiddleware, requireAdmin, requireEntitlement, requireBarberAuth, closeTenantPools, getTenantPool, getJwtSecret, AuthTokenPayload } from './middleware/tenant';
+import { tenantMiddleware, requireAdmin, requireEntitlement, requireBarberAuth, requireUserAuth, requireCustomerAuth, closeTenantPools, getTenantPool, getJwtSecret, AuthTokenPayload } from './middleware/tenant';
 import { createUploadsRouter, UPLOAD_DIR } from './routes/uploads';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1301,11 +1301,15 @@ app.get('/api/barber/bookings', async (req: Request, res: Response) => {
 });
 
 // POST /api/bookings - Create booking
-app.post('/api/bookings', async (req: Request, res: Response) => {
+app.post('/api/bookings', requireCustomerAuth, async (req: Request, res: Response) => {
   try {
-    const { customer_id, barber_id, service_id, booking_date, start_time, notes } = req.body;
+    const { barber_id, service_id, booking_date, start_time, notes } = req.body;
+    // SECURITY: the customer is ALWAYS the authenticated caller. Never accept
+    // customer_id from the body — doing so let anyone create bookings in
+    // another user's name.
+    const customer_id = req.tenant!.userId!;
 
-    if (!customer_id || !barber_id || !service_id || !booking_date) {
+    if (!barber_id || !service_id || !booking_date) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -1350,16 +1354,21 @@ app.post('/api/bookings', async (req: Request, res: Response) => {
 });
 
 // POST /api/bookings/:id/accept - Barber accepts booking
-app.post('/api/bookings/:id/accept', async (req: Request, res: Response) => {
+app.post('/api/bookings/:id/accept', requireBarberAuth, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    // SECURITY: only the barber the booking was addressed to may accept it.
+    const barberId = await getOwnBarberProfileId(req.tenant!.pool, req.tenant!.userId!);
+    if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
+
     const result = await req.tenant!.pool.query(
-      'UPDATE bookings SET status = $1 WHERE id = $2 RETURNING *',
-      ['confirmed', id]
+      `UPDATE bookings SET status = $1
+        WHERE id = $2 AND barber_id = $3 AND status = 'pending' RETURNING *`,
+      ['confirmed', id, barberId]
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Booking not found' });
+      return res.status(404).json({ error: 'Booking not found, not yours, or no longer pending' });
     }
 
     res.json(result.rows[0]);
@@ -1370,16 +1379,21 @@ app.post('/api/bookings/:id/accept', async (req: Request, res: Response) => {
 });
 
 // POST /api/bookings/:id/complete - Barber marks booking complete
-app.post('/api/bookings/:id/complete', async (req: Request, res: Response) => {
+app.post('/api/bookings/:id/complete', requireBarberAuth, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    // SECURITY: only the assigned barber may mark their own job complete.
+    const barberId = await getOwnBarberProfileId(req.tenant!.pool, req.tenant!.userId!);
+    if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
+
     const result = await req.tenant!.pool.query(
-      'UPDATE bookings SET status = $1 WHERE id = $2 RETURNING *',
-      ['completed', id]
+      `UPDATE bookings SET status = $1
+        WHERE id = $2 AND barber_id = $3 AND status = 'confirmed' RETURNING *`,
+      ['completed', id, barberId]
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Booking not found' });
+      return res.status(404).json({ error: 'Booking not found, not yours, or not confirmed' });
     }
 
     res.json(result.rows[0]);
@@ -1390,16 +1404,27 @@ app.post('/api/bookings/:id/complete', async (req: Request, res: Response) => {
 });
 
 // POST /api/bookings/:id/cancel - Barber (or customer) cancels booking
-app.post('/api/bookings/:id/cancel', async (req: Request, res: Response) => {
+app.post('/api/bookings/:id/cancel', requireUserAuth, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const userId = req.tenant!.userId!;
+    // SECURITY: either side of the booking may cancel it, but nobody else.
+    // A barber cancels via their profile id, a customer via their user id.
+    const barberId = req.tenant!.userRole === 'barber'
+      ? await getOwnBarberProfileId(req.tenant!.pool, userId)
+      : null;
+
     const result = await req.tenant!.pool.query(
-      'UPDATE bookings SET status = $1 WHERE id = $2 RETURNING *',
-      ['cancelled', id]
+      `UPDATE bookings SET status = $1
+        WHERE id = $2
+          AND status IN ('pending','confirmed')
+          AND (customer_id = $3 OR ($4::uuid IS NOT NULL AND barber_id = $4))
+        RETURNING *`,
+      ['cancelled', id, userId, barberId]
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Booking not found' });
+      return res.status(404).json({ error: 'Booking not found, not yours, or already closed' });
     }
 
     res.json(result.rows[0]);
@@ -1410,16 +1435,41 @@ app.post('/api/bookings/:id/cancel', async (req: Request, res: Response) => {
 });
 
 // POST /api/reviews - Create review
-app.post('/api/reviews', async (req: Request, res: Response) => {
+app.post('/api/reviews', requireCustomerAuth, async (req: Request, res: Response) => {
   try {
-    const { booking_id, customer_id, barber_id, rating, comment } = req.body;
+    const { booking_id, rating, comment } = req.body;
+    // SECURITY: the reviewer is the authenticated customer. Previously
+    // customer_id/barber_id came from the body with no auth at all, which let
+    // anyone post unlimited fake ratings for any barber.
+    const customer_id = req.tenant!.userId!;
 
-    if (!booking_id || !customer_id || !barber_id || !rating) {
+    if (!booking_id || !rating) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
     if (rating < 1 || rating > 5) {
       return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+    }
+
+    // A review must correspond to a COMPLETED booking that this customer
+    // actually had — that also determines which barber is being reviewed, so
+    // barber_id can never be spoofed.
+    const bookingResult = await req.tenant!.pool.query(
+      `SELECT barber_id FROM bookings
+        WHERE id = $1 AND customer_id = $2 AND status = 'completed'`,
+      [booking_id, customer_id]
+    );
+    if (bookingResult.rows.length === 0) {
+      return res.status(403).json({ error: 'You can only review your own completed bookings' });
+    }
+    const barber_id = bookingResult.rows[0].barber_id;
+
+    // One review per booking.
+    const existing = await req.tenant!.pool.query(
+      'SELECT id FROM reviews WHERE booking_id = $1', [booking_id]
+    );
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: 'This booking has already been reviewed' });
     }
 
     // Create review
@@ -1452,7 +1502,7 @@ app.post('/api/reviews', async (req: Request, res: Response) => {
 // total_amount. Tenant-scoped like every other /api route. Returns a clean 501 if
 // STRIPE_SECRET_KEY isn't set in this environment yet, instead of crashing — the
 // rest of the app (and the frontend's "not enabled yet" state) keeps working.
-app.post('/api/payments/create-intent', async (req: Request, res: Response) => {
+app.post('/api/payments/create-intent', requireCustomerAuth, async (req: Request, res: Response) => {
   if (!stripe) {
     return res.status(501).json({ error: 'Stripe not configured for this environment yet' });
   }
@@ -1468,9 +1518,12 @@ app.post('/api/payments/create-intent', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Tenant context required' });
     }
 
+    // SECURITY: only pay for your OWN booking — the customer_id predicate stops
+    // a caller creating payment intents against other people's bookings.
     const bookingResult = await req.tenant.pool.query(
-      `SELECT id, total_amount, currency, payment_status FROM bookings WHERE id = $1`,
-      [booking_id]
+      `SELECT id, total_amount, currency, payment_status FROM bookings
+        WHERE id = $1 AND customer_id = $2`,
+      [booking_id, req.tenant.userId]
     );
 
     if (bookingResult.rows.length === 0) {

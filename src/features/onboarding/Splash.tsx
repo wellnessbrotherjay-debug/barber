@@ -13,14 +13,19 @@ export default function Splash() {
   const navigate = useNavigate();
 
   return (
-    <div className="relative w-full bg-white overflow-hidden" style={{ height: 900 }}>
+    // The board frame is 393x900, but the usable viewport on a Dynamic Island
+    // device is ~793pt once the safe-area inset is applied — a hard 900px height
+    // pushed the CTA off-screen and forced this single-screen design to scroll.
+    // Laying it out as a flex column keeps every board measurement while letting
+    // the middle absorb the difference, so the CTA is always reachable.
+    <div className="relative w-full bg-white overflow-hidden flex flex-col" style={{ minHeight: '100%' }}>
       {/* Board wordmark */}
       <div className="absolute left-0 right-0 flex justify-center" style={{ top: 58 }}>
         <span className="font-bold text-black" style={{ fontSize: 28 }}>Barbar</span>
       </div>
 
       {/* ---- Hero cluster (board: x 7..381, y 134..517) ---- */}
-      <div className="absolute inset-x-0" style={{ top: 0, height: 540 }}>
+      <div className="relative w-full shrink-0" style={{ height: 522 }}>
         {/* decorative doodles */}
         <img src="/figma/doodle-comb-scissors.png" alt="" aria-hidden
              className="absolute opacity-25" style={{ left: 82, top: 137, width: 46 }} />
@@ -73,7 +78,7 @@ export default function Splash() {
       </div>
 
       {/* ---- Lower block ---- */}
-      <div className="absolute" style={{ left: 20, top: 600, right: 20 }}>
+      <div className="px-5 mt-auto">
         <div className="bg-black text-white font-semibold inline-flex items-center justify-center rounded-full"
              style={{ width: 138, height: 30, fontSize: 14 }}>
           100% Match
@@ -94,8 +99,8 @@ export default function Splash() {
       <button
         type="button"
         onClick={() => navigate('/welcome')}
-        className="absolute bg-black rounded-full flex items-center active:scale-[0.99] transition-transform"
-        style={{ left: 20, top: 813, width: 351, height: 56 }}
+        className="bg-black rounded-full flex items-center active:scale-[0.99] transition-transform mx-5 mt-6 mb-8 shrink-0"
+        style={{ height: 56 }}
       >
         <span className="rounded-full flex items-center justify-center shrink-0"
               style={{ width: 53, height: 53, marginLeft: 1.5, background: COPPER }}>

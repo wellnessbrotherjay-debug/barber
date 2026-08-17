@@ -101,7 +101,7 @@ export default function RateBarber() {
   return (
     <div className="min-h-screen bg-white pb-8">
       {/* Figma 1:139 header: 100px image placeholder, title 18px, subtitle 12px */}
-      <div className="flex flex-col items-center px-4 pt-[110px]">
+      <div className="flex flex-col items-center px-4 pt-[56px]">
         <div className="w-[100px] h-[100px] rounded-[8px] bg-surface flex items-center justify-center">
           <ImageIcon className="w-[41px] h-[38px] text-muted" />
         </div>

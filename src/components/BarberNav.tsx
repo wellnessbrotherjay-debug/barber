@@ -18,7 +18,7 @@ const items = [
 export default function BarberNav({ active }: Props) {
   const navigate = useNavigate();
   return (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[393px] h-[88px] bg-white border-t border-[#f0f0f0] flex items-start justify-around overflow-hidden z-50">
+    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[393px] safe-bottom-nav bg-white border-t border-[#f0f0f0] flex items-start justify-around overflow-hidden z-50">
       {items.map((item) => {
         const isActive = active === item.key;
         const Icon = item.icon;

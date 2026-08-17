@@ -124,3 +124,20 @@ export async function deleteBarberPhoto(id: string): Promise<BarberPhoto[]> {
   const body = await response.json();
   return (body.photos || []) as BarberPhoto[];
 }
+
+/**
+ * Tidy a typed phone number without changing the Figma field (board page 20 has
+ * a single "Enter Phone Number" input and no country-code selector).
+ * Keeps a leading "+" and digits only, so "+62 812-3456 7890" and
+ * "(02) 9999 8888" both store cleanly and an international number entered in
+ * full survives round-tripping. Deliberately does NOT invent a country code —
+ * guessing one would be worse than storing what the barber typed.
+ */
+export function normalisePhone(input: string): string {
+  const trimmed = input.trim();
+  if (!trimmed) return '';
+  const hasPlus = trimmed.startsWith('+');
+  const digits = trimmed.replace(/\D/g, '');
+  if (!digits) return '';
+  return (hasPlus ? '+' : '') + digits;
+}

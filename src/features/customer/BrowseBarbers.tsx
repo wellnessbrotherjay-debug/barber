@@ -99,7 +99,7 @@ export default function BrowseBarbers() {
   return (
     <div className="relative w-full min-h-screen bg-white flex flex-col pb-[88px]">
       {/* Header — Figma 1:330 */}
-      <div className="px-5 pt-[70px] pb-4">
+      <div className="px-5 pt-4 pb-4">
         <h1 className="text-[16px] leading-[24px] font-bold text-ink">Available Now</h1>
       </div>
 

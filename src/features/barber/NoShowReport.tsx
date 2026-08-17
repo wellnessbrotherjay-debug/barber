@@ -56,7 +56,7 @@ export default function NoShowReport() {
   return (
     <div className="min-h-screen bg-white pb-28">
       {/* Top Navigation Bar */}
-      <div className="px-5 pt-[70px] pb-4 flex items-center gap-1.5">
+      <div className="px-5 pt-4 pb-4 flex items-center gap-1.5">
         <button type="button" onClick={() => navigate(-1)} className="-ml-1 p-0.5 shrink-0">
           <ChevronLeft className="w-6 h-6 text-[#1c1b1f]" />
         </button>

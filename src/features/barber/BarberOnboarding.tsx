@@ -17,7 +17,7 @@ import {
   Crosshair,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { authFetch, fetchBarberPhotos, uploadGalleryPhotos, type BarberPhoto } from '@/lib/api';
+import { authFetch, fetchBarberPhotos, normalisePhone, uploadAvatar, uploadGalleryPhotos, type BarberPhoto } from '@/lib/api';
 import { useAuthStore } from '@/store/useAuthStore';
 import BarberServices from './BarberServices';
 import BarberPendingVerification from './BarberPendingVerification';
@@ -195,6 +195,28 @@ export default function BarberOnboarding() {
   // /api/barber/upload/gallery, stored server-side, and the returned rows are
   // this barber's actual gallery.
   const [photos, setPhotos] = useState<BarberPhoto[]>([]);
+  // Step 2 avatar. Seeded from the signed-in user so a barber returning to
+  // onboarding sees the photo they already uploaded.
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.avatar_url ?? null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+
+  async function onPickAvatar(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setAvatarError(null);
+    setAvatarUploading(true);
+    try {
+      const url = await uploadAvatar(file);
+      setAvatarUrl(url);
+      if (user) setUser({ ...user, avatar_url: url });
+    } catch (err) {
+      setAvatarError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAvatarUploading(false);
+    }
+  }
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const photoCount = photos.length;
@@ -378,7 +400,7 @@ export default function BarberOnboarding() {
         method: 'PUT',
         body: JSON.stringify({
           display_name: profile.display_name || undefined,
-          phone: profile.phone || undefined,
+          phone: normalisePhone(profile.phone) || undefined,
           shop_name: profile.shop_name || undefined,
           bio: profile.bio || undefined,
           address_text: profile.address_text || undefined,
@@ -620,10 +642,27 @@ export default function BarberOnboarding() {
     return (
       <div className="min-h-screen bg-white flex flex-col">
         <StepHeader step={2} title="Your profile" onBack={() => setStep(0)} />
-        <div className="px-4 pt-4 flex justify-center">
-          <div className="size-[100px] bg-surface rounded-[8px] flex items-center justify-center">
-            <ImageIcon className="w-10 h-10 text-[#c9c6da]" />
-          </div>
+        {/* Board page 20 draws this as a bare placeholder with no label, so the
+            tile itself is the affordance — tapping it opens the picker and it
+            then shows the uploaded avatar. No extra chrome is added to the
+            locked design. */}
+        <div className="px-4 pt-4 flex flex-col items-center gap-2">
+          <label className="size-[100px] bg-surface rounded-[8px] flex items-center justify-center overflow-hidden cursor-pointer active:opacity-80">
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/heic"
+              className="hidden"
+              disabled={avatarUploading}
+              onChange={onPickAvatar}
+            />
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="Your profile" className="w-full h-full object-cover" />
+            ) : (
+              <ImageIcon className="w-10 h-10 text-[#c9c6da]" />
+            )}
+          </label>
+          {avatarUploading && <p className="text-[11px] text-muted">Uploading…</p>}
+          {avatarError && <p className="text-[11px] text-red-600 text-center px-6">{avatarError}</p>}
         </div>
         <div className="px-5 py-4">
           <div className="bg-white rounded-[12px] p-4 flex flex-col gap-4 drop-shadow-[0px_4px_16px_rgba(231,236,243,0.08)]">

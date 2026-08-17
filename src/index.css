@@ -28,6 +28,30 @@
   html, body, #root {
     height: 100%;
   }
+  /* One scroll container, not three. The document itself must NOT scroll or the
+     safe-area padding on #root scrolls away with it (content would slide back
+     under the Dynamic Island); .app-frame below owns scrolling instead. */
+  html, body {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  /* iOS safe areas.
+     The Figma frames are 393x852 drawn flush to the device edge, so screen
+     content starts at y=0 and would render UNDER the Dynamic Island / notch in
+     the Capacitor webview (requires viewport-fit=cover in index.html for
+     env() to resolve). Padding the app shell pushes every screen below the
+     island once, instead of patching ~55 screens individually.
+     Fixed-position elements (the bottom navs) are not affected by this padding
+     and handle their own inset — see .safe-bottom-nav below. */
+  #root {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    /* Keeps CTAs clear of the home indicator. Screens with a bottom nav already
+       reserve pb-[88px]; this inset lines that reservation up with the nav's
+       new safe-area-aware height so the two stay in agreement. */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
   body {
     margin: 0;
     font-family: var(--font-sans);
@@ -39,6 +63,10 @@
 
 /* Mobile app frame – centers 393px screens */
 .app-shell {
+  /* A definite height, not just min-height: .app-frame's percentage max-height
+     only resolves against a parent with a definite height, so with min-height
+     alone the frame grew unbounded and never became a scroll container. */
+  height: 100%;
   min-height: 100%;
   display: flex;
   justify-content: center;
@@ -48,10 +76,27 @@
 .app-frame {
   width: 100%;
   max-width: 393px;
-  min-height: 100vh;
-  min-height: 100dvh;
+  /* 100% of the safe-area-padded #root, NOT 100dvh: dvh measures the full
+     viewport, so inside a root padded by the top/bottom insets it overflowed by
+     exactly that amount and pushed each screen's bottom CTA off-screen. */
+  min-height: 100%;
+  /* Constrain to the padded root and scroll internally, so tall screens (the
+     4-document Verification step, availability, long profiles) can always reach
+     their bottom action — previously the overflow was simply unreachable. */
+  max-height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   background: white;
   position: relative;
   overflow-x: hidden;
   box-shadow: 0 0 40px rgba(0,0,0,0.08);
+}
+
+/* Bottom nav sits above the iOS home indicator. The nav is position:fixed so
+   the #root inset padding does not apply to it; it grows by the bottom inset
+   and pads its own content down, keeping the Figma 88px bar height on devices
+   with no indicator. */
+.safe-bottom-nav {
+  height: calc(88px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }

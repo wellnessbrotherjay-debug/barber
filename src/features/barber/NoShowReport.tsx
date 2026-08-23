@@ -4,6 +4,7 @@ import { ChevronLeft, X, Info, ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/store/useAuthStore';
 import { fetchBarberJobs, type Job } from './BarberJobs';
+import { authFetch } from '@/lib/api';
 
 export default function NoShowReport() {
   const navigate = useNavigate();
@@ -31,12 +32,9 @@ export default function NoShowReport() {
     if (!id || !user?.id || submitting) return;
     setSubmitting(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/bookings/${id}/cancel`, {
+      const response = await authFetch(`/api/bookings/${id}/cancel`, {
         method: 'POST',
         headers: {
-          'X-Session-Token': `1:${user.id}`,
-          Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}`,
-          'X-User-ID': user.id,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ reason: 'no_show' }),

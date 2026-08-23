@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/store/useAuthStore';
+import { authFetch } from '@/lib/api';
 
 const CHECKLIST = ['Service Delivery Confirmed', 'Customer Payment Handled Offline'];
 
@@ -22,12 +23,9 @@ export default function CompleteJob() {
     if (!id || !user?.id || submitting) return;
     setSubmitting(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/bookings/${id}/complete`, {
+      const response = await authFetch(`/api/bookings/${id}/complete`, {
         method: 'POST',
         headers: {
-          'X-Session-Token': `1:${user.id}`,
-          Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}`,
-          'X-User-ID': user.id,
         },
       });
       if (!response.ok) throw new Error(`Failed to complete booking: ${response.status}`);

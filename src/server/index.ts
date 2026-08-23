@@ -1252,14 +1252,11 @@ app.get('/api/bookings', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/barber/bookings - Get bookings for the logged-in barber
-app.get('/api/barber/bookings', async (req: Request, res: Response) => {
+// GET /api/barber/bookings - Get bookings for the logged-in barber.
+// Identity comes from the verified JWT (req.tenant.userId), never headers.
+app.get('/api/barber/bookings', requireBarberAuth, async (req: Request, res: Response) => {
   try {
-    const barberUserId = req.headers['x-user-id'] as string;
-
-    if (!barberUserId) {
-      return res.status(401).json({ error: 'User ID required' });
-    }
+    const barberUserId = req.tenant!.userId!;
 
     const result = await req.tenant!.pool.query(`
       SELECT

@@ -100,16 +100,12 @@ function RequireOnboardedBarber({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// TEMP: internal-tool stopgap until real admin SSO login exists. Sets the
-// admin session cookie the backend's requireAdmin middleware checks for
-// (src/server/middleware/tenant.ts ~line 89-90: cookie "session" containing
-// "admin" + header "x-admin-role: true"). This is NOT a security boundary —
-// requireAdmin is the actual gate; this route is only reachable if someone
-// already knows the internal URL. Do not treat this as authentication.
+// Admin entry. Authentication is a real server-side credential: the dashboard
+// sends `Authorization: Bearer <ADMIN_API_KEY>` (from localStorage
+// 'adminApiKey') + `X-Admin-Role: true`, verified against the server's
+// ADMIN_API_KEY env var in src/server/middleware/tenant.ts. No cookie is set
+// here — the server fails closed if ADMIN_API_KEY is unset.
 function AdminDashboardEntry() {
-  React.useEffect(() => {
-    document.cookie = 'session=admin-owner; path=/';
-  }, []);
   return <AdminDashboard />;
 }
 

@@ -7,6 +7,7 @@ import CustomerNav from '@/components/CustomerNav';
 
 import { Button } from '@/components/ui/Button';
 import { getStoredLocation, distanceKm } from '@/lib/geo';
+import { authFetch } from '@/lib/api';
 
 interface Barber {
   id: string;
@@ -42,8 +43,10 @@ export default function BarbersMap() {
         const path = here
           ? `/api/barbers/nearby?lat=${here.lat}&lng=${here.lng}&radius_km=25&limit=50`
           : `/api/barbers?limit=50`;
-        const res = await fetch(`${import.meta.env.VITE_API_URL || ''}${path}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}` },
+        // Public discovery: authFetch attaches the JWT when logged in; the
+        // guest X-Session-Token is the anonymous tenant-context fallback.
+        const res = await authFetch(path, {
+          headers: { 'X-Session-Token': '1:guest' },
         });
         const data = (await res.json()) as any;
         const list: Barber[] = Array.isArray(data) ? data : data.barbers || [];

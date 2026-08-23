@@ -4,6 +4,7 @@ import { ChevronLeft, Scissors, Send, Store, Truck, User, Phone } from 'lucide-r
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
+import { authFetch } from '@/lib/api';
 
 interface Service {
   id: string;
@@ -34,11 +35,9 @@ export default function BookingRequest() {
     async function fetchServices() {
       try {
         setLoading(true);
-        const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/barbers/${id}`, {
+        const response = await authFetch(`/api/barbers/${id}`, {
           headers: {
-            'X-Session-Token': `1:${user?.id || 'guest'}`,
-            Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}`,
-            'X-User-ID': user?.id || '',
+            'X-Session-Token': '1:guest',
           },
         });
         if (!response.ok) throw new Error(`Failed to fetch services: ${response.status}`);
@@ -63,13 +62,10 @@ export default function BookingRequest() {
     try {
       setSubmitting(true);
       const bookingDate = new Date().toISOString().slice(0, 10);
-      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/bookings`, {
+      const response = await authFetch(`/api/bookings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Session-Token': `1:${user.id}`,
-          Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}`,
-          'X-User-ID': user.id,
         },
         body: JSON.stringify({
           customer_id: user.id,

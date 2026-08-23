@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { ChevronLeft, MessageCircle, Phone, Clock, MapPin } from 'lucide-react';
 import { formatShortDateTime } from '@/lib/datetime';
 import { useAuthStore } from '@/store/useAuthStore';
+import { authFetch } from '@/lib/api';
 
 // Figma node 1:1171 "Booking History" — segmented Upcoming/Past tabs over
 // bordered booking cards.
@@ -45,11 +46,8 @@ export default function BookingHistory() {
     async function fetchBookings() {
       try {
         setLoading(true);
-        const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/bookings`, {
+        const response = await authFetch(`/api/bookings`, {
           headers: {
-            'X-Session-Token': `1:${user!.id}`,
-            Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}`,
-            'X-User-ID': user!.id,
           },
         });
         if (!response.ok) throw new Error(`Failed to fetch bookings: ${response.status}`);

@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useAuthStore } from '@/store/useAuthStore';
 import { getStoredLocation, distanceKm, formatDistance, formatEta, type LatLng } from '@/lib/geo';
+import { authFetch } from '@/lib/api';
 
 interface Barber {
   id: string;
@@ -60,11 +61,9 @@ export default function BrowseBarbers() {
         const path = here
           ? `/api/barbers/nearby?lat=${here.lat}&lng=${here.lng}&radius_km=${SEARCH_RADIUS_KM}&limit=${PAGE_SIZE}`
           : `/api/barbers?limit=${PAGE_SIZE}`;
-        const response = await fetch(`${import.meta.env.VITE_API_URL || ''}${path}`, {
+        const response = await authFetch(`${path}`, {
           headers: {
-            'X-Session-Token': `1:${user?.id || 'guest'}`,
-            Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}`,
-            'X-User-ID': user?.id || '',
+            'X-Session-Token': '1:guest',
           },
         });
         if (!response.ok) throw new Error(`Failed to fetch barbers: ${response.status}`);

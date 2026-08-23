@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Clock, ChevronLeft, ImageIcon, Scissors, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/store/useAuthStore';
+import { authFetch } from '@/lib/api';
 
 // Booking countdown / waiting-for-barber-response screen (Figma flow step 3).
 //
@@ -66,8 +67,7 @@ export default function BookingWaiting() {
     let cancelled = false;
     async function poll() {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/bookings`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}`, 'X-Session-Token': `1:${user!.id}`, 'X-User-ID': user!.id },
+        const response = await authFetch(`/api/bookings`, {
         });
         if (!response.ok) return;
         const data: Booking[] = await response.json();
@@ -99,9 +99,8 @@ export default function BookingWaiting() {
     if (!bookingId || !user?.id || cancelledRef.current) return;
     cancelledRef.current = true;
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/bookings/${bookingId}/cancel`, {
+      const response = await authFetch(`/api/bookings/${bookingId}/cancel`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}`, 'X-Session-Token': `1:${user.id}`, 'X-User-ID': user.id },
       });
       if (!response.ok) throw new Error(`Failed to cancel: ${response.status}`);
       toast.success('Request cancelled');

@@ -4,6 +4,7 @@ import { ChevronLeft, Clock, MapPin, Check, MessageSquare, Phone } from 'lucide-
 import BarberNav from '@/components/BarberNav';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
+import { authFetch } from '@/lib/api';
 
 interface Props {
   tab: 'incoming' | 'upcoming' | 'past';
@@ -54,11 +55,8 @@ function statusChipLabel(tab: Props['tab'], status: string): string {
 }
 
 export async function fetchBarberJobs(userId: string): Promise<Job[]> {
-  const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/barber/bookings`, {
+  const response = await authFetch(`/api/barber/bookings`, {
     headers: {
-      'X-Session-Token': `1:${userId}`,
-      Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}`,
-      'X-User-ID': userId,
     },
   });
   if (!response.ok) throw new Error(`Failed to fetch jobs: ${response.status}`);

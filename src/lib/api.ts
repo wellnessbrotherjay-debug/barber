@@ -53,18 +53,11 @@ export async function authFetch(path: string, init: RequestInit = {}): Promise<R
   return response;
 }
 
-// GET /api/barber/bookings authenticates via X-Session-Token/X-User-ID headers
-// (not the Authorization JWT authFetch normally sends — see
-// src/server/index.ts and src/server/middleware/tenant.ts), matching the
-// pattern BarberJobs.tsx already uses. Shared here so Wallet/Performance/
-// ProfileEdit can pull the same real booking data.
-export async function fetchBarberBookingsForUser(userId: string): Promise<Response> {
-  return fetch(`${API_BASE}/api/barber/bookings`, {
-    headers: {
-      'X-Session-Token': `1:${userId}`,
-      'X-User-ID': userId,
-    },
-  });
+// GET /api/barber/bookings derives the barber from the JWT (requireBarberAuth
+// on the server) — no ids are sent. The userId parameter is retained only so
+// existing call sites (Wallet/Performance/ProfileEdit/BarberJobs) don't churn.
+export async function fetchBarberBookingsForUser(_userId?: string): Promise<Response> {
+  return authFetch('/api/barber/bookings');
 }
 
 // ---------------------------------------------------------------------------

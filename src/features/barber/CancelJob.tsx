@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/store/useAuthStore';
+import { authFetch } from '@/lib/api';
 
 /* Reason copy replicated verbatim from Figma p52 (including "Too For") */
 const REASONS = ['Emergency', 'Not Available', 'Too For', 'Other'];
@@ -18,12 +19,9 @@ export default function CancelJob() {
     if (!id || !user?.id || submitting) return;
     setSubmitting(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/bookings/${id}/cancel`, {
+      const response = await authFetch(`/api/bookings/${id}/cancel`, {
         method: 'POST',
         headers: {
-          'X-Session-Token': `1:${user.id}`,
-          Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}`,
-          'X-User-ID': user.id,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(reason ? { reason } : {}),

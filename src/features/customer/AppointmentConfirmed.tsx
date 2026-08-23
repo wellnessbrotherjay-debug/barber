@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, XCircle, ImageIcon, MessageSquare, Phone } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
+import { authFetch } from '@/lib/api';
 
 interface Booking {
   id: string;
@@ -19,11 +20,8 @@ export default function AppointmentConfirmed() {
   useEffect(() => {
     if (!user?.id || !bookingId) return;
     let cancelled = false;
-    fetch(`${import.meta.env.VITE_API_URL || ''}/api/bookings`, {
+    authFetch(`/api/bookings`, {
       headers: {
-        Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}`,
-        'X-Session-Token': `1:${user.id}`,
-        'X-User-ID': user.id,
       },
     })
       .then((r) => (r.ok ? r.json() : []))

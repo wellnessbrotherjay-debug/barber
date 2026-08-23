@@ -20,6 +20,7 @@ import {
 } from '@stripe/react-stripe-js';
 import { Card } from '@/components/ui/Card';
 import { useAuthStore } from '@/store/useAuthStore';
+import { authFetch } from '@/lib/api';
 
 // Figma node 1:1972 "Pay Booking Fee" — appointment summary, booking fee
 // breakdown, "What this unlocks" card, black pill CTA pinned at the bottom.
@@ -241,14 +242,8 @@ export default function PayFee() {
     async function createIntent() {
       try {
         setLoading(true);
-        const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/payments/create-intent`, {
+        const response = await authFetch(`/api/payments/create-intent`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Session-Token': `1:${user?.id || 'guest'}`,
-            Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}`,
-            'X-User-ID': user?.id || '',
-          },
           body: JSON.stringify({ booking_id: bookingId }),
         });
 

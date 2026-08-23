@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
+import { authFetch } from '@/lib/api';
 
 interface Booking {
   id: string;
@@ -44,11 +45,8 @@ export default function RateBarber() {
     async function fetchBooking() {
       try {
         setLoading(true);
-        const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/bookings`, {
+        const response = await authFetch(`/api/bookings`, {
           headers: {
-            'X-Session-Token': `1:${user!.id}`,
-            Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}`,
-            'X-User-ID': user!.id,
           },
         });
         if (!response.ok) throw new Error(`Failed to fetch booking: ${response.status}`);
@@ -69,13 +67,10 @@ export default function RateBarber() {
     if (!booking || !user?.id || !id) return;
     try {
       setSubmitting(true);
-      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/reviews`, {
+      const response = await authFetch(`/api/reviews`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Session-Token': `1:${user.id}`,
-          Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}`,
-          'X-User-ID': user.id,
         },
         body: JSON.stringify({
           booking_id: id,

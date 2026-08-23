@@ -4,6 +4,7 @@ import { ChevronLeft, CircleCheck, Clock, Scissors, ShieldCheck, MessageSquare, 
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
+import { authFetch } from '@/lib/api';
 
 const STEPS = [
   { key: 'sent', label: 'Request Sent', icon: CircleCheck },
@@ -24,12 +25,9 @@ export default function BookingRequestStatus() {
       return;
     }
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/bookings/${bookingId}/cancel`, {
+      const response = await authFetch(`/api/bookings/${bookingId}/cancel`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}`,
-          'X-Session-Token': `1:${user.id}`,
-          'X-User-ID': user.id,
         },
       });
       if (!response.ok) throw new Error(`Failed to cancel: ${response.status}`);

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { MessageCircle, Phone, ImageIcon, FileText, Scissors, Calendar, DollarSign } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { useAuthStore } from '@/store/useAuthStore';
+import { authFetch } from '@/lib/api';
 
 interface Booking {
   id: string;
@@ -48,8 +49,7 @@ export default function BookingConfirmed() {
   useEffect(() => {
     if (!user?.id || !bookingId) return;
     let cancelled = false;
-    fetch(`${import.meta.env.VITE_API_URL || ''}/api/bookings`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}`, 'X-Session-Token': `1:${user.id}`, 'X-User-ID': user.id },
+    authFetch(`/api/bookings`, {
     })
       .then((r) => (r.ok ? r.json() : []))
       .then((data: Booking[]) => {

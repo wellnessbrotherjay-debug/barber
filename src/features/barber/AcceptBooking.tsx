@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Scissors, Clock, Phone, Star, Calendar, MapP
 import { toast } from 'sonner';
 import { useAuthStore } from '@/store/useAuthStore';
 import { fetchBarberJobs, type Job } from './BarberJobs';
+import { authFetch } from '@/lib/api';
 
 export default function AcceptBooking() {
   const navigate = useNavigate();
@@ -40,12 +41,9 @@ export default function AcceptBooking() {
     if (!id || !user?.id) return;
     try {
       setSubmitting(true);
-      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/bookings/${id}/accept`, {
+      const response = await authFetch(`/api/bookings/${id}/accept`, {
         method: 'POST',
         headers: {
-          'X-Session-Token': `1:${user.id}`,
-          Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}`,
-          'X-User-ID': user.id,
         },
       });
       if (!response.ok) throw new Error(`Failed to accept booking: ${response.status}`);

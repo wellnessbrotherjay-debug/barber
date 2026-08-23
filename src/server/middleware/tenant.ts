@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
-import { randomBytes } from 'crypto';
+import { randomBytes, timingSafeEqual } from 'crypto';
 
 export interface TenantContext {
   companyId: string;
@@ -118,31 +118,39 @@ export async function tenantMiddleware(
     // Attach admin DB
     req.adminDb = adminDbPool;
 
-    // Check for admin SSO (auth cookie with admin role). This must never
-    // shadow a real Bearer token (JWT customer/barber session, or company
-    // API key) — a stray leftover admin cookie in the browser would
-    // otherwise silently break every authenticated request forever. Only
-    // consider the admin-cookie path when no Bearer header is present at
-    // all, and require the explicit x-admin-role header rather than a loose
-    // substring match on the cookie value (e.g. "admin-owner" trivially
-    // contains "admin" and is not a real credential check).
-    const sessionCookie = req.cookies?.session;
-    const hasBearerAuth = !!req.headers.authorization?.startsWith('Bearer ');
-    if (sessionCookie && !hasBearerAuth) {
-      const isAdmin = req.headers['x-admin-role'] === 'true';
-
-      if (isAdmin) {
-        // Admin context - no specific tenant, has access to all
-        req.tenant = {
-          companyId: 'admin',
-          companyName: 'Admin',
-          tier: 'enterprise',
-          isAdmin: true,
-          userId: req.headers['x-user-id'] as string,
-          pool: adminDbPool,
-        };
-        return next();
+    // Admin authentication: requests marked with `x-admin-role: true` must
+    // carry `Authorization: Bearer <ADMIN_API_KEY>`. The key is a real server
+    // credential from the environment — never a cookie, never a client-chosen
+    // value. Fail closed: if ADMIN_API_KEY is unset, admin access is disabled
+    // entirely. Comparison is constant-time (timingSafeEqual) on equal-length
+    // buffers; a length mismatch fails immediately without leaking timing.
+    if (req.headers['x-admin-role'] === 'true') {
+      const adminKey = process.env.ADMIN_API_KEY;
+      if (!adminKey) {
+        return res.status(401).json({
+          error: 'Admin access disabled',
+          hint: 'Set ADMIN_API_KEY in the server environment to enable admin access',
+        });
       }
+      const authHeader = req.headers.authorization;
+      if (!authHeader?.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Admin authentication required' });
+      }
+      const provided = Buffer.from(authHeader.slice(7));
+      const expected = Buffer.from(adminKey);
+      if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
+        return res.status(401).json({ error: 'Invalid admin credentials' });
+      }
+      // Admin context - no specific tenant, has access to all. userId is
+      // deliberately NOT taken from any client header.
+      req.tenant = {
+        companyId: 'admin',
+        companyName: 'Admin',
+        tier: 'enterprise',
+        isAdmin: true,
+        pool: adminDbPool,
+      };
+      return next();
     }
 
     // Check for API key (barber company authentication) OR a user session JWT
@@ -209,12 +217,15 @@ export async function tenantMiddleware(
       }
     }
 
-    // Check for customer session (per-tenant session token)
+    // Anonymous tenant context for public discovery (guest browse). The
+    // x-session-token header ("<tenantId>:guest") ONLY selects a tenant DB —
+    // it carries NO identity. userId is left undefined and x-user-id is
+    // ignored entirely: identity comes exclusively from the JWT path above.
     const customerSession = req.headers['x-session-token'] as string;
     if (customerSession) {
       const parts = customerSession.split(':');
-      if (parts.length === 2) {
-        const [tenantId, sessionId] = parts;
+      if (parts.length === 2 && /^[1-9]\d*$/.test(parts[0])) {
+        const tenantId = parts[0];
         const pool = await getTenantPool(tenantId);
 
         req.tenant = {
@@ -222,7 +233,6 @@ export async function tenantMiddleware(
           companyName: `Company ${tenantId}`,
           tier: 'starter',
           isAdmin: false,
-          userId: req.headers['x-user-id'] as string,
           pool,
         };
         return next();
@@ -232,7 +242,7 @@ export async function tenantMiddleware(
     // No valid authentication found
     return res.status(401).json({
       error: 'Tenant authentication required',
-      hint: 'Provide: (1) admin session cookie, (2) API key header, or (3) customer session token'
+      hint: 'Provide: (1) a Bearer JWT or API key, (2) ADMIN_API_KEY with x-admin-role, or (3) an anonymous x-session-token for public discovery'
     });
   } catch (err) {
     console.error('Tenant middleware error:', err);

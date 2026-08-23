@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Scissors, Clock, Calendar, CircleCheck, Facebook, Twitter, Instagram } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
+import { authFetch } from '@/lib/api';
 
 interface BarberDetail {
   id: string;
@@ -35,11 +36,9 @@ export default function BarberProfileTabs() {
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
-    fetch(`${import.meta.env.VITE_API_URL || ''}/api/barbers/${id}`, {
+    authFetch(`/api/barbers/${id}`, {
       headers: {
-        'X-Session-Token': `1:${user?.id || 'guest'}`,
-        Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}`,
-        'X-User-ID': user?.id || '',
+        'X-Session-Token': '1:guest',
       },
     })
       .then((r) => (r.ok ? r.json() : null))

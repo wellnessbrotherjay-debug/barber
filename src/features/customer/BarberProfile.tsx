@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
+import { authFetch } from '@/lib/api';
 
 interface BarberDetail {
   id: string;
@@ -47,11 +48,9 @@ export default function BarberProfile() {
     async function fetchBarber() {
       try {
         setLoading(true);
-        const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/barbers/${id}`, {
+        const response = await authFetch(`/api/barbers/${id}`, {
           headers: {
-            'X-Session-Token': `1:${user?.id || 'guest'}`,
-            Authorization: `Bearer ${localStorage.getItem('barberSyncToken') || ''}`,
-            'X-User-ID': user?.id || '',
+            'X-Session-Token': '1:guest',
           },
         });
         if (!response.ok) throw new Error(`Failed to fetch barber: ${response.status}`);

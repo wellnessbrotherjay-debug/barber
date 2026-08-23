@@ -13,12 +13,14 @@ interface Booking {
   total_amount: number;
   barber_profiles: { id: string; display_name: string; shop_name?: string };
   services: { name: string; price: number };
+  // Revealed by the API only once the barber has accepted (see server query).
+  barber_phone?: string | null;
 }
 
 // Booking Confirmed screen (Figma flow step 7) — shown once the barber has
-// accepted (status === 'confirmed'). Chat/Call are honest UI-only placeholders:
-// there is no real chat backend built yet, so both buttons are disabled with a
-// "coming soon" label rather than pretending to open a working conversation.
+// accepted (status === 'confirmed'). Chat/Call v1 open the device's native SMS
+// composer / dialler with the barber's number (revealed by the API only after
+// acceptance) — see docs/SCOPE_RECONCILIATION.md §5.
 // The API returns booking_date as an ISO timestamp and start_time as "HH:MM:SS";
 // the board shows "Tuesday, Oct 24 • 10:00 AM".
 function formatBookingDate(value: string): string {
@@ -124,23 +126,45 @@ export default function BookingConfirmed() {
           </p>
         </Card>
 
+        {/* Chat & call v1 (SCOPE_RECONCILIATION §5): honour the Figma promise
+            by opening the device's native SMS composer / dialler with the
+            barber's number, which the API only reveals after acceptance. If
+            the barber has no phone on file, the buttons stay disabled. */}
         <div className="flex flex-col gap-3">
-          <button
-            type="button"
-            disabled
-            title="Chat is coming soon — not built yet"
-            className="w-full flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full py-4 text-[15px] font-semibold text-ink"
-          >
-            <MessageCircle className="w-5 h-5" strokeWidth={1.8} /> Chat
-          </button>
-          <button
-            type="button"
-            disabled
-            title="Call is coming soon — not built yet"
-            className="w-full flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full py-4 text-[15px] font-semibold text-ink"
-          >
-            <Phone className="w-5 h-5" strokeWidth={1.8} /> Call
-          </button>
+          {booking?.barber_phone ? (
+            <a
+              href={`sms:${booking.barber_phone}`}
+              className="w-full flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full py-4 text-[15px] font-semibold text-ink"
+            >
+              <MessageCircle className="w-5 h-5" strokeWidth={1.8} /> Chat
+            </a>
+          ) : (
+            <button
+              type="button"
+              disabled
+              title="Chat unlocks when your barber's number is available"
+              className="w-full flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full py-4 text-[15px] font-semibold text-ink opacity-60"
+            >
+              <MessageCircle className="w-5 h-5" strokeWidth={1.8} /> Chat
+            </button>
+          )}
+          {booking?.barber_phone ? (
+            <a
+              href={`tel:${booking.barber_phone}`}
+              className="w-full flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full py-4 text-[15px] font-semibold text-ink"
+            >
+              <Phone className="w-5 h-5" strokeWidth={1.8} /> Call
+            </a>
+          ) : (
+            <button
+              type="button"
+              disabled
+              title="Call unlocks when your barber's number is available"
+              className="w-full flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full py-4 text-[15px] font-semibold text-ink opacity-60"
+            >
+              <Phone className="w-5 h-5" strokeWidth={1.8} /> Call
+            </button>
+          )}
         </div>
       </div>
     </div>

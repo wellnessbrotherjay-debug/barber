@@ -1227,6 +1227,10 @@ app.get('/api/bookings', async (req: Request, res: Response) => {
           'display_name', bp.display_name,
           'shop_name', bp.shop_name
         ) as barber_profiles,
+        -- Chat & call v1 (SCOPE_RECONCILIATION §5): the barber's phone number
+        -- is only revealed AFTER the barber accepts — the same unlock moment
+        -- the Figma promises for chat/call. Pending/declined bookings get NULL.
+        CASE WHEN b.status IN ('confirmed', 'completed') THEN bu.phone END as barber_phone,
         json_build_object(
           'id', s.id,
           'name', s.name,
@@ -1235,6 +1239,7 @@ app.get('/api/bookings', async (req: Request, res: Response) => {
         ) as services
       FROM bookings b
       JOIN barber_profiles bp ON b.barber_id = bp.id
+      JOIN users bu ON bp.user_id = bu.id
       JOIN services s ON b.service_id = s.id
       WHERE b.customer_id = $1
       ORDER BY b.booking_date DESC
@@ -1284,7 +1289,10 @@ app.get('/api/barber/bookings', async (req: Request, res: Response) => {
         json_build_object(
           'shop_name', bp.shop_name,
           'address_text', bp.address_text
-        ) as barber_profiles
+        ) as barber_profiles,
+        -- Chat & call v1 (SCOPE_RECONCILIATION §5): the customer's phone is
+        -- only revealed once the barber has accepted the job.
+        CASE WHEN b.status IN ('confirmed', 'completed') THEN u.phone END as customer_phone
       FROM bookings b
       JOIN barber_profiles bp ON b.barber_id = bp.id
       JOIN users u ON b.customer_id = u.id
@@ -1346,6 +1354,17 @@ app.post('/api/bookings', requireCustomerAuth, async (req: Request, res: Respons
       booking_date, startTime, endTime, 'pending', 'unpaid', totalAmount, notes
     ]);
 
+    // Notify the barber that a new request has arrived (non-fatal).
+    const barberUserId = await getBarberUserId(req.tenant!.pool, barber_id);
+    await createNotification(
+      req.tenant!.pool,
+      barberUserId,
+      'New booking request',
+      `You have a new booking request for ${booking_date} at ${startTime}.`,
+      'booking',
+      result.rows[0].id
+    );
+
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error creating booking:', error);
@@ -1371,6 +1390,16 @@ app.post('/api/bookings/:id/accept', requireBarberAuth, async (req: Request, res
       return res.status(404).json({ error: 'Booking not found, not yours, or no longer pending' });
     }
 
+    // Notify the customer their request was accepted (non-fatal).
+    await createNotification(
+      req.tenant!.pool,
+      result.rows[0].customer_id,
+      'Booking confirmed',
+      'Your barber accepted your request. Chat and call are now unlocked.',
+      'booking',
+      result.rows[0].id
+    );
+
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error accepting booking:', error);
@@ -1395,6 +1424,16 @@ app.post('/api/bookings/:id/complete', requireBarberAuth, async (req: Request, r
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found, not yours, or not confirmed' });
     }
+
+    // Notify the customer the job is done — this also unlocks leaving a review.
+    await createNotification(
+      req.tenant!.pool,
+      result.rows[0].customer_id,
+      'Booking completed',
+      'Your appointment is complete. You can now rate your barber.',
+      'booking',
+      result.rows[0].id
+    );
 
     res.json(result.rows[0]);
   } catch (error) {
@@ -1426,6 +1465,25 @@ app.post('/api/bookings/:id/cancel', requireUserAuth, async (req: Request, res: 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found, not yours, or already closed' });
     }
+
+    // Notify the OTHER party about the cancellation (non-fatal). If the
+    // customer cancelled, tell the barber; if the barber cancelled, tell the
+    // customer.
+    const cancelled = result.rows[0];
+    const cancelledByCustomer = cancelled.customer_id === userId;
+    const counterpartUserId = cancelledByCustomer
+      ? await getBarberUserId(req.tenant!.pool, cancelled.barber_id)
+      : cancelled.customer_id;
+    await createNotification(
+      req.tenant!.pool,
+      counterpartUserId,
+      'Booking cancelled',
+      cancelledByCustomer
+        ? 'The customer cancelled this booking.'
+        : 'Your barber cancelled this booking.',
+      'booking',
+      cancelled.id
+    );
 
     res.json(result.rows[0]);
   } catch (error) {
@@ -1595,6 +1653,91 @@ async function getOwnBarberProfileId(pool: any, userId: string): Promise<string 
   const result = await pool.query('SELECT id FROM barber_profiles WHERE user_id = $1', [userId]);
   return result.rows[0]?.id || null;
 }
+
+// ============================================================================
+// NOTIFICATIONS (Figma: Notifications screen + customer nav tab)
+// Rows are written server-side on booking lifecycle events and read back by
+// the owner only. Writing a notification must NEVER fail the parent action —
+// a booking that saved but whose notification insert failed is still a booking.
+// ============================================================================
+
+async function createNotification(
+  pool: any,
+  userId: string | null | undefined,
+  title: string,
+  message: string,
+  type: string,
+  relatedId: string | null
+): Promise<void> {
+  if (!userId) return;
+  try {
+    await pool.query(
+      `INSERT INTO notifications (user_id, title, message, type, related_id)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [userId, title, message, type, relatedId]
+    );
+  } catch (error) {
+    console.error('Non-fatal: failed to write notification:', error);
+  }
+}
+
+// Resolve the user account behind a barber_profiles row (for notifying the
+// barber when a customer acts on a booking).
+async function getBarberUserId(pool: any, barberProfileId: string): Promise<string | null> {
+  const result = await pool.query('SELECT user_id FROM barber_profiles WHERE id = $1', [barberProfileId]);
+  return result.rows[0]?.user_id || null;
+}
+
+// GET /api/notifications — the authenticated user's own notifications, newest
+// first. SECURITY: user_id comes from the JWT only; no client-supplied ids.
+app.get('/api/notifications', requireUserAuth, async (req: Request, res: Response) => {
+  try {
+    const result = await req.tenant!.pool.query(
+      `SELECT id, title, message, type, related_id, is_read, created_at
+         FROM notifications
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        LIMIT 50`,
+      [req.tenant!.userId!]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// PATCH /api/notifications/:id/read — mark one of YOUR notifications read.
+app.patch('/api/notifications/:id/read', requireUserAuth, async (req: Request, res: Response) => {
+  try {
+    const result = await req.tenant!.pool.query(
+      `UPDATE notifications SET is_read = true
+        WHERE id = $1 AND user_id = $2 RETURNING id, is_read`,
+      [req.params.id, req.tenant!.userId!]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error marking notification read:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// POST /api/notifications/read-all — mark all of YOUR notifications read.
+app.post('/api/notifications/read-all', requireUserAuth, async (req: Request, res: Response) => {
+  try {
+    await req.tenant!.pool.query(
+      'UPDATE notifications SET is_read = true WHERE user_id = $1 AND is_read = false',
+      [req.tenant!.userId!]
+    );
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Error marking notifications read:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
 
 // GET /api/barber/status — lightweight onboarding/verification status check
 // for the logged-in barber, used by the client to refresh gate state on app

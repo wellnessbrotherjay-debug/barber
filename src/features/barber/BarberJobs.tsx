@@ -20,6 +20,8 @@ export interface Job {
   users: { full_name: string; email: string };
   services: { name: string; price: number; duration_minutes: number };
   barber_profiles: { shop_name: string | null; address_text: string | null };
+  // Revealed by the API only once the job is accepted (chat/call v1 — §5).
+  customer_phone?: string | null;
 }
 
 const TABS = [
@@ -297,25 +299,48 @@ export default function BarberJobs({ tab }: Props) {
                     )}
                   </div>
                 </div>
+                {/* Chat / Call v1 — native SMS composer / dialler with the
+                    customer's number, revealed by the API only after this job
+                    was accepted (docs/SCOPE_RECONCILIATION.md §5). */}
                 <div className="flex gap-2 w-full">
-                  <button
-                    type="button"
-                    disabled
-                    title="Coming soon"
-                    className="flex-1 flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full px-7 py-3.5 text-[14px] leading-5 font-semibold text-[#1c1b1f] disabled:opacity-60"
-                  >
-                    <MessageSquare className="w-5 h-5" strokeWidth={1.8} />
-                    Chat
-                  </button>
-                  <button
-                    type="button"
-                    disabled
-                    title="Coming soon"
-                    className="flex-1 flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full px-7 py-3.5 text-[14px] leading-5 font-semibold text-[#1c1b1f] disabled:opacity-60"
-                  >
-                    <Phone className="w-5 h-5" strokeWidth={1.8} />
-                    Call
-                  </button>
+                  {j.customer_phone ? (
+                    <a
+                      href={`sms:${j.customer_phone}`}
+                      className="flex-1 flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full px-7 py-3.5 text-[14px] leading-5 font-semibold text-[#1c1b1f]"
+                    >
+                      <MessageSquare className="w-5 h-5" strokeWidth={1.8} />
+                      Chat
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      title="Chat unlocks once the customer's number is available"
+                      className="flex-1 flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full px-7 py-3.5 text-[14px] leading-5 font-semibold text-[#1c1b1f] disabled:opacity-60"
+                    >
+                      <MessageSquare className="w-5 h-5" strokeWidth={1.8} />
+                      Chat
+                    </button>
+                  )}
+                  {j.customer_phone ? (
+                    <a
+                      href={`tel:${j.customer_phone}`}
+                      className="flex-1 flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full px-7 py-3.5 text-[14px] leading-5 font-semibold text-[#1c1b1f]"
+                    >
+                      <Phone className="w-5 h-5" strokeWidth={1.8} />
+                      Call
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      title="Call unlocks once the customer's number is available"
+                      className="flex-1 flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full px-7 py-3.5 text-[14px] leading-5 font-semibold text-[#1c1b1f] disabled:opacity-60"
+                    >
+                      <Phone className="w-5 h-5" strokeWidth={1.8} />
+                      Call
+                    </button>
+                  )}
                 </div>
                 <button
                   type="button"

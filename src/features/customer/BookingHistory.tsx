@@ -18,6 +18,8 @@ interface Booking {
   start_time: string;
   barber_profiles: { id: string; display_name: string; shop_name: string | null };
   services: { id: string; name: string; price: number; duration_minutes: number };
+  // Revealed by the API only after the barber accepts (chat/call v1 — §5).
+  barber_phone?: string | null;
 }
 
 function groupTab(status: string): (typeof TABS)[number] {
@@ -159,24 +161,44 @@ export default function BookingHistory() {
               </div>
             )}
 
-            {/* Chat / Call */}
+            {/* Chat / Call — v1 opens the native SMS composer / dialler with
+                the barber's number, which the API only reveals after the
+                barber accepts (docs/SCOPE_RECONCILIATION.md §5). */}
             <div className="flex gap-2 w-full">
-              <button
-                type="button"
-                disabled
-                title="Chat is coming soon — not built yet"
-                className="flex-1 flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-[999px] px-7 py-3.5 text-[14px] font-semibold leading-5 text-[#1c1b1f] disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                <MessageCircle className="w-5 h-5" /> Chat
-              </button>
-              <button
-                type="button"
-                disabled
-                title="Call is coming soon — not built yet"
-                className="flex-1 flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-[999px] px-7 py-3.5 text-[14px] font-semibold leading-5 text-[#1c1b1f] disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                <Phone className="w-5 h-5" /> Call
-              </button>
+              {b.barber_phone ? (
+                <a
+                  href={`sms:${b.barber_phone}`}
+                  className="flex-1 flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-[999px] px-7 py-3.5 text-[14px] font-semibold leading-5 text-[#1c1b1f]"
+                >
+                  <MessageCircle className="w-5 h-5" /> Chat
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  title="Chat unlocks after your barber accepts"
+                  className="flex-1 flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-[999px] px-7 py-3.5 text-[14px] font-semibold leading-5 text-[#1c1b1f] disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  <MessageCircle className="w-5 h-5" /> Chat
+                </button>
+              )}
+              {b.barber_phone ? (
+                <a
+                  href={`tel:${b.barber_phone}`}
+                  className="flex-1 flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-[999px] px-7 py-3.5 text-[14px] font-semibold leading-5 text-[#1c1b1f]"
+                >
+                  <Phone className="w-5 h-5" /> Call
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  title="Call unlocks after your barber accepts"
+                  className="flex-1 flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-[999px] px-7 py-3.5 text-[14px] font-semibold leading-5 text-[#1c1b1f] disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  <Phone className="w-5 h-5" /> Call
+                </button>
+              )}
             </div>
 
             {/* Note */}

@@ -235,6 +235,12 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
   }
 });
 
+// Health check — must sit ABOVE tenantMiddleware so uptime monitors and the
+// reverse proxy can probe it without credentials.
+app.get('/health', (req: Request, res: Response) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Tenant routing middleware (must be before API routes)
 app.use(tenantMiddleware);
 
@@ -248,11 +254,6 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // so req.tenant is populated; every route inside is requireBarberAuth-guarded
 // and resolves the owning barber server-side from the JWT.
 app.use(createUploadsRouter(requireBarberAuth));
-
-// Health check
-app.get('/health', (req: Request, res: Response) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
 
 // Database connection test
 app.get('/api/health', async (req: Request, res: Response) => {

@@ -3,6 +3,10 @@ import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
 import { randomBytes, timingSafeEqual } from 'crypto';
 
+// HARD RULE: no raw SQL in application code. Every data operation goes through
+// a built-in Postgres function in schema `barber` (migrations/003) — the app
+// layer only ever calls SELECT * FROM barber.<fn>(...).
+
 export interface TenantContext {
   companyId: string;
   companyName: string;
@@ -55,12 +59,13 @@ declare global {
   }
 }
 
-// Admin database (shared across all tenants)
+// Admin database (shared across all tenants). The app connects as the
+// service role barber_app — never the postgres superuser.
 const adminDbPool = new Pool({
   host: process.env.VITE_LOKI_HOST || '100.84.100.96',
   port: parseInt(process.env.VITE_LOKI_PORT || '5432'),
   database: 'barber_app',
-  user: process.env.VITE_LOKI_USER || 'postgres',
+  user: process.env.VITE_LOKI_USER || 'barber_app',
   password: process.env.VITE_LOKI_PASSWORD,
   ssl: false,
   max: 5,
@@ -87,7 +92,7 @@ export async function getTenantPool(tenantId: string): Promise<Pool> {
     host: process.env.VITE_LOKI_HOST || '100.84.100.96',
     port: parseInt(process.env.VITE_LOKI_PORT || '5432'),
     database: dbName,
-    user: process.env.VITE_LOKI_USER || 'postgres',
+    user: process.env.VITE_LOKI_USER || 'barber_app',
     password: process.env.VITE_LOKI_PASSWORD,
     ssl: false,
     max: 10,
@@ -98,7 +103,7 @@ export async function getTenantPool(tenantId: string): Promise<Pool> {
   // Test connection immediately (fail-closed)
   try {
     const client = await pool.connect();
-    await client.query('SELECT NOW()');
+    await client.query('SELECT * FROM barber.db_now()');
     client.release();
   } catch (err) {
     pool.end();
@@ -183,7 +188,7 @@ export async function tenantMiddleware(
 
       try {
         const result = await adminDbPool.query(
-          'SELECT id, name, subscription_tier FROM companies WHERE api_key = $1 AND status = $2',
+          'SELECT * FROM barber.get_company_by_api_key(api_key_ => $1, status_ => $2)',
           [apiKey, 'active']
         );
 
@@ -205,8 +210,7 @@ export async function tenantMiddleware(
 
         // Log API usage
         await adminDbPool.query(
-          `INSERT INTO api_key_usage (company_id, endpoint, method, status_code, timestamp)
-           VALUES ($1, $2, $3, $4, NOW())`,
+          'SELECT * FROM barber.log_api_key_usage(company_id_ => $1, endpoint_ => $2, method_ => $3, status_code_ => $4)',
           [company.id, req.path, req.method, 200]
         ).catch(console.error); // Don't block on logging error
 
@@ -294,8 +298,7 @@ export function requireEntitlement(feature: string) {
 
     try {
       const result = await req.adminDb!.query(
-        `SELECT enabled FROM company_entitlements
-         WHERE company_id = $1 AND feature = $2`,
+        'SELECT * FROM barber.check_entitlement(company_id_ => $1, feature_ => $2)',
         [req.tenant.companyId, feature]
       );
 

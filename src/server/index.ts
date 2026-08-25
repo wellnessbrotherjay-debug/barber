@@ -13,6 +13,10 @@ import { tenantMiddleware, requireAdmin, requireEntitlement, requireBarberAuth, 
 import { createUploadsRouter, UPLOAD_DIR } from './routes/uploads';
 import { sendEmail } from './mailer';
 
+// HARD RULE: no raw SQL in application code. Every data operation below calls a
+// built-in Postgres function in schema `barber` (migrations/003_barber_functions.sql)
+// via SELECT * FROM barber.<fn>(...) — nothing else.
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DIST_DIR = path.join(__dirname, '../../dist');
@@ -81,7 +85,7 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), asy
 
       const pool = await getTenantPool(tenantId);
       const result = await pool.query(
-        `UPDATE bookings SET payment_status = 'paid' WHERE id = $1 RETURNING id`,
+        'SELECT * FROM barber.mark_booking_paid(booking_id_ => $1)',
         [bookingId]
       );
 
@@ -151,7 +155,10 @@ app.post('/api/auth/signup', async (req: Request, res: Response) => {
     const tenantId = String(tenant_id || 1); // TEMP: single-tenant demo mode
     const pool = await getTenantPool(tenantId);
 
-    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [String(email).toLowerCase()]);
+    const existing = await pool.query(
+      'SELECT * FROM barber.get_user_id_by_email(email_ => $1)',
+      [String(email).toLowerCase()]
+    );
     if (existing.rows.length > 0) {
       return res.status(409).json({ error: 'An account with this email already exists' });
     }
@@ -159,9 +166,7 @@ app.post('/api/auth/signup', async (req: Request, res: Response) => {
     const passwordHash = await bcrypt.hash(String(password), BCRYPT_ROUNDS);
 
     const userResult = await pool.query(
-      `INSERT INTO users (email, full_name, role, password_hash)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, email, full_name, role, avatar_url, phone, created_at`,
+      'SELECT * FROM barber.create_user(email_ => $1, full_name_ => $2, role_ => $3, password_hash_ => $4)',
       [String(email).toLowerCase(), full_name, role, passwordHash]
     );
     const user = userResult.rows[0];
@@ -169,8 +174,7 @@ app.post('/api/auth/signup', async (req: Request, res: Response) => {
     let barberStatus: { onboarding_completed: boolean; is_verified: boolean } | undefined;
     if (role === 'barber') {
       await pool.query(
-        `INSERT INTO barber_profiles (user_id, display_name, is_verified, is_approved, onboarding_completed)
-         VALUES ($1, $2, false, false, false)`,
+        'SELECT * FROM barber.create_barber_profile(user_id_ => $1, display_name_ => $2)',
         [user.id, full_name]
       );
       barberStatus = { onboarding_completed: false, is_verified: false };
@@ -197,8 +201,7 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
     const pool = await getTenantPool(tenantId);
 
     const result = await pool.query(
-      `SELECT id, email, full_name, role, avatar_url, phone, password_hash
-       FROM users WHERE email = $1 AND is_active = true`,
+      'SELECT * FROM barber.get_user_for_login(email_ => $1)',
       [String(email).toLowerCase()]
     );
 
@@ -217,7 +220,7 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
     let barberStatus: { onboarding_completed: boolean; is_verified: boolean } | undefined;
     if (user.role === 'barber') {
       const bp = await pool.query(
-        'SELECT onboarding_completed, is_verified FROM barber_profiles WHERE user_id = $1',
+        'SELECT * FROM barber.get_barber_login_status(user_id_ => $1)',
         [user.id]
       );
       if (bp.rows[0]) {
@@ -263,7 +266,7 @@ app.get('/api/health', async (req: Request, res: Response) => {
       return res.status(401).json({ status: 'error', message: 'Tenant context required' });
     }
 
-    const result = await req.tenant.pool.query('SELECT NOW()');
+    const result = await req.tenant.pool.query('SELECT * FROM barber.db_now()');
     res.json({
       status: 'ok',
       database: 'connected',
@@ -294,18 +297,9 @@ app.get('/admin/dashboard', requireAdmin, async (req: Request, res: Response) =>
   try {
     const adminDb = req.adminDb!;
 
-    const stats = await adminDb.query(`
-      SELECT
-        COUNT(*) FILTER (WHERE status = 'active') as active_companies,
-        COUNT(*) FILTER (WHERE status = 'suspended') as suspended_companies,
-        COUNT(*) as total_companies,
-        SUM(CAST(max_barbers AS BIGINT)) as total_max_barbers
-      FROM companies
-    `);
+    const stats = await adminDb.query('SELECT * FROM barber.get_admin_company_stats()');
 
-    const companiesResult = await adminDb.query(
-      `SELECT id, name FROM companies WHERE status = 'active' ORDER BY id`
-    );
+    const companiesResult = await adminDb.query('SELECT * FROM barber.list_active_companies()');
 
     const revenueByDate = new Map<string, { date: string; revenue: number; bookings: number }>();
     let totalBookings = 0;
@@ -314,15 +308,7 @@ app.get('/admin/dashboard', requireAdmin, async (req: Request, res: Response) =>
     for (const company of companiesResult.rows) {
       try {
         const pool = await getTenantPool(company.id.toString());
-        const dailyResult = await pool.query(`
-          SELECT
-            booking_date::text as date,
-            COUNT(*) as bookings,
-            COALESCE(SUM(total_amount) FILTER (WHERE payment_status = 'paid'), 0) as revenue
-          FROM bookings
-          WHERE booking_date >= CURRENT_DATE - INTERVAL '30 days'
-          GROUP BY booking_date
-        `);
+        const dailyResult = await pool.query('SELECT * FROM barber.get_tenant_daily_booking_stats()');
 
         for (const row of dailyResult.rows) {
           const existing = revenueByDate.get(row.date) || { date: row.date, revenue: 0, bookings: 0 };
@@ -331,12 +317,7 @@ app.get('/admin/dashboard', requireAdmin, async (req: Request, res: Response) =>
           revenueByDate.set(row.date, existing);
         }
 
-        const totalsResult = await pool.query(`
-          SELECT
-            COUNT(*) as booking_count,
-            COALESCE(SUM(total_amount) FILTER (WHERE payment_status = 'paid'), 0) as paid_revenue
-          FROM bookings
-        `);
+        const totalsResult = await pool.query('SELECT * FROM barber.get_tenant_booking_totals()');
         totalBookings += Number(totalsResult.rows[0].booking_count);
         totalRevenue += Number(totalsResult.rows[0].paid_revenue);
       } catch (err) {
@@ -364,22 +345,7 @@ app.get('/admin/dashboard', requireAdmin, async (req: Request, res: Response) =>
 app.get('/admin/companies', requireAdmin, async (req: Request, res: Response) => {
   try {
     const adminDb = req.adminDb!;
-    const result = await adminDb.query(`
-      SELECT
-        c.id,
-        c.name,
-        c.owner_email,
-        c.subscription_tier,
-        c.status,
-        c.max_barbers,
-        s.renewal_date,
-        COUNT(DISTINCT u.company_id) as api_usage_count
-      FROM companies c
-      LEFT JOIN company_subscriptions s ON c.id = s.company_id
-      LEFT JOIN api_key_usage u ON c.id = u.company_id AND u.timestamp > NOW() - INTERVAL '24 hours'
-      GROUP BY c.id, s.renewal_date
-      ORDER BY c.created_at DESC
-    `);
+    const result = await adminDb.query('SELECT * FROM barber.admin_list_companies()');
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching companies:', error);
@@ -398,11 +364,10 @@ app.post('/admin/companies', requireAdmin, async (req: Request, res: Response) =
 
     const adminDb = req.adminDb!;
 
-    const result = await adminDb.query(`
-      INSERT INTO companies (name, owner_email, subscription_tier, max_barbers)
-      VALUES ($1, $2, $3, $4)
-      RETURNING id, name, owner_email, api_key, subscription_tier
-    `, [name, owner_email, subscription_tier, max_barbers]);
+    const result = await adminDb.query(
+      'SELECT * FROM barber.admin_create_company(name_ => $1, owner_email_ => $2, subscription_tier_ => $3, max_barbers_ => $4)',
+      [name, owner_email, subscription_tier, max_barbers]
+    );
 
     const company = result.rows[0];
 
@@ -415,7 +380,7 @@ app.post('/admin/companies', requireAdmin, async (req: Request, res: Response) =
 
     for (const feature of features) {
       await adminDb.query(
-        'INSERT INTO company_entitlements (company_id, feature, enabled) VALUES ($1, $2, true)',
+        'SELECT * FROM barber.add_company_entitlement(company_id_ => $1, feature_ => $2)',
         [company.id, feature]
       );
     }
@@ -439,18 +404,10 @@ app.get('/admin/companies/:id', requireAdmin, async (req: Request, res: Response
     const { id } = req.params;
     const adminDb = req.adminDb!;
 
-    const result = await adminDb.query(`
-      SELECT
-        c.*,
-        s.renewal_date,
-        s.status as subscription_status,
-        COUNT(DISTINCT aku.company_id) as api_calls_24h
-      FROM companies c
-      LEFT JOIN company_subscriptions s ON c.id = s.company_id
-      LEFT JOIN api_key_usage aku ON c.id = aku.company_id AND aku.timestamp > NOW() - INTERVAL '24 hours'
-      WHERE c.id = $1
-      GROUP BY c.id, s.renewal_date, s.status
-    `, [id]);
+    const result = await adminDb.query(
+      'SELECT * FROM barber.admin_get_company_detail(id_ => $1)',
+      [id]
+    );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Company not found' });
@@ -475,9 +432,8 @@ app.patch('/admin/companies/:id/status', requireAdmin, async (req: Request, res:
 
     const adminDb = req.adminDb!;
     const result = await adminDb.query(
-      `UPDATE companies SET status = $1 WHERE id = $2
-       RETURNING id, name, owner_email, subscription_tier, status, max_barbers, created_at`,
-      [status, id]
+      'SELECT * FROM barber.admin_set_company_status(id_ => $1, status_ => $2)',
+      [id, status]
     );
 
     if (result.rows.length === 0) {
@@ -498,41 +454,13 @@ app.get('/admin/companies/:id/bookings', requireAdmin, async (req: Request, res:
     const { id } = req.params;
     const adminDb = req.adminDb!;
 
-    const companyResult = await adminDb.query('SELECT id, name FROM companies WHERE id = $1', [id]);
+    const companyResult = await adminDb.query('SELECT * FROM barber.get_company_by_id(id_ => $1)', [id]);
     if (companyResult.rows.length === 0) {
       return res.status(404).json({ error: 'Company not found' });
     }
 
     const pool = await getTenantPool(id);
-    const result = await pool.query(`
-      SELECT
-        b.id,
-        b.booking_reference,
-        b.booking_date,
-        b.start_time,
-        b.end_time,
-        b.status,
-        b.payment_status,
-        b.total_amount,
-        b.currency,
-        b.created_at,
-        json_build_object(
-          'id', bp.id,
-          'display_name', bp.display_name,
-          'shop_name', bp.shop_name
-        ) as barber,
-        json_build_object(
-          'id', s.id,
-          'name', s.name,
-          'price', s.price,
-          'duration_minutes', s.duration_minutes
-        ) as service
-      FROM bookings b
-      JOIN barber_profiles bp ON b.barber_id = bp.id
-      JOIN services s ON b.service_id = s.id
-      ORDER BY b.created_at DESC
-      LIMIT 50
-    `);
+    const result = await pool.query('SELECT * FROM barber.admin_get_company_bookings()');
 
     res.json(result.rows);
   } catch (error) {
@@ -549,36 +477,13 @@ app.get('/admin/companies/:id/barbers', requireAdmin, async (req: Request, res: 
     const { id } = req.params;
     const adminDb = req.adminDb!;
 
-    const companyResult = await adminDb.query('SELECT id, name FROM companies WHERE id = $1', [id]);
+    const companyResult = await adminDb.query('SELECT * FROM barber.get_company_by_id(id_ => $1)', [id]);
     if (companyResult.rows.length === 0) {
       return res.status(404).json({ error: 'Company not found' });
     }
 
     const pool = await getTenantPool(id);
-    const result = await pool.query(`
-      SELECT
-        bp.id,
-        bp.display_name,
-        bp.bio,
-        bp.experience_years,
-        bp.rating_avg,
-        bp.rating_count,
-        bp.shop_name,
-        bp.address_text,
-        bp.is_verified,
-        bp.is_approved,
-        bp.is_active,
-        bp.onboarding_completed,
-        bp.created_at,
-        u.email,
-        u.full_name,
-        u.phone,
-        u.avatar_url,
-        u.is_active as user_is_active
-      FROM barber_profiles bp
-      JOIN users u ON bp.user_id = u.id
-      ORDER BY bp.created_at DESC
-    `);
+    const result = await pool.query('SELECT * FROM barber.admin_get_company_barbers()');
 
     res.json(result.rows);
   } catch (error) {
@@ -594,72 +499,28 @@ app.get('/admin/companies/:id/barbers/:barberId', requireAdmin, async (req: Requ
     const { id, barberId } = req.params;
     const adminDb = req.adminDb!;
 
-    const companyResult = await adminDb.query('SELECT id, name FROM companies WHERE id = $1', [id]);
+    const companyResult = await adminDb.query('SELECT * FROM barber.get_company_by_id(id_ => $1)', [id]);
     if (companyResult.rows.length === 0) {
       return res.status(404).json({ error: 'Company not found' });
     }
 
     const pool = await getTenantPool(id);
 
-    const profileResult = await pool.query(`
-      SELECT
-        bp.id, bp.display_name, bp.bio, bp.experience_years, bp.rating_avg, bp.rating_count,
-        bp.shop_name, bp.address_text, bp.latitude, bp.longitude,
-        bp.is_verified, bp.is_approved, bp.is_active, bp.created_at, bp.updated_at,
-        u.id as user_id, u.email, u.full_name, u.phone, u.avatar_url, u.is_active as user_is_active
-      FROM barber_profiles bp
-      JOIN users u ON bp.user_id = u.id
-      WHERE bp.id = $1
-    `, [barberId]);
+    const profileResult = await pool.query(
+      'SELECT * FROM barber.admin_get_barber_profile(barber_id_ => $1)',
+      [barberId]
+    );
 
     if (profileResult.rows.length === 0) {
       return res.status(404).json({ error: 'Barber not found' });
     }
 
     const [servicesResult, scheduleResult, bookingsResult, reviewsResult, statsResult] = await Promise.all([
-      pool.query(
-        `SELECT id, name, description, price, currency, duration_minutes, is_active, created_at
-         FROM services WHERE barber_id = $1 ORDER BY price ASC`,
-        [barberId]
-      ),
-      pool.query(
-        `SELECT id, day_of_week, start_time, end_time, is_available
-         FROM barber_schedule WHERE barber_id = $1 ORDER BY day_of_week ASC, start_time ASC`,
-        [barberId]
-      ),
-      pool.query(
-        `SELECT b.id, b.booking_reference, b.booking_date, b.start_time, b.end_time,
-                b.status, b.payment_status, b.total_amount, b.currency, b.created_at,
-                json_build_object('id', s.id, 'name', s.name) as service,
-                json_build_object('id', u.id, 'full_name', u.full_name, 'email', u.email) as customer
-         FROM bookings b
-         JOIN services s ON b.service_id = s.id
-         JOIN users u ON b.customer_id = u.id
-         WHERE b.barber_id = $1
-         ORDER BY b.created_at DESC
-         LIMIT 50`,
-        [barberId]
-      ),
-      pool.query(
-        `SELECT r.id, r.rating, r.comment, r.created_at,
-                json_build_object('id', u.id, 'full_name', u.full_name) as customer
-         FROM reviews r
-         JOIN users u ON r.customer_id = u.id
-         WHERE r.barber_id = $1
-         ORDER BY r.created_at DESC
-         LIMIT 50`,
-        [barberId]
-      ),
-      pool.query(
-        `SELECT
-           COUNT(*) as total_bookings,
-           COUNT(*) FILTER (WHERE status = 'completed') as completed_bookings,
-           COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled_bookings,
-           COALESCE(SUM(total_amount) FILTER (WHERE payment_status = 'paid'), 0) as total_paid_revenue,
-           COALESCE(AVG(total_amount), 0) as avg_booking_value
-         FROM bookings WHERE barber_id = $1`,
-        [barberId]
-      ),
+      pool.query('SELECT * FROM barber.admin_get_barber_services(barber_id_ => $1)', [barberId]),
+      pool.query('SELECT * FROM barber.get_barber_schedule(barber_id_ => $1)', [barberId]),
+      pool.query('SELECT * FROM barber.admin_get_barber_bookings(barber_id_ => $1)', [barberId]),
+      pool.query('SELECT * FROM barber.admin_get_barber_reviews(barber_id_ => $1)', [barberId]),
+      pool.query('SELECT * FROM barber.admin_get_barber_stats(barber_id_ => $1)', [barberId]),
     ]);
 
     res.json({
@@ -685,7 +546,7 @@ app.get('/admin/companies/:id/payments', requireAdmin, async (req: Request, res:
     const { id } = req.params;
     const adminDb = req.adminDb!;
 
-    const companyResult = await adminDb.query('SELECT id, name FROM companies WHERE id = $1', [id]);
+    const companyResult = await adminDb.query('SELECT * FROM barber.get_company_by_id(id_ => $1)', [id]);
     if (companyResult.rows.length === 0) {
       return res.status(404).json({ error: 'Company not found' });
     }
@@ -693,26 +554,8 @@ app.get('/admin/companies/:id/payments', requireAdmin, async (req: Request, res:
     const pool = await getTenantPool(id);
 
     const [paymentsResult, bookingPaymentStatusResult] = await Promise.all([
-      pool.query(`
-        SELECT
-          p.id, p.amount, p.currency, p.payment_method, p.transaction_id, p.status, p.notes, p.created_at,
-          json_build_object(
-            'id', b.id, 'booking_reference', b.booking_reference, 'booking_date', b.booking_date,
-            'total_amount', b.total_amount, 'payment_status', b.payment_status
-          ) as booking,
-          json_build_object('id', u.id, 'full_name', u.full_name, 'email', u.email) as customer
-        FROM payments p
-        JOIN bookings b ON p.booking_id = b.id
-        JOIN users u ON p.customer_id = u.id
-        ORDER BY p.created_at DESC
-        LIMIT 100
-      `),
-      pool.query(`
-        SELECT payment_status, payment_method, COUNT(*) as count, COALESCE(SUM(total_amount), 0) as total_amount
-        FROM bookings
-        GROUP BY payment_status, payment_method
-        ORDER BY payment_status
-      `),
+      pool.query('SELECT * FROM barber.admin_get_company_payments()'),
+      pool.query('SELECT * FROM barber.get_booking_payment_breakdown()'),
     ]);
 
     res.json({
@@ -733,7 +576,7 @@ app.get('/admin/companies/:id/onboarding', requireAdmin, async (req: Request, re
     const adminDb = req.adminDb!;
 
     const companyResult = await adminDb.query(
-      `SELECT id, name, subscription_tier, max_barbers, status, created_at FROM companies WHERE id = $1`,
+      'SELECT * FROM barber.admin_get_company_onboarding_row(id_ => $1)',
       [id]
     );
     if (companyResult.rows.length === 0) {
@@ -742,23 +585,14 @@ app.get('/admin/companies/:id/onboarding', requireAdmin, async (req: Request, re
     const company = companyResult.rows[0];
 
     const [entitlementsResult, lastActiveResult] = await Promise.all([
-      adminDb.query(
-        `SELECT feature, enabled, updated_at FROM company_entitlements WHERE company_id = $1 ORDER BY feature`,
-        [id]
-      ),
-      adminDb.query(
-        `SELECT MAX(timestamp) as last_active, COUNT(*) as calls_7d
-         FROM api_key_usage WHERE company_id = $1 AND timestamp > NOW() - INTERVAL '7 days'`,
-        [id]
-      ),
+      adminDb.query('SELECT * FROM barber.get_company_entitlements(company_id_ => $1)', [id]),
+      adminDb.query('SELECT * FROM barber.get_company_activity(company_id_ => $1)', [id]),
     ]);
 
     let barberCount = 0;
     try {
       const pool = await getTenantPool(id);
-      const barberCountResult = await pool.query(
-        `SELECT COUNT(*) as count FROM barber_profiles WHERE is_active = true`
-      );
+      const barberCountResult = await pool.query('SELECT * FROM barber.count_active_barbers()');
       barberCount = Number(barberCountResult.rows[0].count);
     } catch (err) {
       console.error(`Onboarding summary: failed to query tenant DB for company ${id}:`, (err as Error).message);
@@ -790,9 +624,7 @@ app.get('/admin/bookings', requireAdmin, async (req: Request, res: Response) => 
   const TOTAL_CAP = 500;
   try {
     const adminDb = req.adminDb!;
-    const companiesResult = await adminDb.query(
-      `SELECT id, name FROM companies WHERE status = 'active' ORDER BY id`
-    );
+    const companiesResult = await adminDb.query('SELECT * FROM barber.list_active_companies()');
 
     const allBookings: any[] = [];
 
@@ -801,25 +633,7 @@ app.get('/admin/bookings', requireAdmin, async (req: Request, res: Response) => 
       try {
         const pool = await getTenantPool(company.id.toString());
         const result = await pool.query(
-          `
-          SELECT
-            b.id,
-            b.booking_reference,
-            b.booking_date,
-            b.start_time,
-            b.status,
-            b.payment_status,
-            b.total_amount,
-            b.currency,
-            b.created_at,
-            bp.display_name as barber_name,
-            s.name as service_name
-          FROM bookings b
-          JOIN barber_profiles bp ON b.barber_id = bp.id
-          JOIN services s ON b.service_id = s.id
-          ORDER BY b.created_at DESC
-          LIMIT $1
-        `,
+          'SELECT * FROM barber.admin_get_recent_bookings(limit_ => $1)',
           [PER_COMPANY_LIMIT]
         );
 
@@ -849,17 +663,7 @@ app.get('/admin/income', requireAdmin, async (req: Request, res: Response) => {
   try {
     const adminDb = req.adminDb!;
 
-    const result = await adminDb.query(`
-      SELECT
-        DATE(metric_date) as date,
-        SUM(total_revenue) as total_revenue,
-        COUNT(DISTINCT company_id) as active_companies,
-        SUM(completed_bookings) as total_bookings
-      FROM booking_metrics
-      GROUP BY DATE(metric_date)
-      ORDER BY date DESC
-      LIMIT 90
-    `);
+    const result = await adminDb.query('SELECT * FROM barber.admin_get_income_report()');
 
     res.json(result.rows);
   } catch (error) {
@@ -883,23 +687,13 @@ app.get('/api/v1/company/dashboard', async (req: Request, res: Response) => {
     const adminDb = req.adminDb!;
 
     // Get company metrics
-    const metrics = await adminDb.query(`
-      SELECT
-        SUM(total_bookings) as total_bookings,
-        SUM(completed_bookings) as completed_bookings,
-        SUM(canceled_bookings) as canceled_bookings,
-        SUM(total_revenue) as total_revenue,
-        AVG(average_rating) as average_rating,
-        COUNT(*) as metric_days
-      FROM booking_metrics
-      WHERE company_id = $1 AND metric_date >= CURRENT_DATE - INTERVAL '30 days'
-    `, [companyId]);
+    const metrics = await adminDb.query(
+      'SELECT * FROM barber.get_company_metrics_30d(company_id_ => $1)',
+      [companyId]
+    );
 
     // Get today's bookings from tenant DB
-    const todayBookings = await req.tenant.pool.query(`
-      SELECT COUNT(*) as count FROM bookings
-      WHERE DATE(booking_date) = CURRENT_DATE
-    `);
+    const todayBookings = await req.tenant.pool.query('SELECT * FROM barber.count_today_bookings()');
 
     res.json({
       company: {
@@ -925,26 +719,7 @@ app.get('/api/v1/company/bookings', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Company context required' });
     }
 
-    const result = await req.tenant!.pool.query(`
-      SELECT
-        b.id,
-        b.booking_reference,
-        b.customer_id,
-        b.barber_id,
-        b.service_id,
-        b.booking_date,
-        b.start_time,
-        b.status,
-        b.payment_status,
-        b.total_amount,
-        bp.display_name as barber_name,
-        s.name as service_name
-      FROM bookings b
-      JOIN barber_profiles bp ON b.barber_id = bp.id
-      JOIN services s ON b.service_id = s.id
-      ORDER BY b.booking_date DESC
-      LIMIT 100
-    `);
+    const result = await req.tenant!.pool.query('SELECT * FROM barber.company_list_bookings()');
 
     res.json(result.rows);
   } catch (error) {
@@ -963,19 +738,10 @@ app.get('/api/v1/company/income', async (req: Request, res: Response) => {
     const adminDb = req.adminDb!;
     const companyId = req.tenant.companyId;
 
-    const result = await adminDb.query(`
-      SELECT
-        metric_date,
-        total_bookings,
-        completed_bookings,
-        canceled_bookings,
-        total_revenue,
-        average_rating
-      FROM booking_metrics
-      WHERE company_id = $1
-      ORDER BY metric_date DESC
-      LIMIT 90
-    `, [companyId]);
+    const result = await adminDb.query(
+      'SELECT * FROM barber.get_company_income(company_id_ => $1)',
+      [companyId]
+    );
 
     res.json(result.rows);
   } catch (error) {
@@ -991,22 +757,7 @@ app.get('/api/v1/company/barbers', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Company context required' });
     }
 
-    const result = await req.tenant!.pool.query(`
-      SELECT
-        bp.id,
-        bp.display_name,
-        bp.bio,
-        bp.experience_years,
-        bp.rating_avg,
-        bp.rating_count,
-        bp.is_active,
-        COUNT(b.id) as total_bookings,
-        COUNT(b.id) FILTER (WHERE b.status = 'completed') as completed_bookings
-      FROM barber_profiles bp
-      LEFT JOIN bookings b ON bp.id = b.barber_id
-      GROUP BY bp.id
-      ORDER BY bp.rating_avg DESC
-    `);
+    const result = await req.tenant!.pool.query('SELECT * FROM barber.company_list_barbers()');
 
     res.json(result.rows);
   } catch (error) {
@@ -1019,47 +770,6 @@ app.get('/api/v1/company/barbers', async (req: Request, res: Response) => {
 // CUSTOMER API ROUTES (Customers & Barber Apps)
 // ============================================================================
 
-// Shared projection for public barber listings. Services come from a scalar
-// subquery rather than a LEFT JOIN + GROUP BY so that LIMIT/OFFSET applies to
-// BARBERS (the join would multiply rows before the limit, and paginating a
-// multiplied set returns partial barbers). The subquery only runs for the rows
-// actually returned in the page.
-const PUBLIC_BARBER_COLUMNS = `
-        bp.id,
-        bp.user_id,
-        bp.display_name,
-        bp.bio,
-        bp.experience_years,
-        bp.rating_avg,
-        bp.rating_count,
-        bp.shop_name,
-        bp.address_text,
-        bp.latitude,
-        bp.longitude,
-        bp.is_verified,
-        bp.is_active,
-        bp.is_online,
-        bp.service_mode,
-        bp.service_radius_km,
-        bp.work_photos,
-        json_build_object(
-          'full_name', u.full_name,
-          'email', u.email,
-          'avatar_url', u.avatar_url
-        ) as users,
-        COALESCE((
-          SELECT json_agg(json_build_object(
-            'id', s.id,
-            'name', s.name,
-            'description', s.description,
-            'price', s.price,
-            'currency', s.currency,
-            'duration_minutes', s.duration_minutes
-          ) ORDER BY s.price ASC)
-          FROM services s
-          WHERE s.barber_id = bp.id AND s.is_active = true
-        ), '[]'::json) as services`;
-
 /** Clamp a query-string integer into a safe range (guards against ?limit=1e9). */
 function intParam(raw: unknown, def: number, min: number, max: number): number {
   const n = parseInt(String(raw ?? ''), 10);
@@ -1068,20 +778,15 @@ function intParam(raw: unknown, def: number, min: number, max: number): number {
 }
 
 // GET /api/barbers — paginated barber list.
-// Pagination is enforced at the DATABASE (LIMIT/OFFSET), never by slicing a
-// full table fetch in JS, so this stays flat as the tenant grows.
+// Pagination is enforced at the DATABASE (LIMIT/OFFSET inside barber.list_barbers),
+// never by slicing a full table fetch in JS, so this stays flat as the tenant grows.
 app.get('/api/barbers', async (req: Request, res: Response) => {
   try {
     const limit = intParam(req.query.limit, 20, 1, 100);
     const offset = intParam(req.query.offset, 0, 0, 1_000_000);
 
     const result = await req.tenant!.pool.query(
-      `SELECT ${PUBLIC_BARBER_COLUMNS}
-      FROM barber_profiles bp
-      JOIN users u ON bp.user_id = u.id
-      WHERE bp.is_active = true
-      ORDER BY bp.rating_avg DESC, bp.id
-      LIMIT $1 OFFSET $2`,
+      'SELECT * FROM barber.list_barbers(limit_ => $1, offset_ => $2)',
       [limit, offset]
     );
     res.json(result.rows);
@@ -1093,18 +798,10 @@ app.get('/api/barbers', async (req: Request, res: Response) => {
 
 // GET /api/barbers/nearby?lat=&lng=&radius_km=&limit=&offset=
 //
-// Geographic discovery done IN POSTGRES. Distance is computed with the
-// earthdistance extension; the earth_box() predicate is what lets the GiST
-// index (idx_barber_profiles_earth) prune candidates instead of scanning the
-// whole table, and the precise earth_distance() filter runs only on survivors.
-//
-// Eligibility differs by service mode, per the board:
-//   mobile / both -> the barber travels, so they qualify when the CUSTOMER is
-//                    inside the barber's own service_radius_km.
-//   in_shop       -> the customer travels, so they qualify when the shop is
-//                    inside the customer's requested search radius.
-// Either way distance_km is the real customer->barber great-circle distance
-// and ordering is done by the database.
+// Geographic discovery done IN POSTGRES (barber.get_nearby_barbers) using the
+// earthdistance extension + the GiST index probe. Eligibility differs by
+// service mode: mobile/both barbers travel (their own service_radius_km),
+// in_shop barbers are matched against the customer's search radius.
 //
 // NOTE: must be registered BEFORE '/api/barbers/:id', otherwise Express would
 // match "nearby" as an :id.
@@ -1126,22 +823,7 @@ app.get('/api/barbers/nearby', async (req: Request, res: Response) => {
     const boxMeters = Math.max(radiusKm, 50) * 1000;
 
     const result = await req.tenant!.pool.query(
-      `WITH origin AS (SELECT ll_to_earth($1::float8, $2::float8) AS pt)
-       SELECT ${PUBLIC_BARBER_COLUMNS},
-         round((earth_distance(origin.pt, ll_to_earth(bp.latitude::float8, bp.longitude::float8)) / 1000)::numeric, 2) AS distance_km
-       FROM barber_profiles bp
-       JOIN users u ON bp.user_id = u.id
-       CROSS JOIN origin
-       WHERE bp.is_active = true
-         AND bp.latitude IS NOT NULL AND bp.longitude IS NOT NULL
-         AND ($6::boolean = false OR bp.is_online = true)
-         AND earth_box(origin.pt, $5::float8) @> ll_to_earth(bp.latitude::float8, bp.longitude::float8)
-         AND earth_distance(origin.pt, ll_to_earth(bp.latitude::float8, bp.longitude::float8))
-             <= CASE WHEN bp.service_mode IN ('mobile','both')
-                     THEN GREATEST($3::float8 * 1000, bp.service_radius_km::float8 * 1000)
-                     ELSE $3::float8 * 1000 END
-       ORDER BY distance_km ASC, bp.rating_avg DESC, bp.id
-       LIMIT $4 OFFSET $7`,
+      'SELECT * FROM barber.get_nearby_barbers(lat_ => $1, lng_ => $2, radius_km_ => $3, limit_ => $4, box_meters_ => $5, online_only_ => $6, offset_ => $7)',
       [lat, lng, radiusKm, limit, boxMeters, onlineOnly, offset]
     );
 
@@ -1156,37 +838,10 @@ app.get('/api/barbers/nearby', async (req: Request, res: Response) => {
 app.get('/api/barbers/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const result = await req.tenant!.pool.query(`
-      SELECT
-        bp.id,
-        bp.user_id,
-        bp.display_name,
-        bp.bio,
-        bp.experience_years,
-        bp.rating_avg,
-        bp.rating_count,
-        bp.shop_name,
-        bp.address_text,
-        bp.work_photos,
-        json_build_object(
-          'full_name', u.full_name,
-          'email', u.email,
-          'avatar_url', u.avatar_url
-        ) as users,
-        json_agg(json_build_object(
-          'id', s.id,
-          'name', s.name,
-          'description', s.description,
-          'price', s.price,
-          'currency', s.currency,
-          'duration_minutes', s.duration_minutes
-        )) as services
-      FROM barber_profiles bp
-      JOIN users u ON bp.user_id = u.id
-      LEFT JOIN services s ON s.barber_id = bp.id
-      WHERE bp.id = $1
-      GROUP BY bp.id, u.id
-    `, [id]);
+    const result = await req.tenant!.pool.query(
+      'SELECT * FROM barber.get_barber_detail(barber_id_ => $1)',
+      [id]
+    );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Barber not found' });
@@ -1211,41 +866,10 @@ app.get('/api/bookings', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const result = await req.tenant!.pool.query(`
-      SELECT
-        b.id,
-        b.booking_reference,
-        b.customer_id,
-        b.barber_id,
-        b.service_id,
-        b.booking_date,
-        b.start_time,
-        b.end_time,
-        b.status,
-        b.payment_status,
-        b.total_amount,
-        json_build_object(
-          'id', bp.id,
-          'display_name', bp.display_name,
-          'shop_name', bp.shop_name
-        ) as barber_profiles,
-        -- Chat & call v1 (SCOPE_RECONCILIATION §5): the barber's phone number
-        -- is only revealed AFTER the barber accepts — the same unlock moment
-        -- the Figma promises for chat/call. Pending/declined bookings get NULL.
-        CASE WHEN b.status IN ('confirmed', 'completed') THEN bu.phone END as barber_phone,
-        json_build_object(
-          'id', s.id,
-          'name', s.name,
-          'price', s.price,
-          'duration_minutes', s.duration_minutes
-        ) as services
-      FROM bookings b
-      JOIN barber_profiles bp ON b.barber_id = bp.id
-      JOIN users bu ON bp.user_id = bu.id
-      JOIN services s ON b.service_id = s.id
-      WHERE b.customer_id = $1
-      ORDER BY b.booking_date DESC
-    `, [customerId]);
+    const result = await req.tenant!.pool.query(
+      'SELECT * FROM barber.get_customer_bookings(customer_id_ => $1)',
+      [customerId]
+    );
 
     res.json(result.rows);
   } catch (error) {
@@ -1260,45 +884,10 @@ app.get('/api/barber/bookings', requireBarberAuth, async (req: Request, res: Res
   try {
     const barberUserId = req.tenant!.userId!;
 
-    const result = await req.tenant!.pool.query(`
-      SELECT
-        b.id,
-        b.booking_reference,
-        b.customer_id,
-        b.barber_id,
-        b.service_id,
-        b.booking_date,
-        b.start_time,
-        b.end_time,
-        b.status,
-        b.payment_status,
-        b.total_amount,
-        b.notes,
-        json_build_object(
-          'id', u.id,
-          'full_name', u.full_name,
-          'email', u.email
-        ) as users,
-        json_build_object(
-          'id', s.id,
-          'name', s.name,
-          'price', s.price,
-          'duration_minutes', s.duration_minutes
-        ) as services,
-        json_build_object(
-          'shop_name', bp.shop_name,
-          'address_text', bp.address_text
-        ) as barber_profiles,
-        -- Chat & call v1 (SCOPE_RECONCILIATION §5): the customer's phone is
-        -- only revealed once the barber has accepted the job.
-        CASE WHEN b.status IN ('confirmed', 'completed') THEN u.phone END as customer_phone
-      FROM bookings b
-      JOIN barber_profiles bp ON b.barber_id = bp.id
-      JOIN users u ON b.customer_id = u.id
-      JOIN services s ON b.service_id = s.id
-      WHERE bp.user_id = $1
-      ORDER BY b.booking_date DESC
-    `, [barberUserId]);
+    const result = await req.tenant!.pool.query(
+      'SELECT * FROM barber.get_barber_bookings(barber_user_id_ => $1)',
+      [barberUserId]
+    );
 
     res.json(result.rows);
   } catch (error) {
@@ -1325,7 +914,7 @@ app.post('/api/bookings', requireCustomerAuth, async (req: Request, res: Respons
 
     // Get service details for total amount + duration
     const serviceResult = await req.tenant!.pool.query(
-      'SELECT price, duration_minutes FROM services WHERE id = $1',
+      'SELECT * FROM barber.get_service_for_booking(service_id_ => $1)',
       [service_id]
     );
 
@@ -1341,17 +930,13 @@ app.post('/api/bookings', requireCustomerAuth, async (req: Request, res: Respons
     const endTime = `${String(Math.floor(endTotalMinutes / 60) % 24).padStart(2, '0')}:${String(endTotalMinutes % 60).padStart(2, '0')}`;
 
     // Create booking
-    const result = await req.tenant!.pool.query(`
-      INSERT INTO bookings (
-        booking_reference, customer_id, barber_id, service_id,
-        booking_date, start_time, end_time, status, payment_status, total_amount, notes
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-      RETURNING *
-    `, [
-      bookingRef, customer_id, barber_id, service_id,
-      booking_date, startTime, endTime, 'pending', 'unpaid', totalAmount, notes
-    ]);
+    const result = await req.tenant!.pool.query(
+      'SELECT * FROM barber.create_booking(booking_reference_ => $1, customer_id_ => $2, barber_id_ => $3, service_id_ => $4, booking_date_ => $5, start_time_ => $6, end_time_ => $7, status_ => $8, payment_status_ => $9, total_amount_ => $10, notes_ => $11)',
+      [
+        bookingRef, customer_id, barber_id, service_id,
+        booking_date, startTime, endTime, 'pending', 'unpaid', totalAmount, notes
+      ]
+    );
 
     // Notify the barber that a new request has arrived (non-fatal).
     const barberUserId = await getBarberUserId(req.tenant!.pool, barber_id);
@@ -1380,9 +965,8 @@ app.post('/api/bookings/:id/accept', requireBarberAuth, async (req: Request, res
     if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
 
     const result = await req.tenant!.pool.query(
-      `UPDATE bookings SET status = $1
-        WHERE id = $2 AND barber_id = $3 AND status = 'pending' RETURNING *`,
-      ['confirmed', id, barberId]
+      'SELECT * FROM barber.accept_booking(booking_id_ => $1, barber_id_ => $2)',
+      [id, barberId]
     );
 
     if (result.rows.length === 0) {
@@ -1415,9 +999,8 @@ app.post('/api/bookings/:id/complete', requireBarberAuth, async (req: Request, r
     if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
 
     const result = await req.tenant!.pool.query(
-      `UPDATE bookings SET status = $1
-        WHERE id = $2 AND barber_id = $3 AND status = 'confirmed' RETURNING *`,
-      ['completed', id, barberId]
+      'SELECT * FROM barber.complete_booking(booking_id_ => $1, barber_id_ => $2)',
+      [id, barberId]
     );
 
     if (result.rows.length === 0) {
@@ -1453,12 +1036,8 @@ app.post('/api/bookings/:id/cancel', requireUserAuth, async (req: Request, res: 
       : null;
 
     const result = await req.tenant!.pool.query(
-      `UPDATE bookings SET status = $1
-        WHERE id = $2
-          AND status IN ('pending','confirmed')
-          AND (customer_id = $3 OR ($4::uuid IS NOT NULL AND barber_id = $4))
-        RETURNING *`,
-      ['cancelled', id, userId, barberId]
+      'SELECT * FROM barber.cancel_booking(booking_id_ => $1, user_id_ => $2, barber_id_ => $3)',
+      [id, userId, barberId]
     );
 
     if (result.rows.length === 0) {
@@ -1512,8 +1091,7 @@ app.post('/api/reviews', requireCustomerAuth, async (req: Request, res: Response
     // actually had — that also determines which barber is being reviewed, so
     // barber_id can never be spoofed.
     const bookingResult = await req.tenant!.pool.query(
-      `SELECT barber_id FROM bookings
-        WHERE id = $1 AND customer_id = $2 AND status = 'completed'`,
+      'SELECT * FROM barber.get_booking_barber_for_review(booking_id_ => $1, customer_id_ => $2)',
       [booking_id, customer_id]
     );
     if (bookingResult.rows.length === 0) {
@@ -1523,30 +1101,18 @@ app.post('/api/reviews', requireCustomerAuth, async (req: Request, res: Response
 
     // One review per booking.
     const existing = await req.tenant!.pool.query(
-      'SELECT id FROM reviews WHERE booking_id = $1', [booking_id]
+      'SELECT * FROM barber.get_review_by_booking(booking_id_ => $1)',
+      [booking_id]
     );
     if (existing.rows.length > 0) {
       return res.status(409).json({ error: 'This booking has already been reviewed' });
     }
 
-    // Create review
-    const result = await req.tenant!.pool.query(`
-      INSERT INTO reviews (booking_id, customer_id, barber_id, rating, comment)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING *
-    `, [booking_id, customer_id, barber_id, rating, comment]);
-
-    // Update barber's average rating
-    await req.tenant!.pool.query(`
-      UPDATE barber_profiles
-      SET rating_avg = (
-        SELECT AVG(rating) FROM reviews WHERE barber_id = $1
-      ),
-      rating_count = (
-        SELECT COUNT(*) FROM reviews WHERE barber_id = $1
-      )
-      WHERE id = $1
-    `, [barber_id]);
+    // Create review + refresh the barber's rating aggregate (atomic in the fn).
+    const result = await req.tenant!.pool.query(
+      'SELECT * FROM barber.create_review(booking_id_ => $1, customer_id_ => $2, barber_id_ => $3, rating_ => $4, comment_ => $5)',
+      [booking_id, customer_id, barber_id, rating, comment]
+    );
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -1578,8 +1144,7 @@ app.post('/api/payments/create-intent', requireCustomerAuth, async (req: Request
     // SECURITY: only pay for your OWN booking — the customer_id predicate stops
     // a caller creating payment intents against other people's bookings.
     const bookingResult = await req.tenant.pool.query(
-      `SELECT id, total_amount, currency, payment_status FROM bookings
-        WHERE id = $1 AND customer_id = $2`,
+      'SELECT * FROM barber.get_booking_for_payment(booking_id_ => $1, customer_id_ => $2)',
       [booking_id, req.tenant.userId]
     );
 
@@ -1615,24 +1180,7 @@ app.post('/api/payments/create-intent', requireCustomerAuth, async (req: Request
 // GET /api/services - Get all services
 app.get('/api/services', async (req: Request, res: Response) => {
   try {
-    const result = await req.tenant!.pool.query(`
-      SELECT
-        s.id,
-        s.barber_id,
-        s.name,
-        s.description,
-        s.price,
-        s.currency,
-        s.duration_minutes,
-        json_build_object(
-          'id', bp.id,
-          'display_name', bp.display_name
-        ) as barber_profiles
-      FROM services s
-      JOIN barber_profiles bp ON s.barber_id = bp.id
-      WHERE s.is_active = true
-      ORDER BY s.price ASC
-    `);
+    const result = await req.tenant!.pool.query('SELECT * FROM barber.list_services()');
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching services:', error);
@@ -1649,7 +1197,7 @@ app.get('/api/services', async (req: Request, res: Response) => {
 // ============================================================================
 
 async function getOwnBarberProfileId(pool: any, userId: string): Promise<string | null> {
-  const result = await pool.query('SELECT id FROM barber_profiles WHERE user_id = $1', [userId]);
+  const result = await pool.query('SELECT * FROM barber.get_own_barber_profile_id(user_id_ => $1)', [userId]);
   return result.rows[0]?.id || null;
 }
 
@@ -1670,15 +1218,13 @@ async function createNotification(
 ): Promise<void> {
   if (!userId) return;
   try {
-    await pool.query(
-      `INSERT INTO notifications (user_id, title, message, type, related_id)
-       VALUES ($1, $2, $3, $4, $5)`,
+    // barber.create_notification writes the row AND returns the owner's email
+    // for the best-effort email copy via local Postfix (see mailer.ts).
+    const result = await pool.query(
+      'SELECT * FROM barber.create_notification(user_id_ => $1, title_ => $2, message_ => $3, type_ => $4, related_id_ => $5)',
       [userId, title, message, type, relatedId]
     );
-    // Best-effort email copy via local Postfix (see mailer.ts) — mirrors the
-    // in-app notification so booking events reach users who aren't in the app.
-    const userRow = await pool.query('SELECT email FROM users WHERE id = $1', [userId]);
-    const email = userRow.rows[0]?.email as string | undefined;
+    const email = result.rows[0]?.email as string | undefined;
     if (email) sendEmail(email, `Shorter — ${title}`, `${message}\n\nOpen Shorter to view details.`);
   } catch (error) {
     console.error('Non-fatal: failed to write notification:', error);
@@ -1688,7 +1234,7 @@ async function createNotification(
 // Resolve the user account behind a barber_profiles row (for notifying the
 // barber when a customer acts on a booking).
 async function getBarberUserId(pool: any, barberProfileId: string): Promise<string | null> {
-  const result = await pool.query('SELECT user_id FROM barber_profiles WHERE id = $1', [barberProfileId]);
+  const result = await pool.query('SELECT * FROM barber.get_barber_user_id(barber_profile_id_ => $1)', [barberProfileId]);
   return result.rows[0]?.user_id || null;
 }
 
@@ -1697,11 +1243,7 @@ async function getBarberUserId(pool: any, barberProfileId: string): Promise<stri
 app.get('/api/notifications', requireUserAuth, async (req: Request, res: Response) => {
   try {
     const result = await req.tenant!.pool.query(
-      `SELECT id, title, message, type, related_id, is_read, created_at
-         FROM notifications
-        WHERE user_id = $1
-        ORDER BY created_at DESC
-        LIMIT 50`,
+      'SELECT * FROM barber.get_notifications(user_id_ => $1)',
       [req.tenant!.userId!]
     );
     res.json(result.rows);
@@ -1715,8 +1257,7 @@ app.get('/api/notifications', requireUserAuth, async (req: Request, res: Respons
 app.patch('/api/notifications/:id/read', requireUserAuth, async (req: Request, res: Response) => {
   try {
     const result = await req.tenant!.pool.query(
-      `UPDATE notifications SET is_read = true
-        WHERE id = $1 AND user_id = $2 RETURNING id, is_read`,
+      'SELECT * FROM barber.mark_notification_read(notification_id_ => $1, user_id_ => $2)',
       [req.params.id, req.tenant!.userId!]
     );
     if (result.rows.length === 0) {
@@ -1733,7 +1274,7 @@ app.patch('/api/notifications/:id/read', requireUserAuth, async (req: Request, r
 app.post('/api/notifications/read-all', requireUserAuth, async (req: Request, res: Response) => {
   try {
     await req.tenant!.pool.query(
-      'UPDATE notifications SET is_read = true WHERE user_id = $1 AND is_read = false',
+      'SELECT * FROM barber.mark_all_notifications_read(user_id_ => $1)',
       [req.tenant!.userId!]
     );
     res.json({ ok: true });
@@ -1751,11 +1292,7 @@ app.get('/api/barber/status', requireBarberAuth, async (req: Request, res: Respo
     const pool = req.tenant!.pool;
     const userId = req.tenant!.userId!;
     const result = await pool.query(
-      `SELECT onboarding_completed, is_verified, is_approved, is_active,
-              onboarding_step, onboarding_completed_at, verification_status,
-              is_online, service_radius_km, buffer_minutes,
-              service_mode, booking_mode, city, region, country
-       FROM barber_profiles WHERE user_id = $1`,
+      'SELECT * FROM barber.get_barber_status(user_id_ => $1)',
       [userId]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Barber profile not found' });
@@ -1790,18 +1327,14 @@ app.get('/api/barber/profile', requireBarberAuth, async (req: Request, res: Resp
     const pool = req.tenant!.pool;
     const userId = req.tenant!.userId!;
     const result = await pool.query(
-      `SELECT bp.*, u.full_name, u.email, u.phone, u.avatar_url
-       FROM barber_profiles bp
-       JOIN users u ON u.id = bp.user_id
-       WHERE bp.user_id = $1`,
+      'SELECT * FROM barber.get_barber_profile(user_id_ => $1) AS profile',
       [userId]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Barber profile not found' });
-    // bp.* already carries every column (including the migration-002 additions:
-    // service_radius_km, buffer_minutes, is_online, city, region, country,
-    // verification_status, onboarding_step, onboarding_completed_at). Numerics
-    // arrive from pg as strings, so normalise the ones the UI binds to inputs.
-    const row = result.rows[0];
+    const row = result.rows[0]?.profile;
+    if (!row) return res.status(404).json({ error: 'Barber profile not found' });
+    // The jsonb blob carries every barber_profiles column (including the
+    // migration-002 additions) plus the joined user fields. Normalise the
+    // numerics the UI binds to inputs.
     res.json({
       ...row,
       service_radius_km: row.service_radius_km != null ? Number(row.service_radius_km) : null,
@@ -1827,7 +1360,7 @@ app.get('/api/barber/services', requireBarberAuth, async (req: Request, res: Res
     const barberId = await getOwnBarberProfileId(pool, userId);
     if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
     const result = await pool.query(
-      'SELECT id, name, description, price, currency, duration_minutes FROM services WHERE barber_id = $1 AND is_active = true',
+      'SELECT * FROM barber.get_own_services(barber_id_ => $1)',
       [barberId]
     );
     res.json(result.rows);
@@ -1845,7 +1378,7 @@ app.get('/api/barber/schedule', requireBarberAuth, async (req: Request, res: Res
     const barberId = await getOwnBarberProfileId(pool, userId);
     if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
     const result = await pool.query(
-      'SELECT id, day_of_week, start_time, end_time, is_available FROM barber_schedule WHERE barber_id = $1 ORDER BY day_of_week',
+      'SELECT * FROM barber.get_barber_schedule(barber_id_ => $1)',
       [barberId]
     );
     res.json(result.rows);
@@ -1861,12 +1394,7 @@ app.get('/api/reviews-by-barber/:barberId', async (req: Request, res: Response) 
   try {
     const { barberId } = req.params;
     const result = await req.tenant!.pool.query(
-      `SELECT r.id, r.rating, r.comment, r.created_at,
-              u.full_name as customer_name
-       FROM reviews r
-       JOIN users u ON u.id = r.customer_id
-       WHERE r.barber_id = $1
-       ORDER BY r.created_at DESC`,
+      'SELECT * FROM barber.get_reviews_by_barber(barber_id_ => $1)',
       [barberId]
     );
     res.json(result.rows);
@@ -1958,26 +1486,9 @@ app.put('/api/barber/profile', requireBarberAuth, async (req: Request, res: Resp
     }
 
     const result = await pool.query(
-      `UPDATE barber_profiles SET
-         shop_name = COALESCE($1, shop_name),
-         address_text = COALESCE($2, address_text),
-         bio = COALESCE($3, bio),
-         display_name = COALESCE($4, display_name),
-         experience_years = COALESCE($5, experience_years),
-         service_mode = COALESCE($6, service_mode),
-         booking_mode = COALESCE($7, booking_mode),
-         latitude = COALESCE($9, latitude),
-         longitude = COALESCE($10, longitude),
-         service_radius_km = COALESCE($11, service_radius_km),
-         buffer_minutes = COALESCE($12, buffer_minutes),
-         is_online = COALESCE($13, is_online),
-         city = COALESCE($14, city),
-         region = COALESCE($15, region),
-         country = COALESCE($16, country),
-         onboarding_step = GREATEST(COALESCE($17, onboarding_step, 1), COALESCE(onboarding_step, 1))
-       WHERE id = $8
-       RETURNING *`,
+      'SELECT * FROM barber.update_barber_profile(barber_id_ => $1, shop_name_ => $2, address_text_ => $3, bio_ => $4, display_name_ => $5, experience_years_ => $6, service_mode_ => $7, booking_mode_ => $8, latitude_ => $9, longitude_ => $10, service_radius_km_ => $11, buffer_minutes_ => $12, is_online_ => $13, city_ => $14, region_ => $15, country_ => $16, onboarding_step_ => $17) AS profile',
       [
+        barberId,
         shop_name ?? null,
         address_text ?? null,
         bio ?? null,
@@ -1985,7 +1496,6 @@ app.put('/api/barber/profile', requireBarberAuth, async (req: Request, res: Resp
         experience_years ?? null,
         service_mode ?? null,
         booking_mode ?? null,
-        barberId,
         latitude ?? null,
         longitude ?? null,
         service_radius_km ?? null,
@@ -1999,14 +1509,14 @@ app.put('/api/barber/profile', requireBarberAuth, async (req: Request, res: Resp
     );
 
     if (avatar_url) {
-      await pool.query('UPDATE users SET avatar_url = $1 WHERE id = $2', [avatar_url, userId]);
+      await pool.query('SELECT * FROM barber.set_user_avatar(user_id_ => $1, avatar_url_ => $2)', [userId, avatar_url]);
     }
     // Phone lives on users, not barber_profiles.
     if (typeof phone === 'string' && phone.trim()) {
-      await pool.query('UPDATE users SET phone = $1 WHERE id = $2', [phone.trim(), userId]);
+      await pool.query('SELECT * FROM barber.set_user_phone(user_id_ => $1, phone_ => $2)', [userId, phone.trim()]);
     }
 
-    const row = result.rows[0];
+    const row = result.rows[0].profile;
     res.json({
       ...row,
       service_radius_km: row.service_radius_km != null ? Number(row.service_radius_km) : null,
@@ -2038,8 +1548,8 @@ app.patch('/api/barber/online', requireBarberAuth, async (req: Request, res: Res
     }
 
     const result = await pool.query(
-      'UPDATE barber_profiles SET is_online = $1 WHERE id = $2 RETURNING is_online',
-      [is_online, barberId]
+      'SELECT * FROM barber.set_barber_online(barber_id_ => $1, is_online_ => $2)',
+      [barberId, is_online]
     );
     res.json({ is_online: !!result.rows[0].is_online });
   } catch (error) {
@@ -2062,9 +1572,7 @@ app.post('/api/barber/services', requireBarberAuth, async (req: Request, res: Re
     }
 
     const result = await pool.query(
-      `INSERT INTO services (barber_id, category_id, name, description, price, duration_minutes)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
+      'SELECT * FROM barber.create_service(barber_id_ => $1, category_id_ => $2, name_ => $3, description_ => $4, price_ => $5, duration_minutes_ => $6)',
       [barberId, category_id || null, name, description || null, price, duration_minutes]
     );
 
@@ -2086,16 +1594,8 @@ app.put('/api/barber/services/:id', requireBarberAuth, async (req: Request, res:
     const { name, description, price, duration_minutes, category_id, is_active } = req.body || {};
 
     const result = await pool.query(
-      `UPDATE services SET
-         name = COALESCE($1, name),
-         description = COALESCE($2, description),
-         price = COALESCE($3, price),
-         duration_minutes = COALESCE($4, duration_minutes),
-         category_id = COALESCE($5, category_id),
-         is_active = COALESCE($6, is_active)
-       WHERE id = $7 AND barber_id = $8
-       RETURNING *`,
-      [name, description, price, duration_minutes, category_id, is_active, req.params.id, barberId]
+      'SELECT * FROM barber.update_service(service_id_ => $1, barber_id_ => $2, name_ => $3, description_ => $4, price_ => $5, duration_minutes_ => $6, category_id_ => $7, is_active_ => $8)',
+      [req.params.id, barberId, name ?? null, description ?? null, price ?? null, duration_minutes ?? null, category_id ?? null, is_active ?? null]
     );
 
     if (result.rows.length === 0) {
@@ -2118,7 +1618,7 @@ app.delete('/api/barber/services/:id', requireBarberAuth, async (req: Request, r
     if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
 
     const result = await pool.query(
-      'DELETE FROM services WHERE id = $1 AND barber_id = $2 RETURNING id',
+      'SELECT * FROM barber.delete_service(service_id_ => $1, barber_id_ => $2)',
       [req.params.id, barberId]
     );
 
@@ -2133,12 +1633,12 @@ app.delete('/api/barber/services/:id', requireBarberAuth, async (req: Request, r
   }
 });
 
-// PUT /api/barber/schedule — replace the logged-in barber's full week
+// PUT /api/barber/schedule — replace the logged-in barber's full week.
+// barber.replace_barber_schedule does the delete+insert atomically in the DB.
 app.put('/api/barber/schedule', requireBarberAuth, async (req: Request, res: Response) => {
-  const pool = req.tenant!.pool;
-  const userId = req.tenant!.userId!;
-  const client = await pool.connect();
   try {
+    const pool = req.tenant!.pool;
+    const userId = req.tenant!.userId!;
     const barberId = await getOwnBarberProfileId(pool, userId);
     if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
 
@@ -2152,28 +1652,19 @@ app.put('/api/barber/schedule', requireBarberAuth, async (req: Request, res: Res
       }
     }
 
-    await client.query('BEGIN');
-    await client.query('DELETE FROM barber_schedule WHERE barber_id = $1', [barberId]);
-    for (const row of schedule) {
-      await client.query(
-        `INSERT INTO barber_schedule (barber_id, day_of_week, start_time, end_time, is_available)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [barberId, row.day_of_week, row.start_time || '09:00', row.end_time || '18:00', row.is_available !== false]
-      );
-    }
-    await client.query('COMMIT');
-
     const result = await pool.query(
-      'SELECT id, day_of_week, start_time, end_time, is_available FROM barber_schedule WHERE barber_id = $1 ORDER BY day_of_week',
-      [barberId]
+      'SELECT * FROM barber.replace_barber_schedule(barber_id_ => $1, schedule_ => $2)',
+      [barberId, JSON.stringify(schedule.map((row: any) => ({
+        day_of_week: row.day_of_week,
+        start_time: row.start_time || '09:00',
+        end_time: row.end_time || '18:00',
+        is_available: row.is_available !== false,
+      })))]
     );
     res.json(result.rows);
   } catch (error) {
-    await client.query('ROLLBACK');
     console.error('Error updating schedule:', error);
     res.status(500).json({ error: (error as Error).message });
-  } finally {
-    client.release();
   }
 });
 
@@ -2187,21 +1678,17 @@ app.post('/api/barber/onboarding/complete', requireBarberAuth, async (req: Reque
     const barberId = await getOwnBarberProfileId(pool, userId);
     if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
 
-    const profileResult = await pool.query(
-      'SELECT display_name, bio, shop_name FROM barber_profiles WHERE id = $1',
+    const checkResult = await pool.query(
+      'SELECT * FROM barber.get_onboarding_check(barber_id_ => $1)',
       [barberId]
     );
-    const profile = profileResult.rows[0];
+    const profile = checkResult.rows[0];
     const missing: string[] = [];
     if (!profile?.display_name) missing.push('display_name');
     if (!profile?.bio) missing.push('bio');
     if (!profile?.shop_name) missing.push('shop_name');
 
-    const servicesResult = await pool.query(
-      'SELECT COUNT(*)::int as count FROM services WHERE barber_id = $1',
-      [barberId]
-    );
-    const hasServices = servicesResult.rows[0].count > 0;
+    const hasServices = Number(profile?.service_count ?? 0) > 0;
     if (!hasServices) missing.push('at least 1 service');
 
     if (missing.length > 0) {
@@ -2209,14 +1696,10 @@ app.post('/api/barber/onboarding/complete', requireBarberAuth, async (req: Reque
     }
 
     const result = await pool.query(
-      `UPDATE barber_profiles SET
-         onboarding_completed = true,
-         onboarding_completed_at = NOW(),
-         onboarding_step = 7
-       WHERE id = $1 RETURNING *`,
+      'SELECT * FROM barber.complete_onboarding(barber_id_ => $1) AS profile',
       [barberId]
     );
-    res.json(result.rows[0]);
+    res.json(result.rows[0].profile);
   } catch (error) {
     console.error('Error completing onboarding:', error);
     res.status(500).json({ error: (error as Error).message });
@@ -2239,14 +1722,13 @@ app.post('/api/barber/verification/submit', requireBarberAuth, async (req: Reque
 
     for (const docType of documentTypes) {
       await pool.query(
-        `INSERT INTO barber_verification_documents (barber_id, document_type, submitted_at)
-         VALUES ($1, $2, NOW())`,
+        'SELECT * FROM barber.add_verification_document(barber_id_ => $1, document_type_ => $2)',
         [barberId, String(docType)]
       );
     }
 
     const result = await pool.query(
-      'SELECT document_type, submitted_at FROM barber_verification_documents WHERE barber_id = $1 ORDER BY submitted_at',
+      'SELECT * FROM barber.list_verification_documents(barber_id_ => $1)',
       [barberId]
     );
     res.status(201).json(result.rows);
@@ -2266,7 +1748,7 @@ app.get('/api/barber/verification/documents', requireBarberAuth, async (req: Req
     if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
 
     const result = await pool.query(
-      'SELECT document_type, submitted_at FROM barber_verification_documents WHERE barber_id = $1 ORDER BY submitted_at',
+      'SELECT * FROM barber.list_verification_documents(barber_id_ => $1)',
       [barberId]
     );
     res.json(result.rows);
@@ -2291,8 +1773,8 @@ app.patch('/api/barber/profile/photos', requireBarberAuth, async (req: Request, 
     }
 
     const result = await pool.query(
-      'UPDATE barber_profiles SET work_photos_count = $1 WHERE id = $2 RETURNING id, work_photos_count',
-      [count, barberId]
+      'SELECT * FROM barber.set_work_photos_count(barber_id_ => $1, count_ => $2)',
+      [barberId, count]
     );
     res.json(result.rows[0]);
   } catch (error) {
@@ -2317,13 +1799,11 @@ app.post('/api/issues', requireBarberAuth, async (req: Request, res: Response) =
     }
 
     const result = await adminDb.query(
-      `INSERT INTO issue_reports (tenant_id, reporter_user_id, reported_type, comments)
-       VALUES ($1, $2, $3, $4)
-       RETURNING *`,
+      'SELECT * FROM barber.create_issue_report(tenant_id_ => $1, reporter_user_id_ => $2, reported_type_ => $3, comments_ => $4) AS report',
       [tenantId, reporterUserId, reported_type, comments || null]
     );
 
-    res.status(201).json(result.rows[0]);
+    res.status(201).json(result.rows[0].report);
   } catch (error) {
     console.error('Error submitting issue report:', error);
     res.status(500).json({ error: (error as Error).message });
@@ -2337,22 +1817,23 @@ app.patch('/admin/companies/:id/barbers/:barberId/verify', requireAdmin, async (
     const { id, barberId } = req.params;
     const adminDb = req.adminDb!;
 
-    const companyResult = await adminDb.query('SELECT id FROM companies WHERE id = $1', [id]);
+    const companyResult = await adminDb.query('SELECT * FROM barber.get_company_by_id(id_ => $1)', [id]);
     if (companyResult.rows.length === 0) {
       return res.status(404).json({ error: 'Company not found' });
     }
 
     const pool = await getTenantPool(id);
     const result = await pool.query(
-      'UPDATE barber_profiles SET is_verified = true WHERE id = $1 RETURNING *',
+      'SELECT * FROM barber.admin_verify_barber(barber_id_ => $1) AS profile',
       [barberId]
     );
 
-    if (result.rows.length === 0) {
+    const profile = result.rows[0]?.profile;
+    if (!profile) {
       return res.status(404).json({ error: 'Barber not found' });
     }
 
-    res.json(result.rows[0]);
+    res.json(profile);
   } catch (error) {
     console.error('Error verifying barber:', error);
     res.status(500).json({ error: (error as Error).message });
@@ -2368,15 +1849,12 @@ app.patch('/admin/companies/:id/barbers/:barberId/verify', requireAdmin, async (
 //
 // Identity comes exclusively from the verified JWT on req.tenant — the body is
 // only ever read for the { confirm: "DELETE" } re-confirmation token, never for
-// a user id. Works for both 'customer' and 'barber' roles (the customer routes
-// authenticate the same way: req.tenant?.userId, 401 if absent).
+// a user id. Works for both 'customer' and 'barber' roles.
 //
-// Active-commitment guard: the real bookings.status CHECK constraint is
-// ('pending','confirmed','cancelled','completed') — see docs/DATABASE_SCHEMA.sql
-// and the accept/complete/cancel handlers above, which write 'confirmed',
-// 'completed' and 'cancelled' respectively. So "still open" == pending|confirmed.
+// The guarded transaction (row lock, active-commitment check, cascade delete)
+// lives entirely inside barber.delete_account, which reports back with
+// statuscode_/statusmsg_ per the platform Postgres standard.
 // ============================================================================
-const ACTIVE_BOOKING_STATUSES = ['pending', 'confirmed'];
 
 app.delete('/api/account', async (req: Request, res: Response) => {
   const userId = req.tenant?.userId;
@@ -2394,49 +1872,22 @@ app.delete('/api/account', async (req: Request, res: Response) => {
   const pool = req.tenant!.pool;
   const tenantId = req.tenant!.companyId;
   const role = req.tenant!.userRole;
-  const client = await pool.connect();
 
   try {
-    await client.query('BEGIN');
-
-    const userRow = await client.query(
-      'SELECT id, email, role FROM users WHERE id = $1 FOR UPDATE',
+    const result = await pool.query(
+      'SELECT * FROM barber.delete_account(user_id_ => $1)',
       [userId]
     );
-    if (userRow.rows.length === 0) {
-      await client.query('ROLLBACK');
+    const outcome = result.rows[0];
+
+    if (Number(outcome.statuscode_) === 404) {
       return res.status(404).json({ error: 'Account not found' });
     }
-    const effectiveRole = userRow.rows[0].role || role;
 
-    // Resolve the barber profile (if any) — needed both for the commitment
-    // check and to clean up uploaded files after the DB work commits.
-    const profileRow = await client.query(
-      'SELECT id FROM barber_profiles WHERE user_id = $1',
-      [userId]
-    );
-    const barberProfileId: string | null = profileRow.rows[0]?.id ?? null;
+    const effectiveRole = outcome.role_ || role;
+    const active = Number(outcome.active_bookings_ || 0);
 
-    // Business-rule guard: refuse while anything is still open.
-    let active = 0;
-    if (barberProfileId) {
-      const r = await client.query(
-        `SELECT COUNT(*)::int AS n FROM bookings
-          WHERE (customer_id = $1 OR barber_id = $2) AND status = ANY($3::text[])`,
-        [userId, barberProfileId, ACTIVE_BOOKING_STATUSES]
-      );
-      active = r.rows[0].n;
-    } else {
-      const r = await client.query(
-        `SELECT COUNT(*)::int AS n FROM bookings
-          WHERE customer_id = $1 AND status = ANY($2::text[])`,
-        [userId, ACTIVE_BOOKING_STATUSES]
-      );
-      active = r.rows[0].n;
-    }
-
-    if (active > 0) {
-      await client.query('ROLLBACK');
+    if (Number(outcome.statuscode_) === 409) {
       return res.status(409).json({
         error:
           effectiveRole === 'barber'
@@ -2446,11 +1897,7 @@ app.delete('/api/account', async (req: Request, res: Response) => {
       });
     }
 
-    // Deleting the users row cascades to barber_profiles (and its services,
-    // schedule, work photos, verification documents, reviews) plus bookings,
-    // notifications, payments and reviews written by this user.
-    await client.query('DELETE FROM users WHERE id = $1', [userId]);
-    await client.query('COMMIT');
+    const barberProfileId: string | null = outcome.barber_profile_id_ ?? null;
 
     // Files come off disk only after the DB work is durably committed, so a
     // rolled-back delete can never orphan a profile from its images.
@@ -2470,8 +1917,7 @@ app.delete('/api/account', async (req: Request, res: Response) => {
     if (req.adminDb) {
       await req.adminDb
         .query(
-          `INSERT INTO audit_log (admin_user_id, action, resource_type, resource_id, changes, ip_address)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
+          'SELECT * FROM barber.write_audit_log(admin_user_id_ => $1, action_ => $2, resource_type_ => $3, resource_id_ => $4, changes_ => $5, ip_address_ => $6)',
           [
             userId,
             'account.delete',
@@ -2486,11 +1932,8 @@ app.delete('/api/account', async (req: Request, res: Response) => {
 
     return res.json({ deleted: true });
   } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
     console.error('Error deleting account:', error);
     return res.status(500).json({ error: (error as Error).message });
-  } finally {
-    client.release();
   }
 });
 

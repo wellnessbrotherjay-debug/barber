@@ -10,6 +10,9 @@
 // The barber_profiles row is resolved server-side from that userId, so a
 // barber_id in the request body is never read and can never be spoofed —
 // every write path and delete is scoped by that resolved barberId.
+//
+// HARD RULE: no raw SQL — every data operation calls a barber.* Postgres
+// function (migrations/003_barber_functions.sql).
 // ============================================================================
 
 import express, { Request, Response, Router } from 'express';
@@ -104,7 +107,7 @@ const upload = multer({
 // ---------------------------------------------------------------------------
 
 async function getOwnBarberProfileId(pool: Pool, userId: string): Promise<string | null> {
-  const result = await pool.query('SELECT id FROM barber_profiles WHERE user_id = $1', [userId]);
+  const result = await pool.query('SELECT * FROM barber.get_own_barber_profile_id(user_id_ => $1)', [userId]);
   return result.rows[0]?.id || null;
 }
 
@@ -184,17 +187,8 @@ async function removeFile(storageKey: string): Promise<void> {
  * work_photos_count from the relational barber_work_photos rows, so the public
  * GET /api/barbers/:id keeps returning work_photos as a plain string[].
  */
-async function syncWorkPhotosJsonb(pool: Pool, barberId: string): Promise<string[]> {
-  const { rows } = await pool.query(
-    'SELECT url FROM barber_work_photos WHERE barber_id = $1 ORDER BY sort_order ASC, created_at ASC',
-    [barberId]
-  );
-  const urls: string[] = rows.map((r: { url: string }) => r.url);
-  await pool.query(
-    'UPDATE barber_profiles SET work_photos = $1::jsonb, work_photos_count = $2 WHERE id = $3',
-    [JSON.stringify(urls), urls.length, barberId]
-  );
-  return urls;
+async function syncWorkPhotosJsonb(pool: Pool, barberId: string): Promise<void> {
+  await pool.query('SELECT * FROM barber.sync_work_photos(barber_id_ => $1)', [barberId]);
 }
 
 class UploadError extends Error {}
@@ -263,9 +257,9 @@ export function createUploadsRouter(requireBarberAuth: Middleware): Router {
         if (!file) return res.status(400).json({ error: 'No file uploaded (expected field "file")' });
 
         const stored = await storeFile(file, owner.tenantId, owner.barberId, 'avatar');
-        await owner.pool.query('UPDATE users SET avatar_url = $1 WHERE id = $2', [
-          stored.url,
+        await owner.pool.query('SELECT * FROM barber.set_user_avatar(user_id_ => $1, avatar_url_ => $2)', [
           req.tenant!.userId,
+          stored.url,
         ]);
         res.json({ url: stored.url });
       } catch (error) {
@@ -312,15 +306,14 @@ export function createUploadsRouter(requireBarberAuth: Middleware): Router {
         }
 
         const maxRes = await owner.pool.query(
-          'SELECT COALESCE(MAX(sort_order), -1) AS max FROM barber_work_photos WHERE barber_id = $1',
+          'SELECT * FROM barber.get_max_work_photo_sort(barber_id_ => $1)',
           [owner.barberId]
         );
         let nextOrder = Number(maxRes.rows[0]?.max ?? -1) + 1;
 
         for (const s of stored) {
           await owner.pool.query(
-            `INSERT INTO barber_work_photos (barber_id, storage_key, url, sort_order, bytes, mime_type)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
+            'SELECT * FROM barber.add_work_photo(barber_id_ => $1, storage_key_ => $2, url_ => $3, sort_order_ => $4, bytes_ => $5, mime_type_ => $6)',
             [owner.barberId, s.storageKey, s.url, nextOrder++, s.bytes, s.mimeType]
           );
         }
@@ -361,7 +354,7 @@ export function createUploadsRouter(requireBarberAuth: Middleware): Router {
       if (!owner) return;
 
       const result = await owner.pool.query(
-        'DELETE FROM barber_work_photos WHERE id = $1 AND barber_id = $2 RETURNING storage_key',
+        'SELECT * FROM barber.delete_work_photo(photo_id_ => $1, barber_id_ => $2)',
         [req.params.id, owner.barberId]
       );
       if (result.rows.length === 0) {
@@ -396,7 +389,7 @@ export function createUploadsRouter(requireBarberAuth: Middleware): Router {
       }
 
       const ownedRes = await owner.pool.query(
-        'SELECT id FROM barber_work_photos WHERE barber_id = $1',
+        'SELECT * FROM barber.get_work_photo_ids(barber_id_ => $1)',
         [owner.barberId]
       );
       const owned = new Set(ownedRes.rows.map((r: { id: string }) => String(r.id)));
@@ -406,8 +399,8 @@ export function createUploadsRouter(requireBarberAuth: Middleware): Router {
 
       for (let i = 0; i < list.length; i++) {
         await owner.pool.query(
-          'UPDATE barber_work_photos SET sort_order = $1 WHERE id = $2 AND barber_id = $3',
-          [i, list[i], owner.barberId]
+          'SELECT * FROM barber.set_work_photo_order(photo_id_ => $1, barber_id_ => $2, sort_order_ => $3)',
+          [list[i], owner.barberId, i]
         );
       }
 
@@ -424,10 +417,7 @@ export function createUploadsRouter(requireBarberAuth: Middleware): Router {
 
 async function listPhotos(pool: Pool, barberId: string): Promise<PhotoRow[]> {
   const { rows } = await pool.query(
-    `SELECT id, url, storage_key, sort_order, caption, bytes, mime_type, created_at
-       FROM barber_work_photos
-      WHERE barber_id = $1
-      ORDER BY sort_order ASC, created_at ASC`,
+    'SELECT * FROM barber.list_work_photos(barber_id_ => $1)',
     [barberId]
   );
   return rows as PhotoRow[];

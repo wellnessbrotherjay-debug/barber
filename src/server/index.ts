@@ -11,6 +11,7 @@ import { fileURLToPath } from 'url';
 import Stripe from 'stripe';
 import { tenantMiddleware, requireAdmin, requireEntitlement, requireBarberAuth, requireUserAuth, requireCustomerAuth, closeTenantPools, getTenantPool, getJwtSecret, AuthTokenPayload } from './middleware/tenant';
 import { createUploadsRouter, UPLOAD_DIR } from './routes/uploads';
+import { sendEmail } from './mailer';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1674,6 +1675,11 @@ async function createNotification(
        VALUES ($1, $2, $3, $4, $5)`,
       [userId, title, message, type, relatedId]
     );
+    // Best-effort email copy via local Postfix (see mailer.ts) — mirrors the
+    // in-app notification so booking events reach users who aren't in the app.
+    const userRow = await pool.query('SELECT email FROM users WHERE id = $1', [userId]);
+    const email = userRow.rows[0]?.email as string | undefined;
+    if (email) sendEmail(email, `Shorter — ${title}`, `${message}\n\nOpen Shorter to view details.`);
   } catch (error) {
     console.error('Non-fatal: failed to write notification:', error);
   }

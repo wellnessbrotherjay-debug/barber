@@ -85,14 +85,14 @@ export LOKI_PASSWORD=<your-password>
 ./scripts/deploy-to-loki.sh
 
 # 3. Verify deployment
-psql -h 75.119.140.69 -U postgres -d barber_app -c "\dt"
+psql -h 75.119.140.69 -U postgres -d shorter_app -c "\dt"
 ```
 
 **LOKI Connection Details** (from memory):
 - Host: 75.119.140.69 (SSH) or 100.84.100.96 (Tailscale)
 - Port: 22 (SSH) or 5432 (PostgreSQL)
 - User: postgres (or custom user)
-- Database: barber_app (will be created)
+- Database: shorter_app (will be created)
 
 ### ⏳ Phase 4: API Integration & Backend Wiring (Pending)
 **Status**: PLANNED  
@@ -288,7 +288,7 @@ barber/
 
 For issues, refer to:
 1. [LOKI_SETUP_GUIDE.md](./LOKI_SETUP_GUIDE.md#troubleshooting) - Common errors
-2. Database logs: `psql -h 75.119.140.69 -U postgres -d barber_app`
+2. Database logs: `psql -h 75.119.140.69 -U postgres -d shorter_app`
 3. Application logs (after deployment): `pm2 logs barber-app`
 
 ## Summary

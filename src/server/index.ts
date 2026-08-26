@@ -149,7 +149,7 @@ function issueToken(payload: AuthTokenPayload): string {
 
 // POST /api/auth/signup — creates a real user row (bcrypt-hashed password) in
 // the tenant's own DB. role='barber' also creates a barrber_profiles row.
-// TEMP: single-tenant demo mode — tenant_id defaults to 1 (foundation_barber_1)
+// TEMP: single-tenant demo mode — tenant_id defaults to 1 (shorter_prod)
 // since that's the only real company/tenant in production right now. Same
 // stopgap pattern as the rest of this codebase's single-tenant assumptions.
 app.post('/api/auth/signup', async (req: Request, res: Response) => {
@@ -281,9 +281,12 @@ app.get('/api/health', async (req: Request, res: Response) => {
     }
 
     const result = await req.tenant.pool.query('SELECT * FROM barber.db_now()');
+    // Name the database and role, not just "connected" — an app pointed at the
+    // wrong database reports itself healthy otherwise.
     res.json({
       status: 'ok',
-      database: 'connected',
+      database: result.rows[0].database_name,
+      role: result.rows[0].connected_role,
       tenant: req.tenant.companyId,
       timestamp: result.rows[0].now
     });
@@ -305,7 +308,7 @@ app.get('/api/health', async (req: Request, res: Response) => {
 // booking_metrics is a pre-aggregated rollup table that nothing in this codebase
 // writes to, so it is always empty and the old revenue chart always looked broken.
 // Real booking/revenue data lives per-tenant in each company's own database
-// (foundation_barber_<id> — see getTenantPool in middleware/tenant.ts). This
+// (the company's own database (see companies.database_name) — see getTenantPool in middleware/tenant.ts). This
 // iterates every active company's tenant DB and computes real numbers on the fly.
 app.get('/admin/dashboard', requireAdmin, async (req: Request, res: Response) => {
   try {
@@ -462,7 +465,7 @@ app.patch('/admin/companies/:id/status', requireAdmin, async (req: Request, res:
 });
 
 // GET /admin/companies/:id/bookings - Real bookings for ONE company, pulled
-// straight from that company's own tenant database (foundation_barber_<id>).
+// straight from that company's own tenant database (the company's own database (see companies.database_name)).
 app.get('/admin/companies/:id/bookings', requireAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -484,7 +487,7 @@ app.get('/admin/companies/:id/bookings', requireAdmin, async (req: Request, res:
 });
 
 // GET /admin/companies/:id/barbers - Full barber roster for ONE company, pulled
-// from that company's own tenant database (foundation_barber_<id>). This is the
+// from that company's own tenant database (the company's own database (see companies.database_name)). This is the
 // "profile / verification / onboarding" data — is_verified is the verification flag.
 app.get('/admin/companies/:id/barbers', requireAdmin, async (req: Request, res: Response) => {
   try {
@@ -631,7 +634,7 @@ app.get('/admin/companies/:id/onboarding', requireAdmin, async (req: Request, re
 // GET /admin/bookings - Real bookings across ALL companies. booking_metrics is a
 // dead rollup table nothing writes to (see comment above /admin/dashboard) — the
 // actual booking rows live per-tenant, so this iterates every active company's
-// own tenant DB (foundation_barber_<id>) and merges recent bookings, tagged with
+// own tenant DB (the company's own database (see companies.database_name)) and merges recent bookings, tagged with
 // which company they belong to. Capped per-company and overall to keep payload sane.
 app.get('/admin/bookings', requireAdmin, async (req: Request, res: Response) => {
   const PER_COMPANY_LIMIT = 50;
@@ -1798,7 +1801,7 @@ app.patch('/api/barber/profile/photos', requireBarberAuth, async (req: Request, 
 });
 
 // POST /api/issues — submit a safety/issue report. Writes to the shared ADMIN
-// database (barber_app, not per-tenant) via req.adminDb so it's visible across
+// database (shorter_app, not per-tenant) via req.adminDb so it's visible across
 // tenants to the platform owner. No owner-facing UI to view these yet — this
 // just makes submission real and persisted.
 app.post('/api/issues', requireBarberAuth, async (req: Request, res: Response) => {

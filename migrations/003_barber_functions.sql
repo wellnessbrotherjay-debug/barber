@@ -6,11 +6,11 @@
 -- Conventions (platform Postgres standards):
 --   * one function per name, never overloaded
 --   * input params named with trailing underscore (user_id_)
---   * SECURITY DEFINER, owned by postgres; app role barber_app gets EXECUTE only
+--   * SECURITY DEFINER, owned by postgres; app role shorter_app gets EXECUTE only
 --   * errors RAISE (no silent failures); delete_account returns statuscode_/statusmsg_
 --
--- Idempotent: CREATE OR REPLACE everywhere. Applied to foundation_barber_<id>
--- tenant DBs, barber_app_template, and the shared admin DB barber_app —
+-- Idempotent: CREATE OR REPLACE everywhere. Applied to the company's own database (see companies.database_name)
+-- tenant DBs, shorter_template, and the control DB shorter_admin —
 -- plpgsql bodies are not parsed for table existence at CREATE time, so
 -- functions whose tables live in another database are inert but harmless.
 
@@ -28,7 +28,7 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- TENANT MIDDLEWARE (admin DB: barber_app)
+-- TENANT MIDDLEWARE (control DB: shorter_admin)
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION barber.get_company_by_api_key(api_key_ text, status_ text)
@@ -1271,9 +1271,9 @@ EXCEPTION WHEN OTHERS THEN
 END $$;
 
 -- ============================================================================
--- GRANTS — app connects as barber_app (never postgres) and can ONLY execute.
+-- GRANTS — app connects as shorter_app (never postgres) and can ONLY execute.
 -- ============================================================================
 
-GRANT USAGE ON SCHEMA barber TO barber_app;
-GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA barber TO barber_app;
-ALTER DEFAULT PRIVILEGES IN SCHEMA barber GRANT EXECUTE ON FUNCTIONS TO barber_app;
+GRANT USAGE ON SCHEMA barber TO shorter_app;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA barber TO shorter_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA barber GRANT EXECUTE ON FUNCTIONS TO shorter_app;

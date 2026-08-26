@@ -16,7 +16,7 @@ LOKI_HOST=${LOKI_HOST:-100.84.100.96}
 LOKI_USER=${LOKI_USER:-postgres}
 LOKI_PASSWORD=${LOKI_PASSWORD:-}
 LOKI_PORT=${LOKI_PORT:-5432}
-LOKI_DB=${LOKI_DB:-barber_app}
+LOKI_DB=${LOKI_DB:-shorter_admin}
 
 # Check required variables
 if [ -z "$LOKI_PASSWORD" ]; then
@@ -29,7 +29,7 @@ if [ -z "$LOKI_PASSWORD" ]; then
   echo "  LOKI_HOST=100.84.100.96 (default: Tailscale private IP)"
   echo "  LOKI_USER=postgres (default)"
   echo "  LOKI_PORT=5432 (default)"
-  echo "  LOKI_DB=barber_app (default)"
+  echo "  LOKI_DB=shorter_admin (default)"
   exit 1
 fi
 

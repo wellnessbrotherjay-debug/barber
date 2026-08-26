@@ -59,14 +59,26 @@ declare global {
   }
 }
 
-// Admin database (shared across all tenants). The app connects as the
-// service role barber_app — never the postgres superuser.
+// Connection settings come from the environment and nowhere else. A default
+// host, user or database name written here is a second source of truth: it
+// silently sends the application somewhere nobody configured, and a missing
+// setting then looks like a working system pointed at the wrong place.
+function requiredEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} must be set - refusing to start against an unconfigured database`);
+  }
+  return value;
+}
+
+// Control database: the tenant registry (companies, entitlements, metrics).
+// The application connects as its own service role, never a superuser.
 const adminDbPool = new Pool({
-  host: process.env.VITE_LOKI_HOST || '100.84.100.96',
-  port: parseInt(process.env.VITE_LOKI_PORT || '5432'),
-  database: 'barber_app',
-  user: process.env.VITE_LOKI_USER || 'barber_app',
-  password: process.env.VITE_LOKI_PASSWORD,
+  host: requiredEnv('VITE_LOKI_HOST'),
+  port: parseInt(requiredEnv('VITE_LOKI_PORT'), 10),
+  database: requiredEnv('VITE_LOKI_DATABASE'),
+  user: requiredEnv('VITE_LOKI_USER'),
+  password: requiredEnv('VITE_LOKI_PASSWORD'),
   ssl: false,
   max: 5,
   idleTimeoutMillis: 30000,
@@ -86,14 +98,25 @@ export async function getTenantPool(tenantId: string): Promise<Pool> {
     return tenantPools.get(tenantId)!;
   }
 
-  // Create new pool for tenant
-  const dbName = `foundation_barber_${tenantId}`;
+  // WHICH DATABASE THIS TENANT LIVES IN IS DATA, NOT A FORMULA.
+  // This used to glue a prefix onto the company id, which baked a physical
+  // database name into the application and meant the estate could not rename a
+  // database without editing code. The company row names its own database.
+  const registry = await adminDbPool.query(
+    'SELECT * FROM barber.get_company_database(company_id_ => $1)',
+    [tenantId]
+  );
+  const dbName = registry.rows[0]?.database_name as string | undefined;
+  if (!dbName) {
+    throw new Error(`Tenant ${tenantId} has no active database registered - refusing to guess one`);
+  }
+
   const pool = new Pool({
-    host: process.env.VITE_LOKI_HOST || '100.84.100.96',
-    port: parseInt(process.env.VITE_LOKI_PORT || '5432'),
+    host: requiredEnv('VITE_LOKI_HOST'),
+    port: parseInt(requiredEnv('VITE_LOKI_PORT'), 10),
     database: dbName,
-    user: process.env.VITE_LOKI_USER || 'barber_app',
-    password: process.env.VITE_LOKI_PASSWORD,
+    user: requiredEnv('VITE_LOKI_USER'),
+    password: requiredEnv('VITE_LOKI_PASSWORD'),
     ssl: false,
     max: 10,
     idleTimeoutMillis: 30000,

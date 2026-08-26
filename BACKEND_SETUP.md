@@ -22,7 +22,7 @@ Create `.env.local` file in project root (git-ignored):
 # LOKI PostgreSQL Connection
 VITE_LOKI_HOST=100.84.100.96
 VITE_LOKI_PORT=5432
-VITE_LOKI_DATABASE=barber_app
+VITE_LOKI_DATABASE=shorter_app
 VITE_LOKI_USER=postgres
 VITE_LOKI_PASSWORD=<your-postgres-password>
 
@@ -39,7 +39,7 @@ npm run dev:server
 Expected output:
 ```
 🚀 Barber App API running on http://localhost:5000
-📦 Connected to LOKI PostgreSQL at 100.84.100.96:5432/barber_app
+📦 Connected to LOKI PostgreSQL at 100.84.100.96:5432/shorter_app
 ```
 
 ### 4. Run Frontend (in another terminal)
@@ -126,7 +126,7 @@ curl -H "x-user-id: customer-id" http://localhost:5000/api/bookings
 ### Check Database
 ```bash
 # From any machine with Tailscale access:
-psql -h 100.84.100.96 -U postgres -d barber_app
+psql -h 100.84.100.96 -U postgres -d shorter_app
 
 # List tables
 \dt

@@ -8,14 +8,14 @@
 ssh root@100.84.100.96
 
 # Create admin database
-createdb barber_app
+createdb shorter_app
 
 # Apply admin schema
-psql -U postgres -d barber_app < /path/to/docs/ADMIN_DATABASE_SCHEMA.sql
+psql -U postgres -d shorter_app < /path/to/docs/ADMIN_DATABASE_SCHEMA.sql
 
 # Create tenant template
-createdb barber_app_template
-psql -U postgres -d barber_app_template < /path/to/docs/DATABASE_SCHEMA.sql
+createdb shorter_template
+psql -U postgres -d shorter_template < /path/to/docs/DATABASE_SCHEMA.sql
 
 # Verify
 psql -U postgres -l | grep barber
@@ -66,7 +66,7 @@ NODE_ENV=production
 PORT=5000
 VITE_LOKI_HOST=localhost
 VITE_LOKI_PORT=5432
-VITE_LOKI_DATABASE=barber_app
+VITE_LOKI_DATABASE=shorter_app
 VITE_LOKI_USER=postgres
 VITE_API_URL=https://barber.safetykat.com
 EOF
@@ -186,10 +186,10 @@ API Docs:          See MULTITENANT_ARCHITECTURE.md
 | Issue | Solution |
 |-------|----------|
 | Service won't start | `journalctl -u barber-app.service` |
-| DB connection error | `psql -U postgres -d barber_app "SELECT NOW();"` |
+| DB connection error | `psql -U postgres -d shorter_app "SELECT NOW();"` |
 | SSL error | Check `/etc/letsencrypt/live/barber.safetykat.com/` |
 | Nginx 502 | Check backend: `curl localhost:5000/health` |
-| API key not working | Verify company in: `psql -d barber_app "SELECT * FROM companies;"` |
+| API key not working | Verify company in: `psql -d shorter_app "SELECT * FROM companies;"` |
 
 ---
 
@@ -214,10 +214,10 @@ journalctl -u barber-app.service -f
 tail -f /var/log/nginx/barber.access.log
 
 # Watch database connections
-watch -n 5 'psql -U postgres -d barber_app -c "SELECT count(*) as connections FROM pg_stat_activity;"'
+watch -n 5 'psql -U postgres -d shorter_app -c "SELECT count(*) as connections FROM pg_stat_activity;"'
 
 # Watch API usage
-psql -U postgres -d barber_app \
+psql -U postgres -d shorter_app \
   "SELECT company_id, COUNT(*) as requests FROM api_key_usage WHERE timestamp > NOW() - INTERVAL '1 hour' GROUP BY company_id;"
 ```
 
@@ -226,7 +226,7 @@ psql -U postgres -d barber_app \
 ## Scale to 100+ Barber Companies
 
 Each company:
-1. Gets their own database (`foundation_barber_<id>`)
+1. Gets their own database (`the company's own database (see companies.database_name)`)
 2. Gets their own API key
 3. Has their own dashboard
 4. Pays monthly based on tier (starter/pro/enterprise)

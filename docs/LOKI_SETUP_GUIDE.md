@@ -19,10 +19,10 @@ ssh root@75.119.140.69
 ssh root@100.84.100.96
 
 # Create barber app database
-psql -U postgres -c "CREATE DATABASE barber_app;"
+psql -U postgres -c "CREATE DATABASE shorter_app;"
 
 # Verify creation
-psql -U postgres -l | grep barber_app
+psql -U postgres -l | grep shorter_app
 ```
 
 ## Step 2: Deploy Database Schema
@@ -35,10 +35,10 @@ scp docs/DATABASE_SCHEMA.sql root@75.119.140.69:/tmp/
 ssh root@75.119.140.69
 
 # Run the schema migration
-psql -U postgres -d barber_app -f /tmp/DATABASE_SCHEMA.sql
+psql -U postgres -d shorter_app -f /tmp/DATABASE_SCHEMA.sql
 
 # Verify tables were created
-psql -U postgres -d barber_app -c "\dt"
+psql -U postgres -d shorter_app -c "\dt"
 ```
 
 ## Step 3: Configure Application Environment
@@ -53,7 +53,7 @@ openssl rand -base64 32
 # Create .env.local with:
 VITE_LOKI_HOST=75.119.140.69
 VITE_LOKI_PORT=5432
-VITE_LOKI_DATABASE=barber_app
+VITE_LOKI_DATABASE=shorter_app
 VITE_LOKI_USER=postgres
 VITE_LOKI_PASSWORD=<your-postgres-password>
 VITE_JWT_SECRET=<generated-secret-from-above>
@@ -88,7 +88,7 @@ npm install @supabase/supabase-js
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
-  'postgresql://postgres:password@75.119.140.69:5432/barber_app',
+  'postgresql://postgres:password@75.119.140.69:5432/shorter_app',
   'your-jwt-secret'
 )
 ```
@@ -195,7 +195,7 @@ journalctl -u barber-app -f
 |----------|-------|-------|
 | VITE_LOKI_HOST | 75.119.140.69 | LOKI PostgreSQL server IP |
 | VITE_LOKI_PORT | 5432 | PostgreSQL default port |
-| VITE_LOKI_DATABASE | barber_app | Database name (must exist) |
+| VITE_LOKI_DATABASE | shorter_app | Database name (must exist) |
 | VITE_LOKI_USER | postgres | PostgreSQL user (can create custom user) |
 | VITE_LOKI_PASSWORD | (secret) | PostgreSQL password |
 | VITE_JWT_SECRET | (secret) | Used for signing JWTs |

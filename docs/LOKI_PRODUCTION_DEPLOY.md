@@ -29,8 +29,8 @@ ssh root@100.84.100.96
 psql -U postgres
 
 # Create admin database
-CREATE DATABASE barber_app;
-\c barber_app
+CREATE DATABASE shorter_app;
+\c shorter_app
 
 # Run admin schema
 \i /opt/htf/barber-app/docs/ADMIN_DATABASE_SCHEMA.sql
@@ -44,9 +44,9 @@ CREATE DATABASE barber_app;
 
 ```sql
 -- Create template database (one-time)
-CREATE DATABASE barber_app_template TEMPLATE template0;
+CREATE DATABASE shorter_template TEMPLATE template0;
 
-\c barber_app_template
+\c shorter_template
 
 -- Run barber app schema
 \i /opt/htf/barber-app/docs/DATABASE_SCHEMA.sql
@@ -60,8 +60,8 @@ CREATE DATABASE barber_app_template TEMPLATE template0;
 psql -U postgres -l | grep barber
 
 # Should show:
-# barber_app           | postgres | UTF8
-# barber_app_template  | postgres | UTF8
+# shorter_app           | postgres | UTF8
+# shorter_template  | postgres | UTF8
 ```
 
 ## Phase 2: Configure Domain & SSL
@@ -130,7 +130,7 @@ NODE_ENV=production
 PORT=5000
 VITE_LOKI_HOST=localhost
 VITE_LOKI_PORT=5432
-VITE_LOKI_DATABASE=barber_app
+VITE_LOKI_DATABASE=shorter_app
 VITE_LOKI_USER=postgres
 VITE_API_URL=https://barber.safetykat.com
 VITE_ADMIN_SECRET=your-secret-key-here-change-me
@@ -338,7 +338,7 @@ tail -f /var/log/nginx/barber.access.log
 tail -f /var/log/nginx/barber.error.log
 
 # Database connections
-psql -U postgres -d barber_app \
+psql -U postgres -d shorter_app \
   "SELECT datname, count(*) FROM pg_stat_activity GROUP BY datname;"
 ```
 
@@ -390,13 +390,13 @@ ssh root@100.84.100.96
 
 # Clone template for new tenant
 psql -U postgres <<'EOF'
-CREATE DATABASE foundation_barber_2
-  TEMPLATE barber_app_template
+CREATE DATABASE a second company's database
+  TEMPLATE shorter_template
   OWNER postgres;
 EOF
 
 # Verify
-psql -U postgres -d foundation_barber_2 "\dt"
+psql -U postgres -d a second company's database "\dt"
 ```
 
 ## Phase 7: SSL Certificate Renewal
@@ -423,11 +423,11 @@ renew_hook = systemctl reload nginx
 watch -n 5 'curl -s https://barber.safetykat.com/health | jq .'
 
 # Monitor database connections
-psql -U postgres -d barber_app \
+psql -U postgres -d shorter_app \
   -c "SELECT * FROM pg_stat_activity WHERE state != 'idle';"
 
 # Monitor API usage
-psql -U postgres -d barber_app \
+psql -U postgres -d shorter_app \
   "SELECT company_id, COUNT(*) as requests FROM api_key_usage \
    WHERE timestamp > NOW() - INTERVAL '1 hour' \
    GROUP BY company_id ORDER BY requests DESC;"
@@ -445,7 +445,7 @@ DATE=$(date +%Y%m%d_%H%M%S)
 mkdir -p $BACKUP_DIR
 
 # Backup admin DB
-pg_dump -U postgres barber_app | gzip > $BACKUP_DIR/barber_app_$DATE.sql.gz
+pg_dump -U postgres shorter_app | gzip > $BACKUP_DIR/barber_app_$DATE.sql.gz
 
 # Backup all tenant DBs
 for db in $(psql -U postgres -t -c "SELECT datname FROM pg_database WHERE datname LIKE 'foundation_barber_%'")
@@ -512,7 +512,7 @@ EOF
 journalctl -u barber-app.service -n 50
 
 # Test connection to database
-psql -h localhost -U postgres -d barber_app \
+psql -h localhost -U postgres -d shorter_app \
   "SELECT NOW();"
 
 # Check if port 5000 is in use
@@ -525,11 +525,11 @@ netstat -tlnp | grep 5000
 # Verify PostgreSQL is running
 systemctl status postgresql
 
-# Check if barber_app database exists
+# Check if shorter_app database exists
 psql -U postgres -c "\l" | grep barber
 
 # Test direct connection
-psql -U postgres -d barber_app -c "SELECT NOW();"
+psql -U postgres -d shorter_app -c "SELECT NOW();"
 ```
 
 ### SSL Certificate Issues

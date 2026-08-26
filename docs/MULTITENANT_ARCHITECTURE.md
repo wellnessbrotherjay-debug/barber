@@ -4,7 +4,7 @@
 
 The barber app operates as a **standalone module** on LOKI with **per-tenant database isolation** following HTF architecture rules.
 
-- **Shared Admin DB**: `barber_app` on LOKI (companies, API keys, subscriptions)
+- **Shared Admin DB**: `shorter_app` on LOKI (companies, API keys, subscriptions)
 - **Per-Tenant DBs**: `foundation_barber_<company_id>` on LOKI (barbers, bookings, reviews, payments)
 - **Authentication**: 
   - **Admin/Owner**: SSO via UnifiedLogin (httpOnly cookie)
@@ -61,7 +61,7 @@ POST /customer/reviews           → Submit review
 
 ## Database Schema
 
-### Shared Admin DB (`barber_app`)
+### Shared Admin DB (`shorter_app`)
 
 ```sql
 -- Companies/Tenants
@@ -134,7 +134,7 @@ Each tenant connection uses a **fail-closed pool**:
 async function getTenantPool(tenantId: string): Promise<Pool> {
   if (!tenantId) throw new Error('Tenant context required');
   
-  const dbName = `foundation_barber_${tenantId}`;
+  const dbName = `companies.database_name`;
   const pool = new Pool({
     host: process.env.LOKI_HOST,
     port: parseInt(process.env.LOKI_PORT),
@@ -201,7 +201,7 @@ router.get('/api/v1/income/export', async (req, res) => {
 ## Deployment
 
 ### Prerequisites
-- LOKI PostgreSQL with `barber_app` database created
+- LOKI PostgreSQL with `shorter_app` database created
 - Per-tenant database templates or factory
 - Domain configured (DNS A record pointing to LOKI)
 - SSL certificate (Let's Encrypt)
@@ -220,7 +220,7 @@ ExecStart=/usr/bin/node dist/server/index.js
 Environment="NODE_ENV=production"
 Environment="LOKI_HOST=localhost"
 Environment="LOKI_PORT=5432"
-Environment="LOKI_DATABASE=barber_app"
+Environment="LOKI_DATABASE=shorter_app"
 Restart=on-failure
 RestartSec=10
 

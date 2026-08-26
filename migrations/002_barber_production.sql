@@ -3,7 +3,7 @@
 -- relational work photos, and geospatial discovery.
 --
 -- Idempotent: safe to re-run, and applied to both the live tenant DB
--- (foundation_barber_1) and barber_app_template so new tenants inherit it.
+-- (shorter_prod) and shorter_template so new tenants inherit it.
 --
 -- Tenancy note: physical isolation is PER TENANT (one DB per company,
 -- foundation_barber_<tenant_id>). Barbers are ROWS inside that DB, owned via

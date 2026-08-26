@@ -19,7 +19,7 @@
 - **Component library:** Button, Card, Badge, Avatar, Input (reusable, variant-based)
 
 ### ✅ Phase 5-8: Multi-Tenant SaaS Infrastructure
-- **Shared Admin Database** (`barber_app`)
+- **Shared Admin Database** (`shorter_app`)
   - Companies table (100+ barber companies can sign up)
   - API keys & subscriptions
   - Usage metrics & audit logs
@@ -81,9 +81,9 @@
 ### ✅ Production Deployment
 - **Backend:** Express.js running on LOKI via systemd service
 - **Database:** PostgreSQL on LOKI
-  - Admin DB: `barber_app`
-  - Template: `barber_app_template`
-  - Per-tenant: `foundation_barber_<id>` (cloned per company)
+  - Admin DB: `shorter_app`
+  - Template: `shorter_template`
+  - Per-tenant: `the company's own database (see companies.database_name)` (cloned per company)
 - **Nginx:** Reverse proxy configured
 - **SSL:** Ready for Let's Encrypt (pending DNS)
 - **Monitoring:** Logs via systemd journalctl
@@ -96,7 +96,7 @@
 - **Company ID:** 1
 - **API Key:** `00afed7c-b585-4421-a68e-ba42b2dd7d17`
 - **Tier:** Pro
-- **Database:** `foundation_barber_1`
+- **Database:** `shorter_prod`
 - **Access:** `Authorization: Bearer 00afed7c-b585-4421-a68e-ba42b2dd7d17`
 
 ---
@@ -161,14 +161,14 @@ PostgreSQL (per-tenant databases)
 
 ## Database Schema
 
-**Admin DB (`barber_app`):**
+**Admin DB (`shorter_app`):**
 - `companies` - Tenant registry (100+ can sign up)
 - `company_subscriptions` - Billing & plans
 - `company_entitlements` - Feature gating
 - `api_key_usage` - Audit logging
 - `booking_metrics` - Denormalized reporting
 
-**Per-Tenant DB (`foundation_barber_<id>`):**
+**Per-Tenant DB (`the company's own database (see companies.database_name)`):**
 - `users` - Customers & staff
 - `barber_profiles` - Barber details
 - `services` - Service catalog
@@ -186,11 +186,11 @@ PostgreSQL (per-tenant databases)
 ### On LOKI (already executed):
 ```bash
 # 1. Admin DB created & populated
-psql -U postgres -d barber_app < admin_schema.sql
+psql -U postgres -d shorter_app < admin_schema.sql
 
 # 2. Template DB created
-psql -U postgres -c "CREATE DATABASE barber_app_template"
-psql -U postgres -d barber_app_template < DATABASE_SCHEMA.sql
+psql -U postgres -c "CREATE DATABASE shorter_template"
+psql -U postgres -d shorter_template < DATABASE_SCHEMA.sql
 
 # 3. Application deployed
 cd /opt/htf/barber-app
@@ -202,7 +202,7 @@ NODE_ENV=production
 PORT=5000
 VITE_LOKI_HOST=localhost
 VITE_LOKI_PORT=5432
-VITE_LOKI_DATABASE=barber_app
+VITE_LOKI_DATABASE=shorter_app
 VITE_LOKI_USER=postgres
 VITE_LOKI_PASSWORD=postgres
 VITE_API_URL=https://barber.safetykat.com
@@ -272,7 +272,7 @@ curl -X POST https://barber.safetykat.com/admin/companies \
 ```bash
 ssh root@100.84.100.96
 psql -U postgres -c \
-  "CREATE DATABASE foundation_barber_2 TEMPLATE barber_app_template"
+  "CREATE DATABASE a second company's database TEMPLATE shorter_template"
 ```
 
 ### 6. Verify Production
@@ -341,7 +341,7 @@ The platform can support **100+ barber companies** immediately:
 - Custom rate limits
 
 Each company gets:
-- Own database (`foundation_barber_<id>`)
+- Own database (`the company's own database (see companies.database_name)`)
 - Own API key (`sk_live_...`)
 - Own dashboard (`/api/v1/company/dashboard`)
 - Complete data isolation
@@ -357,7 +357,7 @@ systemctl status barber-app.service
 journalctl -u barber-app.service -f
 
 # Database connections
-psql -U postgres -d barber_app \
+psql -U postgres -d shorter_app \
   "SELECT count(*) FROM pg_stat_activity;"
 
 # Nginx
@@ -365,7 +365,7 @@ tail -f /var/log/nginx/barber.access.log
 tail -f /var/log/nginx/barber.error.log
 
 # API usage
-psql -U postgres -d barber_app \
+psql -U postgres -d shorter_app \
   "SELECT company_id, COUNT(*) FROM api_key_usage \
    WHERE timestamp > NOW() - INTERVAL '1 hour' \
    GROUP BY company_id;"
@@ -405,7 +405,7 @@ All components are:
 For any issues:
 1. Check systemd logs: `journalctl -u barber-app.service`
 2. Check Nginx logs: `/var/log/nginx/barber.error.log`
-3. Check database: `psql -U postgres -d barber_app`
+3. Check database: `psql -U postgres -d shorter_app`
 4. Test API directly: `curl http://100.84.100.96:5000/health`
 5. Review documentation files
 

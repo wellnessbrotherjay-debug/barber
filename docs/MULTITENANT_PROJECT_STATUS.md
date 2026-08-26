@@ -60,7 +60,7 @@
 - **Design system**: Tailwind v4, 20+ design tokens, reusable components
 
 ### Phase 5: Multi-Tenant Infrastructure ✅
-- **Shared admin database** (`barber_app`)
+- **Shared admin database** (`shorter_app`)
   - Companies table (tenant registry)
   - API keys & subscriptions
   - Usage metrics & audit logs
@@ -142,7 +142,7 @@ barber-app/
 
 ## Database Schema
 
-### Shared Admin DB (`barber_app`)
+### Shared Admin DB (`shorter_app`)
 ```sql
 companies                    -- Tenant registry
 ├── id (PK)
@@ -272,7 +272,7 @@ curl -X POST https://barber.safetykat.com/admin/companies \
 
 # 2. Admin clones tenant database
 psql -U postgres \
-  "CREATE DATABASE foundation_barber_2 TEMPLATE barber_app_template"
+  "CREATE DATABASE a second company's database TEMPLATE shorter_template"
 
 # 3. Company uses API key for authentication
 # Authorization: Bearer sk_live_...
@@ -420,6 +420,6 @@ For deployment help:
 1. Read `LOKI_PRODUCTION_DEPLOY.md` (complete step-by-step guide)
 2. Check systemd logs: `journalctl -u barber-app.service`
 3. Test API endpoints: `curl https://barber.safetykat.com/health`
-4. Verify database: `psql -d barber_app "\dt"`
+4. Verify database: `psql -d shorter_app "\dt"`
 
 All components are production-ready and documented. Ready to deploy! 🚀

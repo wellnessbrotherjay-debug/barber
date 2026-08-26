@@ -20,7 +20,10 @@ export function getStoredLocation(): LatLng | null {
     if (!raw) return null;
     const v = JSON.parse(raw);
     return typeof v?.lat === 'number' && typeof v?.lng === 'number' ? v : null;
-  } catch {
+  } catch (err) {
+    // A stored location that will not parse is a corrupt entry, not an absence:
+    // say so, then carry on as though there were none.
+    console.error('[geo] the saved location could not be read:', err);
     return null;
   }
 }

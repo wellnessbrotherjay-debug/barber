@@ -204,7 +204,12 @@ export async function tenantMiddleware(
         };
         return next();
       } catch (jwtErr) {
-        // Not a valid JWT (or expired) — fall through to company API-key check.
+        // Not a signed-in person's token. The same header also carries a company
+        // API key, which is not a JWT and will always land here, so this is an
+        // ordinary outcome rather than a failure - but an expired or tampered
+        // token looks identical from here, and that is worth being able to see.
+        console.debug('[tenant] bearer token is not a session token, trying it as a company API key:',
+                      (jwtErr as Error).message);
       }
 
       const apiKey = token;

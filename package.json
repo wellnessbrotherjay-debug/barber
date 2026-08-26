@@ -12,7 +12,8 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "build:ios": "VITE_API_URL=https://barber.safetykat.com vite build && npx cap sync ios",
-    "ios:open": "npx cap open ios"
+    "ios:open": "npx cap open ios",
+    "build:mobile": "VITE_API_URL=https://barber.safetykat.com vite build && npx cap sync"
   },
   "dependencies": {
     "@capacitor/cli": "^8.4.2",

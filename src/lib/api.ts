@@ -2,7 +2,16 @@
 // Attaches the JWT issued by POST /api/auth/signup|login (stored under
 // 'barberSyncToken') as an Authorization: Bearer header.
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
+// Web builds served by the API itself use same-origin relative URLs.
+// Native (Capacitor) builds load from capacitor://localhost, where a relative
+// URL can never reach the backend — there the URL MUST be baked in at build
+// time (VITE_API_URL), and a missing value fails loudly instead of silently
+// producing dead requests.
+const isNativeShell = !window.location.protocol.startsWith('http');
+if (isNativeShell && !import.meta.env.VITE_API_URL) {
+  throw new Error('VITE_API_URL must be set at build time for native app builds');
+}
+const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
 export const TOKEN_STORAGE_KEY = 'barberSyncToken';
 

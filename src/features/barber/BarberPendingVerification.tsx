@@ -80,7 +80,7 @@ export default function BarberPendingVerification() {
     return (
       <div className="min-h-screen bg-white flex flex-col">
         <div className="flex items-center gap-2 px-5 py-4">
-          <button type="button" onClick={() => navigate('/barber/jobs')} className="shrink-0 -ml-1 p-1">
+          <button type="button" onClick={() => navigate('/barber/jobs/incoming')} className="shrink-0 -ml-1 p-1">
             <ArrowLeft className="w-5 h-5 text-ink" />
           </button>
           <h1 className="text-lg font-bold leading-6 text-ink">Verification Status</h1>
@@ -151,7 +151,7 @@ export default function BarberPendingVerification() {
           </button>
           <button
             type="button"
-            onClick={() => navigate('/barber/jobs')}
+            onClick={() => navigate('/barber/jobs/incoming')}
             className="w-full rounded-pill px-9 py-[18px] text-xs font-semibold leading-5 text-center text-muted"
           >
             Back to Dashboard
@@ -169,7 +169,7 @@ export default function BarberPendingVerification() {
     return (
       <div className="min-h-screen bg-white flex flex-col">
         <div className="flex items-center justify-center gap-1.5 px-5 py-4">
-          <button type="button" aria-label="Back" onClick={() => navigate('/barber/jobs')} className="w-6 h-6 flex items-center justify-center shrink-0">
+          <button type="button" aria-label="Back" onClick={() => navigate('/barber/jobs/incoming')} className="w-6 h-6 flex items-center justify-center shrink-0">
             <ArrowLeft className="w-5 h-5 text-ink" />
           </button>
           <h1 className="flex-1 text-center text-[16px] leading-6 font-bold text-ink">Verification Status</h1>
@@ -205,7 +205,7 @@ export default function BarberPendingVerification() {
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <div className="flex items-center gap-2 px-5 py-4">
-        <button type="button" onClick={() => navigate('/barber/jobs')} className="shrink-0 -ml-1 p-1">
+        <button type="button" onClick={() => navigate('/barber/jobs/incoming')} className="shrink-0 -ml-1 p-1">
           <ArrowLeft className="w-5 h-5 text-ink" />
         </button>
         <h1 className="text-lg font-bold leading-6 text-ink">Verification Status</h1>
@@ -275,7 +275,7 @@ export default function BarberPendingVerification() {
       <div className="px-5 pb-5 pt-2 flex flex-col gap-1">
         <button
           type="button"
-          onClick={() => navigate('/barber/jobs')}
+          onClick={() => navigate('/barber/jobs/incoming')}
           className="w-full bg-ink text-white rounded-pill px-9 py-[18px] text-sm font-semibold leading-5 text-center"
         >
           Done

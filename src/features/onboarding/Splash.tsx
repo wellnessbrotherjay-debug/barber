@@ -1,6 +1,8 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { Heart, ChevronsRight } from 'lucide-react';
+import { useAuthStore } from '../../store/useAuthStore';
+import { getToken } from '../../lib/api';
 
 // Splash / hero — page 1 of the Shorter Figma board, replicated literally
 // (locked design per the service agreement, cl. 4.1): navy #23313E circle,
@@ -11,6 +13,14 @@ const NAVY = '#23313E';
 const COPPER = '#CF8654';
 export default function Splash() {
   const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
+
+  // A signed-in user landing on "/" (fresh app open, post-login redirect, or
+  // any stray "home" navigation) goes straight to their home screen — the
+  // public splash is only for signed-out visitors.
+  if (user && getToken()) {
+    return <Navigate to={user.role === 'barber' ? '/barber' : '/customer'} replace />;
+  }
 
   return (
     // The board frame is 393x900, but the usable viewport on a Dynamic Island

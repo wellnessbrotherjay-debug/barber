@@ -222,10 +222,22 @@ export default function BarberOnboarding() {
   const photoCount = photos.length;
 
   // Step 5 — where do you work
-  const [serviceMode, setServiceMode] = useState<'in_shop' | 'mobile'>('in_shop');
+  const [serviceMode, setServiceMode] = useState<'in_shop' | 'mobile' | 'both'>('in_shop');
   const [shopAddress, setShopAddress] = useState('');
   const [shopLat, setShopLat] = useState<number | null>(null);
   const [shopLng, setShopLng] = useState<number | null>(null);
+  const [addressSearchNonce, setAddressSearchNonce] = useState(0);
+
+  // The two service cards are independent toggles over one mode value.
+  // At least one must stay selected — a barber with no mode is unbookable.
+  const hasShop = serviceMode !== 'mobile';
+  const hasMobile = serviceMode !== 'in_shop';
+  function toggleShopMode() {
+    setServiceMode(hasShop ? (hasMobile ? 'mobile' : 'in_shop') : hasMobile ? 'both' : 'in_shop');
+  }
+  function toggleMobileMode() {
+    setServiceMode(hasMobile ? (hasShop ? 'in_shop' : 'mobile') : hasShop ? 'both' : 'mobile');
+  }
 
   // Step 6 — availability
   const [online, setOnline] = useState(false);
@@ -270,7 +282,7 @@ export default function BarberOnboarding() {
             bio: p.bio || '',
             address_text: p.address_text || '',
           });
-          if (p.service_mode === 'mobile' || p.service_mode === 'in_shop') setServiceMode(p.service_mode);
+          if (p.service_mode === 'mobile' || p.service_mode === 'in_shop' || p.service_mode === 'both') setServiceMode(p.service_mode);
           if (p.address_text) setShopAddress(p.address_text);
           if (p.latitude != null) setShopLat(Number(p.latitude));
           if (p.longitude != null) setShopLng(Number(p.longitude));
@@ -485,9 +497,12 @@ export default function BarberOnboarding() {
         method: 'PUT',
         body: JSON.stringify({
           service_mode: serviceMode,
-          address_text: serviceMode === 'in_shop' ? shopAddress || profile.address_text || undefined : profile.address_text || undefined,
-          latitude: serviceMode === 'in_shop' ? shopLat ?? undefined : undefined,
-          longitude: serviceMode === 'in_shop' ? shopLng ?? undefined : undefined,
+          // Coordinates persist for EVERY mode — a mobile barber with no base
+          // location can never appear in nearby search (travel radius needs
+          // a point to measure from).
+          address_text: shopAddress || profile.address_text || undefined,
+          latitude: shopLat ?? undefined,
+          longitude: shopLng ?? undefined,
           // Only sent when the reverse geocoder actually resolved them.
           city: geoCity || undefined,
           region: geoRegion || undefined,
@@ -924,7 +939,7 @@ export default function BarberOnboarding() {
           {/* In-shop card */}
           <div
             className="bg-white border-[0.75px] border-[#d2dbe9] rounded-[12px] p-3 flex flex-col gap-3 cursor-pointer"
-            onClick={() => setServiceMode('in_shop')}
+            onClick={toggleShopMode}
           >
             <div className="flex items-start justify-between w-full">
               <div className="flex gap-3 items-center">
@@ -940,13 +955,13 @@ export default function BarberOnboarding() {
               </div>
               <span
                 className={`size-3 rounded-[2px] border border-ink shrink-0 flex items-center justify-center ${
-                  serviceMode === 'in_shop' ? 'bg-ink' : 'bg-white'
+                  hasShop ? 'bg-ink' : 'bg-white'
                 }`}
               >
-                {serviceMode === 'in_shop' && <Check className="w-2.5 h-2.5 text-white" />}
+                {hasShop && <Check className="w-2.5 h-2.5 text-white" />}
               </span>
             </div>
-            {serviceMode === 'in_shop' && (
+            {hasShop && (
               <div className="bg-[#fafafa] rounded-[12px] p-3" onClick={(e) => e.stopPropagation()}>
                 <div className="flex flex-col gap-2">
                   <div className="relative w-full">
@@ -954,9 +969,12 @@ export default function BarberOnboarding() {
                       placeholder="Shop Address"
                       value={shopAddress}
                       onChange={(e) => setShopAddress(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') setAddressSearchNonce((n) => n + 1); }}
                       className="w-full bg-white border border-[#e5e7eb] rounded-pill pl-4 pr-11 py-4 text-sm font-medium leading-[18px] text-ink placeholder:text-[#848992]"
                     />
-                    <Crosshair className="w-[18px] h-[18px] text-[#848992] absolute right-4 top-1/2 -translate-y-1/2" />
+                    <button type="button" aria-label="Find address on map" onClick={() => setAddressSearchNonce((n) => n + 1)} className="absolute right-4 top-1/2 -translate-y-1/2">
+                      <Crosshair className="w-[18px] h-[18px] text-[#848992]" />
+                    </button>
                   </div>
                   <p className="text-[10px] font-semibold leading-[14px] text-muted">
                     Set precise pin on map
@@ -964,6 +982,8 @@ export default function BarberOnboarding() {
                   <ShopLocationMap
                     latitude={shopLat}
                     longitude={shopLng}
+                    searchQuery={shopAddress}
+                    searchNonce={addressSearchNonce}
                     onChange={(lat, lng, address, parts) => {
                       setShopLat(lat);
                       setShopLng(lng);
@@ -981,7 +1001,7 @@ export default function BarberOnboarding() {
           {/* Come to customer card */}
           <div
             className="bg-white border-[0.75px] border-[#d2dbe9] rounded-[12px] p-3 cursor-pointer"
-            onClick={() => setServiceMode('mobile')}
+            onClick={toggleMobileMode}
           >
             <div className="flex items-start justify-between w-full">
               <div className="flex gap-3 items-center">
@@ -997,10 +1017,10 @@ export default function BarberOnboarding() {
               </div>
               <span
                 className={`size-3 rounded-[2px] border border-ink shrink-0 flex items-center justify-center ${
-                  serviceMode === 'mobile' ? 'bg-ink' : 'bg-white'
+                  hasMobile ? 'bg-ink' : 'bg-white'
                 }`}
               >
-                {serviceMode === 'mobile' && <Check className="w-2.5 h-2.5 text-white" />}
+                {hasMobile && <Check className="w-2.5 h-2.5 text-white" />}
               </span>
             </div>
           </div>

@@ -97,7 +97,7 @@ export default function BarberProfileEdit() {
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
   const portfolioInputRef = React.useRef<HTMLInputElement | null>(null);
 
-  const [serviceMode, setServiceMode] = useState<'in_shop' | 'come_to_customer'>('in_shop');
+  const [serviceMode, setServiceMode] = useState<'in_shop' | 'come_to_customer' | 'both'>('in_shop');
   const [bookingMode, setBookingMode] = useState<'instant' | 'request_only'>('request_only');
   const [bufferMinutes, setBufferMinutes] = useState('15');
 
@@ -143,6 +143,7 @@ export default function BarberProfileEdit() {
           // barber_profiles.service_mode is in_shop|mobile|both; this screen's
           // Figma labels are "In Shop" / "Come to Customer".
           if (p.service_mode === 'mobile') setServiceMode('come_to_customer');
+          else if (p.service_mode === 'both') setServiceMode('both');
           else if (p.service_mode === 'in_shop') setServiceMode('in_shop');
           if (p.booking_mode === 'instant' || p.booking_mode === 'request_only') setBookingMode(p.booking_mode);
           if (p.buffer_minutes != null) setBufferMinutes(String(Number(p.buffer_minutes)));
@@ -284,7 +285,7 @@ export default function BarberProfileEdit() {
           address_text: form.address_text || undefined,
           experience_years: form.experience_years ? Number(form.experience_years) : undefined,
           phone: normalisePhone(form.phone) || undefined,
-          service_mode: serviceMode === 'in_shop' ? 'in_shop' : 'mobile',
+          service_mode: serviceMode === 'in_shop' ? 'in_shop' : serviceMode === 'both' ? 'both' : 'mobile',
           booking_mode: bookingMode,
           buffer_minutes: Number(bufferMinutes),
           is_online: isOnline,

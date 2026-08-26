@@ -114,7 +114,21 @@ app.use(express.static(DIST_DIR));
 // Barber-uploaded images. Read-only public serving of the upload directory —
 // all WRITES go through the authenticated, ownership-checked uploads router
 // below; nothing here can create or overwrite a file.
-app.use('/uploads', express.static(UPLOAD_DIR, { fallthrough: true, maxAge: '7d' }));
+// fallthrough:false — an upload that is not on disk must answer 404, not fall
+// through to the SPA catch-all below. Returning the HTML app shell for a
+// missing image makes a broken photo look like a successful request to every
+// caller, and hides the real fault.
+app.use('/uploads', express.static(UPLOAD_DIR, { fallthrough: false, maxAge: '7d' }));
+
+// express.static with fallthrough:false raises a NotFoundError for a missing
+// file; without this it reaches the generic handler and is reported as a 500.
+// A missing image is a 404 — say so plainly rather than as a server fault.
+app.use('/uploads', (err: any, _req: Request, res: Response, next: NextFunction) => {
+  if (err && (err.status === 404 || err.statusCode === 404)) {
+    return res.status(404).json({ error: 'Image not found' });
+  }
+  return next(err);
+});
 
 app.get(/^(?!\/(api|admin|health)).*/, (req: Request, res: Response, next: NextFunction) => {
   if (req.method !== 'GET' || !req.accepts('html')) return next();

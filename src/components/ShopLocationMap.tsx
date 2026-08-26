@@ -26,6 +26,26 @@ interface Props {
   latitude: number | null;
   longitude: number | null;
   onChange: (lat: number, lng: number, address: string, parts?: AddressParts) => void;
+  /** Bumped by the parent to forward-geocode `searchQuery` and move the pin there. */
+  searchQuery?: string;
+  searchNonce?: number;
+}
+
+// Forward-geocodes a typed address via the same Nominatim API the reverse path
+// uses. Returns null when the address resolves to nothing.
+export async function forwardGeocode(query: string): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`,
+      { headers: { Accept: 'application/json' } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!Array.isArray(data) || !data[0]) return null;
+    return { lat: Number(data[0].lat), lng: Number(data[0].lon) };
+  } catch {
+    return null;
+  }
 }
 
 const DEFAULT_CENTER: [number, number] = [40.7128, -74.006]; // NYC fallback if no geolocation/pin yet
@@ -58,11 +78,27 @@ async function reverseGeocode(
   }
 }
 
-export default function ShopLocationMap({ latitude, longitude, onChange }: Props) {
+export default function ShopLocationMap({ latitude, longitude, onChange, searchQuery, searchNonce }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
   const [locating, setLocating] = useState(false);
+
+  // Parent-triggered address search: each nonce bump forward-geocodes the
+  // query, moves the pin there and reports the resolved coordinates back.
+  useEffect(() => {
+    if (!searchNonce || !searchQuery?.trim()) return;
+    let cancelled = false;
+    forwardGeocode(searchQuery).then(async (hit) => {
+      if (cancelled || !hit || !mapRef.current || !markerRef.current) return;
+      markerRef.current.setLatLng([hit.lat, hit.lng]);
+      mapRef.current.setView([hit.lat, hit.lng], 15);
+      const { address, parts } = await reverseGeocode(hit.lat, hit.lng);
+      if (!cancelled) onChange(hit.lat, hit.lng, address, parts);
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchNonce]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;

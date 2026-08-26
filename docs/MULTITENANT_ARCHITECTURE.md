@@ -272,7 +272,7 @@ server {
 
 ```typescript
 // Allow barber company origins only
-const allowedOrigins = ['<the site address, from configuration>', 'https://api.barber.safetykat.com'];
+const allowedOrigins = ['<the site address, from configuration>', '<the API address, from configuration>'];
 app.use(cors({
   origin: allowedOrigins,
   credentials: true,

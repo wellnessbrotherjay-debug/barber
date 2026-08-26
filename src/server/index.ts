@@ -26,7 +26,9 @@ const DIST_DIR = path.join(__dirname, '../../dist');
 dotenv.config({ path: '.env.local' });
 
 const app: Express = express();
-const PORT = process.env.PORT || 5000;
+// No second source: an unset PORT means nobody configured this deployment, and
+// quietly listening somewhere else is how two copies end up fighting over a box.
+const PORT = parseInt(requiredEnv('PORT'), 10);
 
 // Middleware
 // WHICH SITES MAY CALL THIS API IS CONFIGURATION, NOT A LIST IN THE CODE.

@@ -13,7 +13,7 @@ echo -e "${YELLOW}🚀 Barber App - LOKI Database Deployment${NC}"
 
 # Default to Tailscale IP (secure private network)
 LOKI_HOST=${LOKI_HOST:-100.84.100.96}
-LOKI_USER=${LOKI_USER:-postgres}
+LOKI_USER=${LOKI_USER:?LOKI_USER must be set - the superuser is never used (RULES_NEVER_POSTGRES_USER); use the application role}
 LOKI_PASSWORD=${LOKI_PASSWORD:-}
 LOKI_PORT=${LOKI_PORT:-5432}
 LOKI_DB=${LOKI_DB:-shorter_admin}
@@ -27,7 +27,7 @@ if [ -z "$LOKI_PASSWORD" ]; then
   echo ""
   echo "Optional:"
   echo "  LOKI_HOST=100.84.100.96 (default: Tailscale private IP)"
-  echo "  LOKI_USER=postgres (default)"
+  echo "  LOKI_USER=<the application role - never the superuser>"
   echo "  LOKI_PORT=5432 (default)"
   echo "  LOKI_DB=shorter_admin (default)"
   exit 1

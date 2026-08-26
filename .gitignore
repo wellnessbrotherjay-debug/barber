@@ -9,3 +9,7 @@ coverage/
 
 # AI tooling state — never belongs in the repository (RULES_NO_LOCAL_AI_FILES)
 .claude/
+
+# Capacitor copies the built web bundle in here on every sync - generated
+# output, never source, and scanning it reports the bundler own code as ours.
+android/app/src/main/assets/public/

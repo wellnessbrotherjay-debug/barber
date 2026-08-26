@@ -27,8 +27,14 @@ import type { Pool } from 'pg';
 // Config
 // ---------------------------------------------------------------------------
 
-export const UPLOAD_DIR =
-  process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
+const CONFIGURED_UPLOAD_DIR = process.env.UPLOAD_DIR;
+if (!CONFIGURED_UPLOAD_DIR) {
+  // Falling back to the working directory writes uploads wherever the process
+  // happened to start, so the same photo is present on one restart and gone on
+  // the next. One configured place, or fail loudly.
+  throw new Error('UPLOAD_DIR must be set - refusing to store uploads in an unconfigured folder');
+}
+export const UPLOAD_DIR: string = CONFIGURED_UPLOAD_DIR;
 
 const MAX_BYTES_PER_FILE = 8 * 1024 * 1024; // 8MB
 const MAX_FILES_PER_REQUEST = 6;

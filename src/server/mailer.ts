@@ -18,7 +18,9 @@ const SENDMAIL = '/usr/sbin/sendmail';
 // Who the mail comes from is configuration, not a constant: a different
 // deployment sends as itself, and nothing has to be edited to do it.
 const ENVELOPE_FROM = process.env.MAIL_FROM;
-const FROM = process.env.MAIL_FROM_DISPLAY || (ENVELOPE_FROM ? `Shorter <${ENVELOPE_FROM}>` : '');
+// One source: the display name is built from the configured address, never a
+// second setting that can disagree with it.
+const FROM = ENVELOPE_FROM ? `Shorter <${ENVELOPE_FROM}>` : '';
 
 const sendmailAvailable = existsSync(SENDMAIL);
 

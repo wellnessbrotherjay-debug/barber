@@ -227,10 +227,244 @@ interface PhotoRow {
 }
 
 // ---------------------------------------------------------------------------
-// Router factory
+// Route handlers
+//
+// Each route's work lives in its own named function so the router factory
+// below stays a readable list of registrations, and so the ownership rules of
+// one route can be read without scrolling past the others.
 // ---------------------------------------------------------------------------
 
 type Middleware = (req: Request, res: Response, next: express.NextFunction) => void;
+
+/**
+ * Multer runs as its own middleware step so that a rejected upload answers with
+ * our own wording instead of multer's raw error. Shared by all three upload
+ * routes rather than repeated at each one.
+ */
+function receiveSingleFile(): Middleware {
+  return (req: Request, res: Response, next: express.NextFunction) => {
+    upload.single('file')(req, res, (err: unknown) => {
+      if (err) return res.status(400).json({ error: multerMessage(err) });
+      next();
+    });
+  };
+}
+
+function receiveManyFiles(): Middleware {
+  return (req: Request, res: Response, next: express.NextFunction) => {
+    upload.array('files', MAX_FILES_PER_REQUEST)(req, res, (err: unknown) => {
+      if (err) return res.status(400).json({ error: multerMessage(err) });
+      next();
+    });
+  };
+}
+
+// -------------------------------------------------------------------------
+// POST /api/barber/upload/avatar  (multipart, field: file)
+// -> { url }
+// -------------------------------------------------------------------------
+async function handleBarberAvatarUpload(req: Request, res: Response): Promise<void> {
+  try {
+    const owner = await resolveOwner(req, res);
+    if (!owner) return;
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ error: 'No file uploaded (expected field "file")' });
+      return;
+    }
+
+    const stored = await storeFile(file, owner.tenantId, owner.barberId, 'avatar');
+    await owner.pool.query('SELECT * FROM barber.set_user_avatar(user_id_ => $1, avatar_url_ => $2)', [
+      req.tenant!.userId,
+      stored.url,
+    ]);
+    res.json({ url: stored.url });
+  } catch (error) {
+    if (error instanceof UploadError) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    console.error('Avatar upload failed:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+}
+
+// -------------------------------------------------------------------------
+// POST /api/account/avatar  (multipart, field: file)
+// -> { url }
+// The signed-in person's own picture, customer or barber. Same storage and
+// same checks as the barber avatar above — the only difference is that the
+// owner is the account itself, taken from the token and never from the body.
+// -------------------------------------------------------------------------
+async function handleAccountAvatarUpload(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = req.tenant!.userId!;
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ error: 'No file uploaded (expected field "file")' });
+      return;
+    }
+
+    const stored = await storeFile(file, req.tenant!.companyId, userId, 'avatar');
+    await req.tenant!.pool.query(
+      'SELECT * FROM barber.set_user_avatar(user_id_ => $1, avatar_url_ => $2)',
+      [userId, stored.url]
+    );
+    res.json({ url: stored.url });
+  } catch (error) {
+    if (error instanceof UploadError) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    console.error('Account avatar upload failed:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+}
+
+// -------------------------------------------------------------------------
+// POST /api/barber/upload/gallery  (multipart, field: files, max 6)
+// -> { photos: PhotoRow[] }  (the caller's full gallery, ordered)
+// -------------------------------------------------------------------------
+async function handleGalleryUpload(req: Request, res: Response): Promise<void> {
+  const written: string[] = [];
+  try {
+    const owner = await resolveOwner(req, res);
+    if (!owner) return;
+    const files = (req.files as Express.Multer.File[] | undefined) || [];
+    if (files.length === 0) {
+      res.status(400).json({ error: 'No files uploaded (expected field "files")' });
+      return;
+    }
+    if (files.length > MAX_FILES_PER_REQUEST) {
+      res.status(400).json({ error: `At most ${MAX_FILES_PER_REQUEST} photos per upload` });
+      return;
+    }
+
+    // Validate + write all files first; if any fails, unwind the ones
+    // already on disk so a rejected batch leaves nothing behind.
+    const stored: StoredFile[] = [];
+    for (const file of files) {
+      const s = await storeFile(file, owner.tenantId, owner.barberId, 'gallery');
+      stored.push(s);
+      written.push(s.storageKey);
+    }
+
+    const maxRes = await owner.pool.query(
+      'SELECT * FROM barber.get_max_work_photo_sort(barber_id_ => $1)',
+      [owner.barberId]
+    );
+    let nextOrder = Number(maxRes.rows[0]?.max ?? -1) + 1;
+
+    for (const s of stored) {
+      await owner.pool.query(
+        'SELECT * FROM barber.add_work_photo(barber_id_ => $1, storage_key_ => $2, url_ => $3, sort_order_ => $4, bytes_ => $5, mime_type_ => $6)',
+        [owner.barberId, s.storageKey, s.url, nextOrder++, s.bytes, s.mimeType]
+      );
+    }
+
+    await syncWorkPhotosJsonb(owner.pool, owner.barberId);
+    const photos = await listPhotos(owner.pool, owner.barberId);
+    res.json({ photos });
+  } catch (error) {
+    await Promise.all(written.map(removeFile));
+    if (error instanceof UploadError) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    console.error('Gallery upload failed:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+}
+
+// -------------------------------------------------------------------------
+// GET /api/barber/photos -> PhotoRow[]
+// -------------------------------------------------------------------------
+async function handleListPhotos(req: Request, res: Response): Promise<void> {
+  try {
+    const owner = await resolveOwner(req, res);
+    if (!owner) return;
+    res.json(await listPhotos(owner.pool, owner.barberId));
+  } catch (error) {
+    console.error('Error listing work photos:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+}
+
+// -------------------------------------------------------------------------
+// DELETE /api/barber/photos/:id -> { success, photos }
+// Ownership enforced in the DELETE predicate itself; 404 when not owned.
+// -------------------------------------------------------------------------
+async function handleDeletePhoto(req: Request, res: Response): Promise<void> {
+  try {
+    const owner = await resolveOwner(req, res);
+    if (!owner) return;
+
+    const result = await owner.pool.query(
+      'SELECT * FROM barber.delete_work_photo(photo_id_ => $1, barber_id_ => $2)',
+      [req.params.id, owner.barberId]
+    );
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'Photo not found' });
+      return;
+    }
+
+    await removeFile(result.rows[0].storage_key);
+    await syncWorkPhotosJsonb(owner.pool, owner.barberId);
+    res.json({ success: true, photos: await listPhotos(owner.pool, owner.barberId) });
+  } catch (error) {
+    console.error('Error deleting work photo:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+}
+
+// -------------------------------------------------------------------------
+// PATCH /api/barber/photos/reorder   body { ids: string[] } -> { photos }
+// 403 if ANY id in the list is not owned by the caller.
+// -------------------------------------------------------------------------
+async function handleReorderPhotos(req: Request, res: Response): Promise<void> {
+  try {
+    const owner = await resolveOwner(req, res);
+    if (!owner) return;
+
+    const ids = (req.body?.ids ?? []) as unknown;
+    if (!Array.isArray(ids) || ids.some((id) => typeof id !== 'string' || !id)) {
+      res.status(400).json({ error: 'Body must be { ids: string[] }' });
+      return;
+    }
+    const list = ids as string[];
+    if (new Set(list).size !== list.length) {
+      res.status(400).json({ error: 'Duplicate photo ids in reorder request' });
+      return;
+    }
+
+    const ownedRes = await owner.pool.query(
+      'SELECT * FROM barber.get_work_photo_ids(barber_id_ => $1)',
+      [owner.barberId]
+    );
+    const owned = new Set(ownedRes.rows.map((r: { id: string }) => String(r.id)));
+    if (list.some((id) => !owned.has(id))) {
+      res.status(403).json({ error: 'One or more photos do not belong to you' });
+      return;
+    }
+
+    for (let i = 0; i < list.length; i++) {
+      await owner.pool.query(
+        'SELECT * FROM barber.set_work_photo_order(photo_id_ => $1, barber_id_ => $2, sort_order_ => $3)',
+        [list[i], owner.barberId, i]
+      );
+    }
+
+    await syncWorkPhotosJsonb(owner.pool, owner.barberId);
+    res.json({ photos: await listPhotos(owner.pool, owner.barberId) });
+  } catch (error) {
+    console.error('Error reordering work photos:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Router factory
+// ---------------------------------------------------------------------------
 
 export function createUploadsRouter(requireBarberAuth: Middleware, requireUserAuth: Middleware): Router {
   const router = express.Router();
@@ -242,217 +476,32 @@ export function createUploadsRouter(requireBarberAuth: Middleware, requireUserAu
     console.error('[uploads] could not create UPLOAD_DIR', UPLOAD_DIR, err);
   }
 
-  // -------------------------------------------------------------------------
-  // POST /api/barber/upload/avatar  (multipart, field: file)
-  // -> { url }
-  // -------------------------------------------------------------------------
   router.post(
     '/api/barber/upload/avatar',
     requireBarberAuth,
-    (req: Request, res: Response, next: express.NextFunction) => {
-      upload.single('file')(req, res, (err: unknown) => {
-        if (err) return res.status(400).json({ error: multerMessage(err) });
-        next();
-      });
-    },
-    async (req: Request, res: Response) => {
-      try {
-        const owner = await resolveOwner(req, res);
-        if (!owner) return;
-        const file = req.file;
-        if (!file) return res.status(400).json({ error: 'No file uploaded (expected field "file")' });
-
-        const stored = await storeFile(file, owner.tenantId, owner.barberId, 'avatar');
-        await owner.pool.query('SELECT * FROM barber.set_user_avatar(user_id_ => $1, avatar_url_ => $2)', [
-          req.tenant!.userId,
-          stored.url,
-        ]);
-        res.json({ url: stored.url });
-      } catch (error) {
-        if (error instanceof UploadError) return res.status(400).json({ error: error.message });
-        console.error('Avatar upload failed:', error);
-        res.status(500).json({ error: (error as Error).message });
-      }
-    }
+    receiveSingleFile(),
+    handleBarberAvatarUpload
   );
 
-  // -------------------------------------------------------------------------
-  // POST /api/account/avatar  (multipart, field: file)
-  // -> { url }
-  // The signed-in person's own picture, customer or barber. Same storage and
-  // same checks as the barber avatar above — the only difference is that the
-  // owner is the account itself, taken from the token and never from the body.
-  // -------------------------------------------------------------------------
   router.post(
     '/api/account/avatar',
     requireUserAuth,
-    (req: Request, res: Response, next: express.NextFunction) => {
-      upload.single('file')(req, res, (err: unknown) => {
-        if (err) return res.status(400).json({ error: multerMessage(err) });
-        next();
-      });
-    },
-    async (req: Request, res: Response) => {
-      try {
-        const userId = req.tenant!.userId!;
-        const file = req.file;
-        if (!file) return res.status(400).json({ error: 'No file uploaded (expected field "file")' });
-
-        const stored = await storeFile(file, req.tenant!.companyId, userId, 'avatar');
-        await req.tenant!.pool.query(
-          'SELECT * FROM barber.set_user_avatar(user_id_ => $1, avatar_url_ => $2)',
-          [userId, stored.url]
-        );
-        res.json({ url: stored.url });
-      } catch (error) {
-        if (error instanceof UploadError) return res.status(400).json({ error: error.message });
-        console.error('Account avatar upload failed:', error);
-        res.status(500).json({ error: (error as Error).message });
-      }
-    }
+    receiveSingleFile(),
+    handleAccountAvatarUpload
   );
 
-  // -------------------------------------------------------------------------
-  // POST /api/barber/upload/gallery  (multipart, field: files, max 6)
-  // -> { photos: PhotoRow[] }  (the caller's full gallery, ordered)
-  // -------------------------------------------------------------------------
   router.post(
     '/api/barber/upload/gallery',
     requireBarberAuth,
-    (req: Request, res: Response, next: express.NextFunction) => {
-      upload.array('files', MAX_FILES_PER_REQUEST)(req, res, (err: unknown) => {
-        if (err) return res.status(400).json({ error: multerMessage(err) });
-        next();
-      });
-    },
-    async (req: Request, res: Response) => {
-      const written: string[] = [];
-      try {
-        const owner = await resolveOwner(req, res);
-        if (!owner) return;
-        const files = (req.files as Express.Multer.File[] | undefined) || [];
-        if (files.length === 0) {
-          return res.status(400).json({ error: 'No files uploaded (expected field "files")' });
-        }
-        if (files.length > MAX_FILES_PER_REQUEST) {
-          return res.status(400).json({ error: `At most ${MAX_FILES_PER_REQUEST} photos per upload` });
-        }
-
-        // Validate + write all files first; if any fails, unwind the ones
-        // already on disk so a rejected batch leaves nothing behind.
-        const stored: StoredFile[] = [];
-        for (const file of files) {
-          const s = await storeFile(file, owner.tenantId, owner.barberId, 'gallery');
-          stored.push(s);
-          written.push(s.storageKey);
-        }
-
-        const maxRes = await owner.pool.query(
-          'SELECT * FROM barber.get_max_work_photo_sort(barber_id_ => $1)',
-          [owner.barberId]
-        );
-        let nextOrder = Number(maxRes.rows[0]?.max ?? -1) + 1;
-
-        for (const s of stored) {
-          await owner.pool.query(
-            'SELECT * FROM barber.add_work_photo(barber_id_ => $1, storage_key_ => $2, url_ => $3, sort_order_ => $4, bytes_ => $5, mime_type_ => $6)',
-            [owner.barberId, s.storageKey, s.url, nextOrder++, s.bytes, s.mimeType]
-          );
-        }
-
-        await syncWorkPhotosJsonb(owner.pool, owner.barberId);
-        const photos = await listPhotos(owner.pool, owner.barberId);
-        res.json({ photos });
-      } catch (error) {
-        await Promise.all(written.map(removeFile));
-        if (error instanceof UploadError) return res.status(400).json({ error: error.message });
-        console.error('Gallery upload failed:', error);
-        res.status(500).json({ error: (error as Error).message });
-      }
-    }
+    receiveManyFiles(),
+    handleGalleryUpload
   );
 
-  // -------------------------------------------------------------------------
-  // GET /api/barber/photos -> PhotoRow[]
-  // -------------------------------------------------------------------------
-  router.get('/api/barber/photos', requireBarberAuth, async (req: Request, res: Response) => {
-    try {
-      const owner = await resolveOwner(req, res);
-      if (!owner) return;
-      res.json(await listPhotos(owner.pool, owner.barberId));
-    } catch (error) {
-      console.error('Error listing work photos:', error);
-      res.status(500).json({ error: (error as Error).message });
-    }
-  });
+  router.get('/api/barber/photos', requireBarberAuth, handleListPhotos);
 
-  // -------------------------------------------------------------------------
-  // DELETE /api/barber/photos/:id -> { success, photos }
-  // Ownership enforced in the DELETE predicate itself; 404 when not owned.
-  // -------------------------------------------------------------------------
-  router.delete('/api/barber/photos/:id', requireBarberAuth, async (req: Request, res: Response) => {
-    try {
-      const owner = await resolveOwner(req, res);
-      if (!owner) return;
+  router.delete('/api/barber/photos/:id', requireBarberAuth, handleDeletePhoto);
 
-      const result = await owner.pool.query(
-        'SELECT * FROM barber.delete_work_photo(photo_id_ => $1, barber_id_ => $2)',
-        [req.params.id, owner.barberId]
-      );
-      if (result.rows.length === 0) {
-        return res.status(404).json({ error: 'Photo not found' });
-      }
-
-      await removeFile(result.rows[0].storage_key);
-      await syncWorkPhotosJsonb(owner.pool, owner.barberId);
-      res.json({ success: true, photos: await listPhotos(owner.pool, owner.barberId) });
-    } catch (error) {
-      console.error('Error deleting work photo:', error);
-      res.status(500).json({ error: (error as Error).message });
-    }
-  });
-
-  // -------------------------------------------------------------------------
-  // PATCH /api/barber/photos/reorder   body { ids: string[] } -> { photos }
-  // 403 if ANY id in the list is not owned by the caller.
-  // -------------------------------------------------------------------------
-  router.patch('/api/barber/photos/reorder', requireBarberAuth, async (req: Request, res: Response) => {
-    try {
-      const owner = await resolveOwner(req, res);
-      if (!owner) return;
-
-      const ids = (req.body?.ids ?? []) as unknown;
-      if (!Array.isArray(ids) || ids.some((id) => typeof id !== 'string' || !id)) {
-        return res.status(400).json({ error: 'Body must be { ids: string[] }' });
-      }
-      const list = ids as string[];
-      if (new Set(list).size !== list.length) {
-        return res.status(400).json({ error: 'Duplicate photo ids in reorder request' });
-      }
-
-      const ownedRes = await owner.pool.query(
-        'SELECT * FROM barber.get_work_photo_ids(barber_id_ => $1)',
-        [owner.barberId]
-      );
-      const owned = new Set(ownedRes.rows.map((r: { id: string }) => String(r.id)));
-      if (list.some((id) => !owned.has(id))) {
-        return res.status(403).json({ error: 'One or more photos do not belong to you' });
-      }
-
-      for (let i = 0; i < list.length; i++) {
-        await owner.pool.query(
-          'SELECT * FROM barber.set_work_photo_order(photo_id_ => $1, barber_id_ => $2, sort_order_ => $3)',
-          [list[i], owner.barberId, i]
-        );
-      }
-
-      await syncWorkPhotosJsonb(owner.pool, owner.barberId);
-      res.json({ photos: await listPhotos(owner.pool, owner.barberId) });
-    } catch (error) {
-      console.error('Error reordering work photos:', error);
-      res.status(500).json({ error: (error as Error).message });
-    }
-  });
+  router.patch('/api/barber/photos/reorder', requireBarberAuth, handleReorderPhotos);
 
   return router;
 }

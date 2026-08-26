@@ -7,6 +7,67 @@ import { fetchBarberJobs, type Job } from './BarberJobs';
 
 const COUNTDOWN_SECONDS = 80; // 1:20 — Figma p62
 
+// The request card is its own component because it is one cohesive block that
+// only needs the job and the countdown text — the screen around it is just
+// loading/error handling and the two action buttons.
+function RequestCard({ job, mm, ss }: { job: Job; mm: number; ss: string }) {
+  return (
+    <div className="border-[0.75px] border-[#d2dbe9] rounded-[16px] p-4 space-y-4">
+      {/* Header row: pill + countdown */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5 bg-[#f8f8f8] rounded-full px-3 py-2">
+          <span className="w-[3px] h-[3px] rounded-full bg-[#514e59]" />
+          <span className="text-[12px] leading-4 font-medium text-[#514e59]">Payment authorizes</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Clock className="w-4 h-4 text-[#1c1b1f]" strokeWidth={1.8} />
+          <span className="text-[14px] leading-5 font-bold text-[#1c1b1f]">{mm}:{ss}</span>
+        </div>
+      </div>
+
+      {/* Customer block */}
+      <div className="flex items-center gap-4 bg-[#f4f5f8] rounded-[12px] p-4">
+        <div className="w-[52px] h-[52px] rounded-full bg-white flex items-center justify-center shrink-0">
+          <ImageIcon className="w-5 h-5 text-[#d4d2e3]" strokeWidth={1.6} />
+        </div>
+        <div>
+          <p className="text-[16px] leading-6 font-semibold text-[#1c1b1f]">{job.users?.full_name}</p>
+          <div className="mt-0.5 flex items-center gap-1.5">
+            <Scissors className="w-3.5 h-3.5 text-[#a09cab]" strokeWidth={1.8} />
+            <p className="text-[13px] leading-4 font-medium text-[#a09cab]">{job.services?.name}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Info tiles */}
+      <div className="flex gap-3">
+        <div className="flex-1 flex items-center gap-3 bg-[#fafafa] rounded-[12px] p-3">
+          <span className="w-10 h-10 rounded-[10px] bg-white flex items-center justify-center shrink-0">
+            <Store className="w-4.5 h-4.5 text-[#1c1b1f]" strokeWidth={1.8} />
+          </span>
+          <div>
+            <p className="text-[13px] leading-4 font-semibold text-[#1c1b1f]">Date &amp; Time</p>
+            <p className="text-[11px] leading-4 font-medium text-[#a09cab] mt-0.5">
+              {job.booking_date}, {job.start_time}
+            </p>
+          </div>
+        </div>
+        <div className="flex-1 flex items-center gap-3 bg-[#fafafa] rounded-[12px] p-3">
+          <span className="w-10 h-10 rounded-[10px] bg-white flex items-center justify-center shrink-0">
+            <Truck className="w-4.5 h-4.5 text-[#1c1b1f]" strokeWidth={1.8} />
+          </span>
+          <div>
+            <p className="text-[13px] leading-4 font-semibold text-[#1c1b1f]">Price</p>
+            <p className="text-[11px] leading-4 font-medium text-[#a09cab] mt-0.5">
+              ${Number(job.total_amount).toFixed(2)}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* Incoming Request Detail — Figma p62 */
 export default function IncomingRequest() {
   const navigate = useNavigate();
@@ -58,61 +119,7 @@ export default function IncomingRequest() {
         {error && <p className="text-sm text-red-600">{error}</p>}
         {!loading && !error && !job && <p className="text-sm text-[#a09cab]">Request not found.</p>}
 
-        {job && (
-          <div className="border-[0.75px] border-[#d2dbe9] rounded-[16px] p-4 space-y-4">
-            {/* Header row: pill + countdown */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 bg-[#f8f8f8] rounded-full px-3 py-2">
-                <span className="w-[3px] h-[3px] rounded-full bg-[#514e59]" />
-                <span className="text-[12px] leading-4 font-medium text-[#514e59]">Payment authorizes</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-[#1c1b1f]" strokeWidth={1.8} />
-                <span className="text-[14px] leading-5 font-bold text-[#1c1b1f]">{mm}:{ss}</span>
-              </div>
-            </div>
-
-            {/* Customer block */}
-            <div className="flex items-center gap-4 bg-[#f4f5f8] rounded-[12px] p-4">
-              <div className="w-[52px] h-[52px] rounded-full bg-white flex items-center justify-center shrink-0">
-                <ImageIcon className="w-5 h-5 text-[#d4d2e3]" strokeWidth={1.6} />
-              </div>
-              <div>
-                <p className="text-[16px] leading-6 font-semibold text-[#1c1b1f]">{job.users?.full_name}</p>
-                <div className="mt-0.5 flex items-center gap-1.5">
-                  <Scissors className="w-3.5 h-3.5 text-[#a09cab]" strokeWidth={1.8} />
-                  <p className="text-[13px] leading-4 font-medium text-[#a09cab]">{job.services?.name}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Info tiles */}
-            <div className="flex gap-3">
-              <div className="flex-1 flex items-center gap-3 bg-[#fafafa] rounded-[12px] p-3">
-                <span className="w-10 h-10 rounded-[10px] bg-white flex items-center justify-center shrink-0">
-                  <Store className="w-4.5 h-4.5 text-[#1c1b1f]" strokeWidth={1.8} />
-                </span>
-                <div>
-                  <p className="text-[13px] leading-4 font-semibold text-[#1c1b1f]">Date &amp; Time</p>
-                  <p className="text-[11px] leading-4 font-medium text-[#a09cab] mt-0.5">
-                    {job.booking_date}, {job.start_time}
-                  </p>
-                </div>
-              </div>
-              <div className="flex-1 flex items-center gap-3 bg-[#fafafa] rounded-[12px] p-3">
-                <span className="w-10 h-10 rounded-[10px] bg-white flex items-center justify-center shrink-0">
-                  <Truck className="w-4.5 h-4.5 text-[#1c1b1f]" strokeWidth={1.8} />
-                </span>
-                <div>
-                  <p className="text-[13px] leading-4 font-semibold text-[#1c1b1f]">Price</p>
-                  <p className="text-[11px] leading-4 font-medium text-[#a09cab] mt-0.5">
-                    ${Number(job.total_amount).toFixed(2)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        {job && <RequestCard job={job} mm={mm} ss={ss} />}
 
         {/* Payment Note — Figma copy verbatim */}
         <div className="bg-[#f4f5f8] rounded-[12px] p-4">

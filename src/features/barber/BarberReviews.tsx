@@ -31,6 +31,71 @@ function relativeTime(iso: string): string {
   return `${months} month${months === 1 ? '' : 's'} ago`;
 }
 
+// The big average number and its stars are one self-contained block.
+function AverageRating({ avgDisplay }: { avgDisplay: string }) {
+  return (
+    <div className="px-5 py-4 flex flex-col items-center gap-2">
+      <p className="text-[28px] leading-9 font-bold text-[#1c1b1f]">{avgDisplay}</p>
+      <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Average Rating</p>
+      <div className="flex gap-2 mt-1">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Star
+            key={i}
+            className={`w-7 h-7 ${i < Math.round(Number(avgDisplay)) ? 'fill-[#a4a1af] text-[#a4a1af]' : 'fill-[#e5e3ee] text-[#e5e3ee]'}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// The five bars are a repeated shape driven only by the computed distribution.
+function DistributionBars({ distribution }: { distribution: { count: number; pct: number }[] }) {
+  return (
+    <div className="px-5 py-4 flex flex-col gap-6">
+      {distribution.map((d, i) => {
+        const starLabel = 5 - i;
+        return (
+          <div key={starLabel} className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[14px] leading-5 font-semibold text-[#1c1b1f]">{starLabel}★</span>
+              <span className="bg-[#f8f8f8] rounded-full px-3 py-1.5 text-[10px] leading-3 font-medium text-[#514e59]">{d.pct}%</span>
+            </div>
+            <div className="w-full h-2 rounded-full bg-[#f1efe9] overflow-hidden">
+              <div className="h-full rounded-full bg-[#1c1b1f]" style={{ width: `${d.pct}%` }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// One feedback card — separated so the feedback list body is a single line.
+function ReviewCard({ review }: { review: Review }) {
+  return (
+    <div className="bg-white border-[0.75px] border-[#d2dbe9] rounded-[12px] p-3 flex flex-col gap-2">
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-[#a4a1af] flex items-center justify-center shrink-0">
+            <UserRound className="w-5 h-5 text-white" fill="currentColor" />
+          </div>
+          <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f]">{review.customer_name || 'Customer'}</p>
+        </div>
+        <span className="text-[12px] leading-4 font-medium text-[#a09cab] whitespace-nowrap">{relativeTime(review.created_at)}</span>
+      </div>
+      <div className="flex gap-1.5 pl-12">
+        {Array.from({ length: Math.max(0, Math.min(5, Math.round(review.rating))) }).map((_, j) => (
+          <Star key={j} className="w-5 h-5 fill-[#a4a1af] text-[#a4a1af]" />
+        ))}
+      </div>
+      {review.comment && (
+        <p className="text-[12px] leading-4 font-medium text-[#a09cab]">"{review.comment}"</p>
+      )}
+    </div>
+  );
+}
+
 export default function BarberReviews() {
   const navigate = useNavigate();
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -105,36 +170,10 @@ export default function BarberReviews() {
       ) : (
         <>
           {/* Average rating block */}
-          <div className="px-5 py-4 flex flex-col items-center gap-2">
-            <p className="text-[28px] leading-9 font-bold text-[#1c1b1f]">{avgDisplay}</p>
-            <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Average Rating</p>
-            <div className="flex gap-2 mt-1">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Star
-                  key={i}
-                  className={`w-7 h-7 ${i < Math.round(Number(avgDisplay)) ? 'fill-[#a4a1af] text-[#a4a1af]' : 'fill-[#e5e3ee] text-[#e5e3ee]'}`}
-                />
-              ))}
-            </div>
-          </div>
+          <AverageRating avgDisplay={avgDisplay} />
 
           {/* Star distribution bars */}
-          <div className="px-5 py-4 flex flex-col gap-6">
-            {distribution.map((d, i) => {
-              const starLabel = 5 - i;
-              return (
-                <div key={starLabel} className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[14px] leading-5 font-semibold text-[#1c1b1f]">{starLabel}★</span>
-                    <span className="bg-[#f8f8f8] rounded-full px-3 py-1.5 text-[10px] leading-3 font-medium text-[#514e59]">{d.pct}%</span>
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-[#f1efe9] overflow-hidden">
-                    <div className="h-full rounded-full bg-[#1c1b1f]" style={{ width: `${d.pct}%` }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <DistributionBars distribution={distribution} />
 
           {/* Recent Feedback */}
           <div className="px-5 py-4">
@@ -143,25 +182,7 @@ export default function BarberReviews() {
           <div className="px-5 space-y-3">
             {reviews.length === 0 && <p className="text-center text-sm text-[#a09cab] py-8">No reviews yet</p>}
             {reviews.slice(0, visibleCount).map((r) => (
-              <div key={r.id} className="bg-white border-[0.75px] border-[#d2dbe9] rounded-[12px] p-3 flex flex-col gap-2">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-[#a4a1af] flex items-center justify-center shrink-0">
-                      <UserRound className="w-5 h-5 text-white" fill="currentColor" />
-                    </div>
-                    <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f]">{r.customer_name || 'Customer'}</p>
-                  </div>
-                  <span className="text-[12px] leading-4 font-medium text-[#a09cab] whitespace-nowrap">{relativeTime(r.created_at)}</span>
-                </div>
-                <div className="flex gap-1.5 pl-12">
-                  {Array.from({ length: Math.max(0, Math.min(5, Math.round(r.rating))) }).map((_, j) => (
-                    <Star key={j} className="w-5 h-5 fill-[#a4a1af] text-[#a4a1af]" />
-                  ))}
-                </div>
-                {r.comment && (
-                  <p className="text-[12px] leading-4 font-medium text-[#a09cab]">"{r.comment}"</p>
-                )}
-              </div>
+              <ReviewCard key={r.id} review={r} />
             ))}
           </div>
 

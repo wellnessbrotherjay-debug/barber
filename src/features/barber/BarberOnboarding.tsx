@@ -173,8 +173,18 @@ const DOCS: DocDef[] = [
 
 const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']; // Mon..Sun display labels
 
-export default function BarberOnboarding() {
-  const { user, setUser } = useAuthStore();
+type AuthUser = ReturnType<typeof useAuthStore.getState>['user'];
+
+// ---------------------------------------------------------------------------
+// State
+//
+// The wizard's state is grouped into three hooks purely so that no single
+// function in this file is longer than it needs to be. The grouping follows
+// the steps of the flow, so a change to (say) the availability step only ever
+// touches the availability group.
+// ---------------------------------------------------------------------------
+
+function useProfileFields(user: AuthUser) {
   const [step, setStep] = useState(0); // 0 = intro
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -200,33 +210,40 @@ export default function BarberOnboarding() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.avatar_url ?? null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
-
-  async function onPickAvatar(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    setAvatarError(null);
-    setAvatarUploading(true);
-    try {
-      const url = await uploadAvatar(file);
-      setAvatarUrl(url);
-      if (user) setUser({ ...user, avatar_url: url });
-    } catch (err) {
-      setAvatarError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setAvatarUploading(false);
-    }
-  }
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const photoCount = photos.length;
 
+  const docInputRef = useRef<Record<DocKey, HTMLInputElement | null>>({} as any);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
+
+  function updateProfile<K extends keyof typeof profile>(key: K, value: string) {
+    setProfile((prev) => ({ ...prev, [key]: value }));
+  }
+
+  return {
+    step, setStep, saving, setSaving, submitted, setSubmitted,
+    profile, setProfile, updateProfile,
+    docFiles, setDocFiles,
+    photos, setPhotos, photoCount,
+    avatarUrl, setAvatarUrl, avatarUploading, setAvatarUploading, avatarError, setAvatarError,
+    uploadingPhotos, setUploadingPhotos, photoError, setPhotoError,
+    docInputRef, photoInputRef,
+  };
+}
+
+function useLocationFields() {
   // Step 5 — where do you work
   const [serviceMode, setServiceMode] = useState<'in_shop' | 'mobile' | 'both'>('in_shop');
   const [shopAddress, setShopAddress] = useState('');
   const [shopLat, setShopLat] = useState<number | null>(null);
   const [shopLng, setShopLng] = useState<number | null>(null);
   const [addressSearchNonce, setAddressSearchNonce] = useState(0);
+
+  // Geocoded address components for the shop pin (persisted alongside lat/lng).
+  const [geoCity, setGeoCity] = useState<string | null>(null);
+  const [geoRegion, setGeoRegion] = useState<string | null>(null);
+  const [geoCountry, setGeoCountry] = useState<string | null>(null);
 
   // The two service cards are independent toggles over one mode value.
   // At least one must stay selected — a barber with no mode is unbookable.
@@ -239,6 +256,16 @@ export default function BarberOnboarding() {
     setServiceMode(hasMobile ? (hasShop ? 'in_shop' : 'mobile') : hasShop ? 'both' : 'mobile');
   }
 
+  return {
+    serviceMode, setServiceMode, shopAddress, setShopAddress,
+    shopLat, setShopLat, shopLng, setShopLng,
+    addressSearchNonce, setAddressSearchNonce,
+    geoCity, setGeoCity, geoRegion, setGeoRegion, geoCountry, setGeoCountry,
+    hasShop, hasMobile, toggleShopMode, toggleMobileMode,
+  };
+}
+
+function useAvailabilityFields() {
   // Step 6 — availability
   const [online, setOnline] = useState(false);
   const [startTime, setStartTime] = useState('09:00');
@@ -248,20 +275,32 @@ export default function BarberOnboarding() {
   const [radiusKm, setRadiusKm] = useState(15);
   const [bufferMin, setBufferMin] = useState(15);
 
-  // Geocoded address components for the shop pin (persisted alongside lat/lng).
-  const [geoCity, setGeoCity] = useState<string | null>(null);
-  const [geoRegion, setGeoRegion] = useState<string | null>(null);
-  const [geoCountry, setGeoCountry] = useState<string | null>(null);
-
   const [missing, setMissing] = useState<string[]>([]);
   const [servicesCount, setServicesCount] = useState<number | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
-  // ---------------------------------------------------------------------
-  // Rehydrate from the database on mount. A barber who logs out mid-flow
-  // comes back to their saved values AND their saved onboarding_step, so
-  // nothing typed earlier is lost.
-  // ---------------------------------------------------------------------
+  return {
+    online, setOnline, startTime, setStartTime, endTime, setEndTime,
+    activeDays, setActiveDays, bookingMode, setBookingMode,
+    radiusKm, setRadiusKm, bufferMin, setBufferMin,
+    missing, setMissing, servicesCount, setServicesCount, hydrated, setHydrated,
+  };
+}
+
+type Fields = ReturnType<typeof useProfileFields> &
+  ReturnType<typeof useLocationFields> &
+  ReturnType<typeof useAvailabilityFields>;
+
+// ---------------------------------------------------------------------------
+// Effects
+// ---------------------------------------------------------------------------
+
+/**
+ * Rehydrate from the database on mount. A barber who logs out mid-flow
+ * comes back to their saved values AND their saved onboarding_step, so
+ * nothing typed earlier is lost.
+ */
+function useOnboardingHydration(f: Fields, user: AuthUser) {
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -275,31 +314,31 @@ export default function BarberOnboarding() {
         if (profileRes.ok) {
           const p = await profileRes.json();
           if (cancelled) return;
-          setProfile({
+          f.setProfile({
             display_name: p.display_name || user?.full_name || '',
             phone: p.phone || '',
             shop_name: p.shop_name || '',
             bio: p.bio || '',
             address_text: p.address_text || '',
           });
-          if (p.service_mode === 'mobile' || p.service_mode === 'in_shop' || p.service_mode === 'both') setServiceMode(p.service_mode);
-          if (p.address_text) setShopAddress(p.address_text);
-          if (p.latitude != null) setShopLat(Number(p.latitude));
-          if (p.longitude != null) setShopLng(Number(p.longitude));
-          if (p.city) setGeoCity(p.city);
-          if (p.region) setGeoRegion(p.region);
-          if (p.country) setGeoCountry(p.country);
-          if (p.booking_mode === 'instant' || p.booking_mode === 'request_only') setBookingMode(p.booking_mode);
-          if (p.service_radius_km != null) setRadiusKm(Number(p.service_radius_km));
-          if (p.buffer_minutes != null) setBufferMin(Number(p.buffer_minutes));
-          setOnline(!!p.is_online);
+          if (p.service_mode === 'mobile' || p.service_mode === 'in_shop' || p.service_mode === 'both') f.setServiceMode(p.service_mode);
+          if (p.address_text) f.setShopAddress(p.address_text);
+          if (p.latitude != null) f.setShopLat(Number(p.latitude));
+          if (p.longitude != null) f.setShopLng(Number(p.longitude));
+          if (p.city) f.setGeoCity(p.city);
+          if (p.region) f.setGeoRegion(p.region);
+          if (p.country) f.setGeoCountry(p.country);
+          if (p.booking_mode === 'instant' || p.booking_mode === 'request_only') f.setBookingMode(p.booking_mode);
+          if (p.service_radius_km != null) f.setRadiusKm(Number(p.service_radius_km));
+          if (p.buffer_minutes != null) f.setBufferMin(Number(p.buffer_minutes));
+          f.setOnline(!!p.is_online);
           // work photos are loaded from /api/barber/photos (real rows), not
           // from the denormalised count.
           // onboarding_step is 1-7 (Figma numbering); local `step` is 0-6.
           const savedStep = Number(p.onboarding_step);
           if (Number.isFinite(savedStep) && savedStep >= 1 && savedStep <= 7) {
             // Only jump if the user hasn't already navigated while we loaded.
-            setStep((current) => (current === 0 ? savedStep - 1 : current));
+            f.setStep((current) => (current === 0 ? savedStep - 1 : current));
           }
         }
 
@@ -312,17 +351,17 @@ export default function BarberOnboarding() {
               const uiIndex = (Number(r.day_of_week) + 6) % 7; // Sun(0)->6, Mon(1)->0
               if (uiIndex >= 0 && uiIndex < 7) days[uiIndex] = !!r.is_available;
             }
-            setActiveDays(days);
+            f.setActiveDays(days);
             const sample = rows.find((r: any) => r.is_available) || rows[0];
-            if (sample?.start_time) setStartTime(String(sample.start_time).slice(0, 5));
-            if (sample?.end_time) setEndTime(String(sample.end_time).slice(0, 5));
+            if (sample?.start_time) f.setStartTime(String(sample.start_time).slice(0, 5));
+            if (sample?.end_time) f.setEndTime(String(sample.end_time).slice(0, 5));
           }
         }
       } catch (err) {
         console.error(`[BarberOnboarding] restoring saved onboarding progress failed:`, err);
         // Keep defaults — the user can still fill the flow in from scratch.
       } finally {
-        if (!cancelled) setHydrated(true);
+        if (!cancelled) f.setHydrated(true);
       }
     })();
     return () => {
@@ -330,25 +369,11 @@ export default function BarberOnboarding() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+}
 
-  /**
-   * Persist how far the barber has got. `step` is the local 0-based index;
-   * onboarding_step in the database is the Figma-visible 1-7 number.
-   * Fire-and-forget: a failed progress ping must never block navigation.
-   */
-  function markStep(localStep: number) {
-    if (!hydrated) return;
-    const value = Math.min(Math.max(localStep + 1, 1), 7);
-    authFetch('/api/barber/profile', {
-      method: 'PUT',
-      body: JSON.stringify({ onboarding_step: value }),
-    }).catch(() => {});
-  }
-
-  function goToStep(next: number) {
-    setStep(next);
-    markStep(next);
-  }
+/** The two per-step refetches: the service count on step 6 and the gallery on step 3. */
+function useOnboardingStepEffects(f: Fields) {
+  const { step, setServicesCount, setPhotos } = f;
 
   // Live count of this barber's own services, refetched whenever step 6
   // (Finish Setup) is reached, so "at least 1 service" can be enforced
@@ -368,7 +393,7 @@ export default function BarberOnboarding() {
     return () => {
       cancelled = true;
     };
-  }, [step]);
+  }, [step, setServicesCount]);
 
   // The gallery is real server state, so entering the work-photos step pulls
   // whatever this barber has already uploaded (e.g. a resumed onboarding).
@@ -385,54 +410,127 @@ export default function BarberOnboarding() {
     return () => {
       cancelled = true;
     };
-  }, [step]);
+  }, [step, setPhotos]);
+}
 
-  // Live, client-side mirror of the server's onboarding/complete validation
-  // (display_name/bio/shop_name filled in + >=1 service) — computed from
-  // current form state so the Finish Setup button can be disabled and the
-  // exact gaps highlighted BEFORE the user attempts to submit, not after.
-  const liveMissing = React.useMemo(() => {
-    const gaps: { key: string; label: string; step: number }[] = [];
-    if (!profile.bio?.trim()) gaps.push({ key: 'bio', label: 'Bio', step: 1 });
-    if (!profile.shop_name?.trim()) gaps.push({ key: 'shop_name', label: 'Shop name', step: 1 });
+type LiveMissing = { key: string; label: string; step: number }[];
+
+// Live, client-side mirror of the server's onboarding/complete validation
+// (display_name/bio/shop_name filled in + >=1 service) — computed from
+// current form state so the Finish Setup button can be disabled and the
+// exact gaps highlighted BEFORE the user attempts to submit, not after.
+function useLiveMissing(f: Fields): LiveMissing {
+  const { bio, shop_name } = f.profile;
+  const { servicesCount } = f;
+  return React.useMemo(() => {
+    const gaps: LiveMissing = [];
+    if (!bio?.trim()) gaps.push({ key: 'bio', label: 'Bio', step: 1 });
+    if (!shop_name?.trim()) gaps.push({ key: 'shop_name', label: 'Shop name', step: 1 });
     if (servicesCount === 0) gaps.push({ key: 'services', label: 'At least 1 service', step: 4 });
     return gaps;
-  }, [profile.bio, profile.shop_name, servicesCount]);
+  }, [bio, shop_name, servicesCount]);
+}
 
-  const docInputRef = useRef<Record<DocKey, HTMLInputElement | null>>({} as any);
-  const photoInputRef = useRef<HTMLInputElement | null>(null);
+// ---------------------------------------------------------------------------
+// Actions
+//
+// Grouped the same way as the state above so that each group stays short
+// enough to read in one go.
+// ---------------------------------------------------------------------------
 
-  function updateProfile<K extends keyof typeof profile>(key: K, value: string) {
-    setProfile((prev) => ({ ...prev, [key]: value }));
+/** Uploading an avatar and uploading gallery photos — the two file pickers. */
+function useMediaActions(f: Fields, user: AuthUser, setUser: (u: AuthUser) => void) {
+  async function onPickAvatar(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    f.setAvatarError(null);
+    f.setAvatarUploading(true);
+    try {
+      const url = await uploadAvatar(file);
+      f.setAvatarUrl(url);
+      if (user) setUser({ ...user, avatar_url: url });
+    } catch (err) {
+      f.setAvatarError(err instanceof Error ? err.message : String(err));
+    } finally {
+      f.setAvatarUploading(false);
+    }
+  }
+
+  async function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(e.target.files || []);
+    e.target.value = ''; // let the same file be re-picked after an error
+    if (selected.length === 0) return;
+    if (selected.length > 6) {
+      f.setPhotoError('You can upload at most 6 photos at a time.');
+      return;
+    }
+    f.setPhotoError(null);
+    f.setUploadingPhotos(true);
+    try {
+      const updated = await uploadGalleryPhotos(selected);
+      f.setPhotos(updated);
+      toast.success(`${selected.length} photo${selected.length === 1 ? '' : 's'} uploaded`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      f.setPhotoError(message);
+      toast.error(message);
+    } finally {
+      f.setUploadingPhotos(false);
+    }
+  }
+
+  return { onPickAvatar, handlePhotoSelect };
+}
+
+/** Moving between steps, and the saves that belong to steps 1-3. */
+function useStepActions(f: Fields) {
+  /**
+   * Persist how far the barber has got. `step` is the local 0-based index;
+   * onboarding_step in the database is the Figma-visible 1-7 number.
+   * Fire-and-forget: a failed progress ping must never block navigation.
+   */
+  function markStep(localStep: number) {
+    if (!f.hydrated) return;
+    const value = Math.min(Math.max(localStep + 1, 1), 7);
+    authFetch('/api/barber/profile', {
+      method: 'PUT',
+      body: JSON.stringify({ onboarding_step: value }),
+    }).catch(() => {});
+  }
+
+  function goToStep(next: number) {
+    f.setStep(next);
+    markStep(next);
   }
 
   async function handleSaveProfile() {
-    setSaving(true);
+    f.setSaving(true);
     try {
       const response = await authFetch('/api/barber/profile', {
         method: 'PUT',
         body: JSON.stringify({
-          display_name: profile.display_name || undefined,
-          phone: normalisePhone(profile.phone) || undefined,
-          shop_name: profile.shop_name || undefined,
-          bio: profile.bio || undefined,
-          address_text: profile.address_text || undefined,
+          display_name: f.profile.display_name || undefined,
+          phone: normalisePhone(f.profile.phone) || undefined,
+          shop_name: f.profile.shop_name || undefined,
+          bio: f.profile.bio || undefined,
+          address_text: f.profile.address_text || undefined,
           onboarding_step: 3,
         }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || `Failed to save profile: ${response.status}`);
-      setStep(2);
+      f.setStep(2);
     } catch (err) {
       toast.error(`${err instanceof Error ? err.message : err}`);
     } finally {
-      setSaving(false);
+      f.setSaving(false);
     }
   }
 
   function handleDocSelect(key: DocKey, e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) setDocFiles((prev) => ({ ...prev, [key]: file.name }));
+    if (file) f.setDocFiles((prev) => ({ ...prev, [key]: file.name }));
   }
 
   async function handleSubmitVerification(skip: boolean) {
@@ -440,12 +538,12 @@ export default function BarberOnboarding() {
       goToStep(3);
       return;
     }
-    const submittedTypes = DOCS.filter((d) => docFiles[d.key]).map((d) => d.key);
+    const submittedTypes = DOCS.filter((d) => f.docFiles[d.key]).map((d) => d.key);
     if (submittedTypes.length === 0) {
       goToStep(3);
       return;
     }
-    setSaving(true);
+    f.setSaving(true);
     try {
       const response = await authFetch('/api/barber/verification/submit', {
         method: 'POST',
@@ -458,30 +556,7 @@ export default function BarberOnboarding() {
     } catch (err) {
       toast.error(`${err instanceof Error ? err.message : err}`);
     } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const selected = Array.from(e.target.files || []);
-    e.target.value = ''; // let the same file be re-picked after an error
-    if (selected.length === 0) return;
-    if (selected.length > 6) {
-      setPhotoError('You can upload at most 6 photos at a time.');
-      return;
-    }
-    setPhotoError(null);
-    setUploadingPhotos(true);
-    try {
-      const updated = await uploadGalleryPhotos(selected);
-      setPhotos(updated);
-      toast.success(`${selected.length} photo${selected.length === 1 ? '' : 's'} uploaded`);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setPhotoError(message);
-      toast.error(message);
-    } finally {
-      setUploadingPhotos(false);
+      f.setSaving(false);
     }
   }
 
@@ -491,45 +566,50 @@ export default function BarberOnboarding() {
     goToStep(4);
   }
 
+  return { markStep, goToStep, handleSaveProfile, handleDocSelect, handleSubmitVerification, handleSavePhotos };
+}
+
+/** The two saves at the end of the flow: the work location, and the final submit. */
+function useFinishActions(f: Fields, user: AuthUser, setUser: (u: AuthUser) => void) {
   async function handleSaveWorkLocation() {
-    setSaving(true);
+    f.setSaving(true);
     try {
       const response = await authFetch('/api/barber/profile', {
         method: 'PUT',
         body: JSON.stringify({
-          service_mode: serviceMode,
+          service_mode: f.serviceMode,
           // Coordinates persist for EVERY mode — a mobile barber with no base
           // location can never appear in nearby search (travel radius needs
           // a point to measure from).
-          address_text: shopAddress || profile.address_text || undefined,
-          latitude: shopLat ?? undefined,
-          longitude: shopLng ?? undefined,
+          address_text: f.shopAddress || f.profile.address_text || undefined,
+          latitude: f.shopLat ?? undefined,
+          longitude: f.shopLng ?? undefined,
           // Only sent when the reverse geocoder actually resolved them.
-          city: geoCity || undefined,
-          region: geoRegion || undefined,
-          country: geoCountry || undefined,
+          city: f.geoCity || undefined,
+          region: f.geoRegion || undefined,
+          country: f.geoCountry || undefined,
           onboarding_step: 7,
         }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || `Failed to save location: ${response.status}`);
-      setStep(6);
+      f.setStep(6);
     } catch (err) {
       toast.error(`${err instanceof Error ? err.message : err}`);
     } finally {
-      setSaving(false);
+      f.setSaving(false);
     }
   }
 
   async function handleFinishSetup() {
-    setSaving(true);
-    setMissing([]);
+    f.setSaving(true);
+    f.setMissing([]);
     try {
       // Persist availability + booking mode first.
-      const schedule = activeDays.map((isOn, i) => ({
+      const schedule = f.activeDays.map((isOn, i) => ({
         day_of_week: (i + 1) % 7, // Mon(0)->1 ... Sun(6)->0, matches barber_schedule's 0=Sunday convention
-        start_time: startTime,
-        end_time: endTime,
+        start_time: f.startTime,
+        end_time: f.endTime,
         is_available: isOn,
       }));
       const scheduleResp = await authFetch('/api/barber/schedule', {
@@ -542,10 +622,10 @@ export default function BarberOnboarding() {
       const profileResp = await authFetch('/api/barber/profile', {
         method: 'PUT',
         body: JSON.stringify({
-          booking_mode: bookingMode,
-          service_radius_km: radiusKm,
-          buffer_minutes: bufferMin,
-          is_online: online,
+          booking_mode: f.bookingMode,
+          service_radius_km: f.radiusKm,
+          buffer_minutes: f.bufferMin,
+          is_online: f.online,
           onboarding_step: 7,
         }),
       });
@@ -558,669 +638,751 @@ export default function BarberOnboarding() {
       const body = await response.json();
       if (!response.ok) {
         if (body.missing) {
-          setMissing(body.missing);
+          f.setMissing(body.missing);
           toast.error(`Missing: ${body.missing.join(', ')}`);
           return;
         }
         throw new Error(body.error || `Failed to submit: ${response.status}`);
       }
       setUser(user ? { ...user, onboarding_completed: true, is_verified: false } : user);
-      setSubmitted(true);
+      f.setSubmitted(true);
     } catch (err) {
       toast.error(`${err instanceof Error ? err.message : err}`);
     } finally {
-      setSaving(false);
+      f.setSaving(false);
     }
   }
 
-  if (submitted) {
-    return <BarberPendingVerification />;
-  }
+  return { handleSaveWorkLocation, handleFinishSetup };
+}
 
-  // ------------------------------------------------------------------
-  // Step 0 — Setup / intro (Figma 1:2884)
-  // ------------------------------------------------------------------
-  if (step === 0) {
-    return (
-      <div className="min-h-screen bg-white flex flex-col">
-        {/* "Professional Setup" bar + progress (Figma 1:2904) */}
-        <div className="px-5 py-4">
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium leading-4 text-ink">Professional Setup</p>
-              <span className="bg-[#f8f8f8] rounded-pill px-3 py-1.5 text-[10px] leading-3 font-medium text-[#514e59]">
-                Step 1 of {TOTAL_STEPS}
-              </span>
-            </div>
-            <div className="relative h-2 w-full">
-              <div className="absolute inset-0 bg-[#f5f1f1] rounded-pill" />
-              <div
-                className="absolute inset-y-0 left-0 bg-ink rounded-pill"
-                style={{ width: `${(1 / TOTAL_STEPS) * 100}%` }}
-              />
-            </div>
+type Actions = ReturnType<typeof useMediaActions> &
+  ReturnType<typeof useStepActions> &
+  ReturnType<typeof useFinishActions>;
+
+// ---------------------------------------------------------------------------
+// Steps
+//
+// One component per step of the wizard. The board draws each step as its own
+// screen, so this file reads in the same order the barber walks through it,
+// and a correction to one screen cannot disturb another.
+// ---------------------------------------------------------------------------
+
+// ------------------------------------------------------------------
+// Step 0 — Setup / intro (Figma 1:2884)
+// ------------------------------------------------------------------
+function StepIntro({ goToStep }: { goToStep: (next: number) => void }) {
+  return (
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* "Professional Setup" bar + progress (Figma 1:2904) */}
+      <div className="px-5 py-4">
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium leading-4 text-ink">Professional Setup</p>
+            <span className="bg-[#f8f8f8] rounded-pill px-3 py-1.5 text-[10px] leading-3 font-medium text-[#514e59]">
+              Step 1 of {TOTAL_STEPS}
+            </span>
+          </div>
+          <div className="relative h-2 w-full">
+            <div className="absolute inset-0 bg-[#f5f1f1] rounded-pill" />
+            <div
+              className="absolute inset-y-0 left-0 bg-ink rounded-pill"
+              style={{ width: `${(1 / TOTAL_STEPS) * 100}%` }}
+            />
           </div>
         </div>
+      </div>
 
-        {/* Welcome block (Figma 1:2897) */}
-        <div className="px-5 pt-9 flex flex-col gap-4 items-start">
-          <div className="size-[100px] bg-surface rounded-[8px] flex items-center justify-center">
+      {/* Welcome block (Figma 1:2897) */}
+      <div className="px-5 pt-9 flex flex-col gap-4 items-start">
+        <div className="size-[100px] bg-surface rounded-[8px] flex items-center justify-center">
+          <ImageIcon className="w-10 h-10 text-[#c9c6da]" />
+        </div>
+        <div className="flex flex-col gap-1 items-start">
+          <h2 className="text-2xl font-bold text-ink">Welcome, Barber</h2>
+          <p className="text-sm font-medium text-muted leading-normal">
+            Join our community of stylists. Set up your chair
+            <br />
+            &amp; start receiving bookings.
+          </p>
+        </div>
+      </div>
+
+      {/* Checklist rows (Figma 1:2916) */}
+      <div className="px-5 py-4 mt-8 flex flex-col gap-4 items-start">
+        {[
+          { icon: MapPin, label: 'Set your shop location', to: 5 },
+          { icon: Clock, label: 'Define working hours', to: 6 },
+          { icon: Calendar, label: 'Sync your schedule', to: 6 },
+        ].map(({ icon: Icon, label, to }) => (
+          <button key={label} type="button" onClick={() => goToStep(to)} className="flex gap-3 items-center">
+            <div className="size-[38px] bg-surface-2 rounded-[8px] flex items-center justify-center shrink-0">
+              <Icon className="w-4 h-4 text-ink" />
+            </div>
+            <p className="text-xs font-semibold leading-4 text-ink">{label}</p>
+          </button>
+        ))}
+      </div>
+
+      <div className="flex-1" />
+      <BottomActions
+        primaryLabel="Start Setup"
+        onPrimary={() => goToStep(1)}
+        secondaryLabel="Skip for now"
+        onSecondary={() => goToStep(1)}
+        footnote={
+          <>
+            Minimum setup is required to access the barber dashboard
+            <br />
+            &amp; start appearing in searches.
+          </>
+        }
+      />
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------
+// Step 1 — Your profile (Figma 1:2942)
+// ------------------------------------------------------------------
+function StepProfile({ f, a }: { f: Fields; a: Actions }) {
+  return (
+    <div className="min-h-screen bg-white flex flex-col">
+      <StepHeader step={2} title="Your profile" onBack={() => f.setStep(0)} />
+      {/* Board page 20 draws this as a bare placeholder with no label, so the
+          tile itself is the affordance — tapping it opens the picker and it
+          then shows the uploaded avatar. No extra chrome is added to the
+          locked design. */}
+      <div className="px-4 pt-4 flex flex-col items-center gap-2">
+        <label className="size-[100px] bg-surface rounded-[8px] flex items-center justify-center overflow-hidden cursor-pointer active:opacity-80">
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/heic"
+            className="hidden"
+            disabled={f.avatarUploading}
+            onChange={a.onPickAvatar}
+          />
+          {f.avatarUrl ? (
+            <img src={f.avatarUrl} alt="Your profile" className="w-full h-full object-cover" />
+          ) : (
             <ImageIcon className="w-10 h-10 text-[#c9c6da]" />
+          )}
+        </label>
+        {f.avatarUploading && <p className="text-[11px] text-muted">Uploading…</p>}
+        {f.avatarError && <p className="text-[11px] text-red-600 text-center px-6">{f.avatarError}</p>}
+      </div>
+      <div className="px-5 py-4">
+        <div className="bg-white rounded-[12px] p-4 flex flex-col gap-4 drop-shadow-[0px_4px_16px_rgba(231,236,243,0.08)]">
+          <PillInput
+            icon={User}
+            placeholder="Enter Name"
+            value={f.profile.display_name}
+            onChange={(v) => f.updateProfile('display_name', v)}
+          />
+          <PillInput
+            icon={Phone}
+            placeholder="Enter Phone Number"
+            value={f.profile.phone}
+            onChange={(v) => f.updateProfile('phone', v)}
+          />
+          <PillInput
+            icon={Store}
+            placeholder="Shop Name"
+            value={f.profile.shop_name}
+            onChange={(v) => f.updateProfile('shop_name', v)}
+          />
+          <div className="relative w-full">
+            <FileText className="w-[18px] h-[18px] text-[#848992] absolute left-[18px] top-[18px]" />
+            <textarea
+              placeholder="Short bio"
+              value={f.profile.bio}
+              onChange={(e) => f.updateProfile('bio', e.target.value)}
+              className="w-full h-[141px] bg-white border border-[#e5e7eb] rounded-[12px] pl-11 pr-[18px] py-[18px] text-sm font-medium leading-[18px] text-ink placeholder:text-[#848992] resize-none"
+            />
           </div>
-          <div className="flex flex-col gap-1 items-start">
-            <h2 className="text-2xl font-bold text-ink">Welcome, Barber</h2>
-            <p className="text-sm font-medium text-muted leading-normal">
-              Join our community of stylists. Set up your chair
-              <br />
-              &amp; start receiving bookings.
+          <PillInput
+            icon={MapPin}
+            placeholder="Service area (City/Zone)"
+            value={f.profile.address_text}
+            onChange={(v) => f.updateProfile('address_text', v)}
+          />
+        </div>
+      </div>
+      <div className="flex-1" />
+      <BottomActions
+        primaryLabel={f.saving ? 'Saving…' : 'Continue'}
+        primaryDisabled={f.saving}
+        onPrimary={a.handleSaveProfile}
+        secondaryLabel="Back"
+        onSecondary={() => f.setStep(0)}
+      />
+    </div>
+  );
+}
+
+/** One of the four upload tiles on the verification step — the board draws
+ *  four identical squares, so there is one square here. */
+function VerificationDocTile({ doc, f, a }: { doc: DocDef; f: Fields; a: Actions }) {
+  return (
+    <div className="px-5 py-4 flex justify-center">
+      <div className="relative bg-surface rounded-[8px] w-full max-w-[353px] aspect-square">
+        <div className="absolute left-1/2 -translate-x-1/2 top-[72px]">
+          <ImageIcon className="w-[58px] h-[52px] text-[#c9c6da]" />
+        </div>
+        <div className="absolute left-0 right-0 top-[161px] flex flex-col gap-1 items-center justify-center text-center">
+          <p className="text-sm font-semibold leading-5 text-black">{doc.label}</p>
+          <p className="text-xs font-semibold leading-[14px] text-muted">{doc.description}</p>
+        </div>
+        <input
+          ref={(el) => {
+            f.docInputRef.current[doc.key] = el;
+          }}
+          type="file"
+          className="hidden"
+          onChange={(e) => a.handleDocSelect(doc.key, e)}
+        />
+        <button
+          type="button"
+          onClick={() => f.docInputRef.current[doc.key]?.click()}
+          className={`absolute left-1/2 -translate-x-1/2 top-[232px] rounded-pill px-8 py-4 text-sm font-semibold leading-5 text-center ${
+            f.docFiles[doc.key] ? 'bg-green-100 text-green-800' : 'bg-ink text-white'
+          }`}
+        >
+          {f.docFiles[doc.key] ? (
+            <span className="flex items-center gap-1">
+              <Check className="w-4 h-4" /> Uploaded
+            </span>
+          ) : (
+            'Select file'
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------
+// Step 2 — Verification (Figma 1:585)
+// ------------------------------------------------------------------
+function StepVerification({ f, a }: { f: Fields; a: Actions }) {
+  return (
+    <div className="min-h-screen bg-white flex flex-col">
+      <StepHeader step={3} title="Verification" onBack={() => f.setStep(1)} />
+      {/* Identity Verification intro (Figma 1:605) */}
+      <div className="px-5 py-4 flex gap-2 items-start">
+        <div className="size-[38px] bg-surface-2 rounded-[8px] flex items-center justify-center shrink-0">
+          <ShieldCheck className="w-6 h-6 text-ink" />
+        </div>
+        <div className="flex flex-col gap-1 flex-1 min-w-0">
+          <h2 className="text-lg font-bold leading-6 text-ink">Identity Verification</h2>
+          <p className="text-xs font-medium leading-4 text-muted">
+            To ensure trust in our marketplace, we require all barbers to verify their identity and
+            professional qualifications before accepting bookings.
+          </p>
+        </div>
+      </div>
+
+      {/* Big upload tiles (Figma 1:613..1:640) */}
+      <div className="flex flex-col">
+        {DOCS.map((doc) => (
+          <VerificationDocTile key={doc.key} doc={doc} f={f} a={a} />
+        ))}
+      </div>
+
+      {/* Processing time info card (Figma 1:649) */}
+      <div className="px-5 py-4">
+        <div className="bg-[#f4f5f8] rounded-[12px] p-4 flex gap-3 items-start">
+          <div className="size-10 bg-white border border-[#e5e7eb] rounded-pill flex items-center justify-center shrink-0">
+            <Clock className="w-5 h-5 text-ink" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-semibold leading-5 text-ink">Processing Time</p>
+            <p className="text-xs font-medium leading-4 text-muted max-w-[264px]">
+              Verification usually takes 24-48 hours once submitted.
             </p>
           </div>
         </div>
-
-        {/* Checklist rows (Figma 1:2916) */}
-        <div className="px-5 py-4 mt-8 flex flex-col gap-4 items-start">
-          {[
-            { icon: MapPin, label: 'Set your shop location', to: 5 },
-            { icon: Clock, label: 'Define working hours', to: 6 },
-            { icon: Calendar, label: 'Sync your schedule', to: 6 },
-          ].map(({ icon: Icon, label, to }) => (
-            <button key={label} type="button" onClick={() => goToStep(to)} className="flex gap-3 items-center">
-              <div className="size-[38px] bg-surface-2 rounded-[8px] flex items-center justify-center shrink-0">
-                <Icon className="w-4 h-4 text-ink" />
-              </div>
-              <p className="text-xs font-semibold leading-4 text-ink">{label}</p>
-            </button>
-          ))}
-        </div>
-
-        <div className="flex-1" />
-        <BottomActions
-          primaryLabel="Start Setup"
-          onPrimary={() => goToStep(1)}
-          secondaryLabel="Skip for now"
-          onSecondary={() => goToStep(1)}
-          footnote={
-            <>
-              Minimum setup is required to access the barber dashboard
-              <br />
-              &amp; start appearing in searches.
-            </>
-          }
-        />
       </div>
-    );
-  }
 
-  // ------------------------------------------------------------------
-  // Step 1 — Your profile (Figma 1:2942)
-  // ------------------------------------------------------------------
-  if (step === 1) {
-    return (
-      <div className="min-h-screen bg-white flex flex-col">
-        <StepHeader step={2} title="Your profile" onBack={() => setStep(0)} />
-        {/* Board page 20 draws this as a bare placeholder with no label, so the
-            tile itself is the affordance — tapping it opens the picker and it
-            then shows the uploaded avatar. No extra chrome is added to the
-            locked design. */}
-        <div className="px-4 pt-4 flex flex-col items-center gap-2">
-          <label className="size-[100px] bg-surface rounded-[8px] flex items-center justify-center overflow-hidden cursor-pointer active:opacity-80">
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/heic"
-              className="hidden"
-              disabled={avatarUploading}
-              onChange={onPickAvatar}
-            />
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="Your profile" className="w-full h-full object-cover" />
-            ) : (
-              <ImageIcon className="w-10 h-10 text-[#c9c6da]" />
-            )}
-          </label>
-          {avatarUploading && <p className="text-[11px] text-muted">Uploading…</p>}
-          {avatarError && <p className="text-[11px] text-red-600 text-center px-6">{avatarError}</p>}
-        </div>
-        <div className="px-5 py-4">
-          <div className="bg-white rounded-[12px] p-4 flex flex-col gap-4 drop-shadow-[0px_4px_16px_rgba(231,236,243,0.08)]">
-            <PillInput
-              icon={User}
-              placeholder="Enter Name"
-              value={profile.display_name}
-              onChange={(v) => updateProfile('display_name', v)}
-            />
-            <PillInput
-              icon={Phone}
-              placeholder="Enter Phone Number"
-              value={profile.phone}
-              onChange={(v) => updateProfile('phone', v)}
-            />
-            <PillInput
-              icon={Store}
-              placeholder="Shop Name"
-              value={profile.shop_name}
-              onChange={(v) => updateProfile('shop_name', v)}
-            />
-            <div className="relative w-full">
-              <FileText className="w-[18px] h-[18px] text-[#848992] absolute left-[18px] top-[18px]" />
-              <textarea
-                placeholder="Short bio"
-                value={profile.bio}
-                onChange={(e) => updateProfile('bio', e.target.value)}
-                className="w-full h-[141px] bg-white border border-[#e5e7eb] rounded-[12px] pl-11 pr-[18px] py-[18px] text-sm font-medium leading-[18px] text-ink placeholder:text-[#848992] resize-none"
-              />
+      <BottomActions
+        primaryLabel={f.saving ? 'Submitting…' : 'Submit for Review'}
+        primaryDisabled={f.saving}
+        onPrimary={() => a.handleSubmitVerification(false)}
+        secondaryLabel="Skip for now"
+        onSecondary={() => a.handleSubmitVerification(true)}
+      />
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------
+// Step 3 — Your work photos (Figma 1:2999)
+// ------------------------------------------------------------------
+function StepWorkPhotos({ f, a }: { f: Fields; a: Actions }) {
+  return (
+    <div className="min-h-screen bg-white flex flex-col">
+      <StepHeader step={4} title="Your work photos" onBack={() => f.setStep(2)} />
+      <div className="px-5 py-4 flex justify-center">
+        <div className="relative bg-surface rounded-[8px] w-full max-w-[353px] aspect-square">
+          {f.photoCount === 0 ? (
+            <div className="absolute left-1/2 -translate-x-1/2 top-[72px]">
+              <ImageIcon className="w-[58px] h-[52px] text-[#c9c6da]" />
             </div>
-            <PillInput
-              icon={MapPin}
-              placeholder="Service area (City/Zone)"
-              value={profile.address_text}
-              onChange={(v) => updateProfile('address_text', v)}
-            />
-          </div>
-        </div>
-        <div className="flex-1" />
-        <BottomActions
-          primaryLabel={saving ? 'Saving…' : 'Continue'}
-          primaryDisabled={saving}
-          onPrimary={handleSaveProfile}
-          secondaryLabel="Back"
-          onSecondary={() => setStep(0)}
-        />
-      </div>
-    );
-  }
-
-  // ------------------------------------------------------------------
-  // Step 2 — Verification (Figma 1:585)
-  // ------------------------------------------------------------------
-  if (step === 2) {
-    return (
-      <div className="min-h-screen bg-white flex flex-col">
-        <StepHeader step={3} title="Verification" onBack={() => setStep(1)} />
-        {/* Identity Verification intro (Figma 1:605) */}
-        <div className="px-5 py-4 flex gap-2 items-start">
-          <div className="size-[38px] bg-surface-2 rounded-[8px] flex items-center justify-center shrink-0">
-            <ShieldCheck className="w-6 h-6 text-ink" />
-          </div>
-          <div className="flex flex-col gap-1 flex-1 min-w-0">
-            <h2 className="text-lg font-bold leading-6 text-ink">Identity Verification</h2>
-            <p className="text-xs font-medium leading-4 text-muted">
-              To ensure trust in our marketplace, we require all barbers to verify their identity and
-              professional qualifications before accepting bookings.
-            </p>
-          </div>
-        </div>
-
-        {/* Big upload tiles (Figma 1:613..1:640) */}
-        <div className="flex flex-col">
-          {DOCS.map((doc) => (
-            <div key={doc.key} className="px-5 py-4 flex justify-center">
-              <div className="relative bg-surface rounded-[8px] w-full max-w-[353px] aspect-square">
-                <div className="absolute left-1/2 -translate-x-1/2 top-[72px]">
-                  <ImageIcon className="w-[58px] h-[52px] text-[#c9c6da]" />
-                </div>
-                <div className="absolute left-0 right-0 top-[161px] flex flex-col gap-1 items-center justify-center text-center">
-                  <p className="text-sm font-semibold leading-5 text-black">{doc.label}</p>
-                  <p className="text-xs font-semibold leading-[14px] text-muted">{doc.description}</p>
-                </div>
-                <input
-                  ref={(el) => {
-                    docInputRef.current[doc.key] = el;
-                  }}
-                  type="file"
-                  className="hidden"
-                  onChange={(e) => handleDocSelect(doc.key, e)}
+          ) : (
+            <div className="absolute left-0 right-0 top-[24px] px-5 grid grid-cols-3 gap-2">
+              {f.photos.slice(0, 6).map((photo) => (
+                <img
+                  key={photo.id}
+                  src={photo.url}
+                  alt=""
+                  className="w-full aspect-square object-cover rounded-[8px]"
                 />
-                <button
-                  type="button"
-                  onClick={() => docInputRef.current[doc.key]?.click()}
-                  className={`absolute left-1/2 -translate-x-1/2 top-[232px] rounded-pill px-8 py-4 text-sm font-semibold leading-5 text-center ${
-                    docFiles[doc.key] ? 'bg-green-100 text-green-800' : 'bg-ink text-white'
-                  }`}
-                >
-                  {docFiles[doc.key] ? (
-                    <span className="flex items-center gap-1">
-                      <Check className="w-4 h-4" /> Uploaded
-                    </span>
-                  ) : (
-                    'Select file'
-                  )}
-                </button>
-              </div>
+              ))}
             </div>
+          )}
+          <div className="absolute left-0 right-0 top-[161px] flex flex-col gap-1 items-center justify-center text-center">
+            {f.photoCount === 0 ? (
+              <>
+                <p className="text-sm font-semibold leading-5 text-black">No photos added yet</p>
+                <p className="text-[10px] font-semibold leading-[14px] text-muted">
+                  Showcase your best projects to stand out
+                </p>
+              </>
+            ) : (
+              <p className="text-sm font-semibold leading-5 text-black">
+                {f.photoCount} photo{f.photoCount === 1 ? '' : 's'} uploaded
+              </p>
+            )}
+            {f.photoError && (
+              <p className="text-[10px] font-semibold leading-[14px] text-red-600 px-6">{f.photoError}</p>
+            )}
+          </div>
+          <input
+            ref={f.photoInputRef}
+            type="file"
+            multiple
+            accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+            className="hidden"
+            onChange={a.handlePhotoSelect}
+          />
+          <button
+            type="button"
+            disabled={f.uploadingPhotos}
+            onClick={() => f.photoInputRef.current?.click()}
+            className="absolute left-1/2 -translate-x-1/2 top-[232px] bg-ink text-white rounded-pill px-8 py-4 text-sm font-semibold leading-5 whitespace-nowrap disabled:opacity-60"
+          >
+            {f.uploadingPhotos ? 'Uploading…' : 'Add to Gallery'}
+          </button>
+        </div>
+      </div>
+      <div className="flex-1" />
+      <BottomActions
+        primaryLabel={f.saving ? 'Saving…' : 'Continue'}
+        primaryDisabled={f.saving || f.uploadingPhotos}
+        onPrimary={() => a.handleSavePhotos(false)}
+        secondaryLabel="Skip for now"
+        onSecondary={() => a.handleSavePhotos(true)}
+      />
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------
+// Step 4 — Services (Figma 1:3033; reuses BarberServices logic/UI)
+// ------------------------------------------------------------------
+function StepServices({ f, a }: { f: Fields; a: Actions }) {
+  return (
+    <div className="min-h-screen bg-white pb-40 relative">
+      <StepHeader step={5} title="Services" onBack={() => f.setStep(3)} />
+      <BarberServices embedded />
+      <div className="fixed bottom-0 left-0 right-0 bg-white px-5 pb-5 pt-2 max-w-md mx-auto flex flex-col gap-1">
+        <button
+          type="button"
+          onClick={() => a.goToStep(5)}
+          className="w-full bg-ink text-white rounded-pill px-9 py-[18px] text-sm font-semibold leading-5 text-center"
+        >
+          Go Online
+        </button>
+        <button
+          type="button"
+          onClick={async () => {
+            // Services are saved to the `services` table as they're added
+            // (BarberServices posts each one). This just confirms what the
+            // server actually holds rather than claiming a phantom save.
+            try {
+              const r = await authFetch('/api/barber/services');
+              const mine = r.ok ? await r.json() : [];
+              const n = Array.isArray(mine) ? mine.length : 0;
+              f.setServicesCount(n);
+              toast.success(`${n} service${n === 1 ? '' : 's'} saved`);
+            } catch (err) {
+      console.error(`[BarberOnboarding] restoring saved onboarding progress failed:`, err);
+              toast.error('Could not confirm saved services');
+            }
+          }}
+          className="w-full rounded-pill px-9 py-[18px] text-sm font-semibold leading-5 text-center text-muted"
+        >
+          Save Changes
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** The in-shop card, which alone carries the address field and the map. It is
+ *  its own component because it is the only part of the step that grows when
+ *  selected. */
+function InShopCard({ f }: { f: Fields }) {
+  return (
+    <div
+      className="bg-white border-[0.75px] border-[#d2dbe9] rounded-[12px] p-3 flex flex-col gap-3 cursor-pointer"
+      onClick={f.toggleShopMode}
+    >
+      <div className="flex items-start justify-between w-full">
+        <div className="flex gap-3 items-center">
+          <div className="size-[38px] bg-surface-2 rounded-[8px] flex items-center justify-center shrink-0">
+            <Store className="w-4 h-4 text-ink" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <p className="text-xs font-semibold leading-4 text-ink">In-shop</p>
+            <p className="text-[10px] font-semibold leading-[14px] text-muted">
+              Customers come to your location
+            </p>
+          </div>
+        </div>
+        <span
+          className={`size-3 rounded-[2px] border border-ink shrink-0 flex items-center justify-center ${
+            f.hasShop ? 'bg-ink' : 'bg-white'
+          }`}
+        >
+          {f.hasShop && <Check className="w-2.5 h-2.5 text-white" />}
+        </span>
+      </div>
+      {f.hasShop && (
+        <div className="bg-[#fafafa] rounded-[12px] p-3" onClick={(e) => e.stopPropagation()}>
+          <div className="flex flex-col gap-2">
+            <div className="relative w-full">
+              <input
+                placeholder="Shop Address"
+                value={f.shopAddress}
+                onChange={(e) => f.setShopAddress(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') f.setAddressSearchNonce((n) => n + 1); }}
+                className="w-full bg-white border border-[#e5e7eb] rounded-pill pl-4 pr-11 py-4 text-sm font-medium leading-[18px] text-ink placeholder:text-[#848992]"
+              />
+              <button type="button" aria-label="Find address on map" onClick={() => f.setAddressSearchNonce((n) => n + 1)} className="absolute right-4 top-1/2 -translate-y-1/2">
+                <Crosshair className="w-[18px] h-[18px] text-[#848992]" />
+              </button>
+            </div>
+            <p className="text-[10px] font-semibold leading-[14px] text-muted">
+              Set precise pin on map
+            </p>
+            <ShopLocationMap
+              latitude={f.shopLat}
+              longitude={f.shopLng}
+              searchQuery={f.shopAddress}
+              searchNonce={f.addressSearchNonce}
+              onChange={(lat, lng, address, parts) => {
+                f.setShopLat(lat);
+                f.setShopLng(lng);
+                f.setShopAddress(address);
+                if (parts?.city) f.setGeoCity(parts.city);
+                if (parts?.region) f.setGeoRegion(parts.region);
+                if (parts?.country) f.setGeoCountry(parts.country);
+              }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The come-to-customer card. Sits beside InShopCard so the two toggles read
+ *  as the pair the board draws. */
+function ComeToCustomerCard({ f }: { f: Fields }) {
+  return (
+    <div
+      className="bg-white border-[0.75px] border-[#d2dbe9] rounded-[12px] p-3 cursor-pointer"
+      onClick={f.toggleMobileMode}
+    >
+      <div className="flex items-start justify-between w-full">
+        <div className="flex gap-3 items-center">
+          <div className="size-[38px] bg-surface-2 rounded-[8px] flex items-center justify-center shrink-0">
+            <Car className="w-4 h-4 text-ink" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <p className="text-xs font-semibold leading-4 text-ink">Come to customer</p>
+            <p className="text-[10px] font-semibold leading-[14px] text-muted">
+              You travel to the customer&apos;s site
+            </p>
+          </div>
+        </div>
+        <span
+          className={`size-3 rounded-[2px] border border-ink shrink-0 flex items-center justify-center ${
+            f.hasMobile ? 'bg-ink' : 'bg-white'
+          }`}
+        >
+          {f.hasMobile && <Check className="w-2.5 h-2.5 text-white" />}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------
+// Step 5 — Where do you work? (Figma 1:3097)
+// ------------------------------------------------------------------
+function StepWorkLocation({ f, a }: { f: Fields; a: Actions }) {
+  return (
+    <div className="min-h-screen bg-white flex flex-col">
+      <StepHeader step={6} title="Where do you work?" onBack={() => f.setStep(4)} />
+      <div className="px-5 py-4 flex flex-col gap-3">
+        {/* In-shop card */}
+        <InShopCard f={f} />
+
+        {/* Come to customer card */}
+        <ComeToCustomerCard f={f} />
+      </div>
+      <div className="flex-1" />
+      <BottomActions
+        primaryLabel={f.saving ? 'Saving…' : 'Continue'}
+        primaryDisabled={f.saving}
+        onPrimary={a.handleSaveWorkLocation}
+        secondaryLabel="Go Back"
+        onSecondary={() => f.setStep(4)}
+      />
+    </div>
+  );
+}
+
+/** Online/offline switch. Separate because it is the only control on the step
+ *  that changes what customers can see. */
+function AvailabilityStatusCard({ f }: { f: Fields }) {
+  return (
+    <div className="bg-white border-[0.75px] border-[#d2dbe9] rounded-[12px] p-3 flex items-center justify-between">
+      <div>
+        <p className="text-xs font-semibold leading-4 text-ink">Status: {f.online ? 'Online' : 'Offline'}</p>
+        <p className="text-[10px] font-semibold leading-[14px] text-muted mt-1">
+          {f.online ? 'You are visible to customers' : 'You are currently hidden'}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={() => f.setOnline((v) => !v)}
+        className={`w-12 h-7 rounded-pill transition-colors flex items-center px-1 ${f.online ? 'bg-ink' : 'bg-border'}`}
+      >
+        <div className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${f.online ? 'translate-x-5' : 'translate-x-0'}`} />
+      </button>
+    </div>
+  );
+}
+
+/** The two time fields and the day circles — the "when do you work" half of
+ *  the step. */
+function WorkingHoursFields({ f }: { f: Fields }) {
+  return (
+    <>
+      <div>
+        <p className="text-xs font-bold leading-4 text-ink mb-2">Working Hours</p>
+        <div className="flex gap-3">
+          <div className="relative flex-1">
+            <Clock className="w-4 h-4 text-[#848992] absolute left-4 top-1/2 -translate-y-1/2" />
+            <input
+              type="time"
+              value={f.startTime}
+              onChange={(e) => f.setStartTime(e.target.value)}
+              className="w-full pl-11 pr-3 py-3 bg-white border border-[#e5e7eb] rounded-[8px] text-xs font-medium"
+            />
+          </div>
+          <div className="relative flex-1">
+            <Clock className="w-4 h-4 text-[#848992] absolute left-4 top-1/2 -translate-y-1/2" />
+            <input
+              type="time"
+              value={f.endTime}
+              onChange={(e) => f.setEndTime(e.target.value)}
+              className="w-full pl-11 pr-3 py-3 bg-white border border-[#e5e7eb] rounded-[8px] text-xs font-medium"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs font-bold leading-4 text-ink mb-2">Active Days</p>
+        <div className="flex justify-between">
+          {DAYS.map((d, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() =>
+                f.setActiveDays((prev) => prev.map((v, idx) => (idx === i ? !v : v)))
+              }
+              className={`w-9 h-9 rounded-full text-xs font-bold flex items-center justify-center ${
+                f.activeDays[i] ? 'bg-ink text-white' : 'bg-surface text-muted'
+              }`}
+            >
+              {d}
+            </button>
           ))}
         </div>
-
-        {/* Processing time info card (Figma 1:649) */}
-        <div className="px-5 py-4">
-          <div className="bg-[#f4f5f8] rounded-[12px] p-4 flex gap-3 items-start">
-            <div className="size-10 bg-white border border-[#e5e7eb] rounded-pill flex items-center justify-center shrink-0">
-              <Clock className="w-5 h-5 text-ink" />
-            </div>
-            <div className="flex flex-col gap-1">
-              <p className="text-sm font-semibold leading-5 text-ink">Processing Time</p>
-              <p className="text-xs font-medium leading-4 text-muted max-w-[264px]">
-                Verification usually takes 24-48 hours once submitted.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <BottomActions
-          primaryLabel={saving ? 'Submitting…' : 'Submit for Review'}
-          primaryDisabled={saving}
-          onPrimary={() => handleSubmitVerification(false)}
-          secondaryLabel="Skip for now"
-          onSecondary={() => handleSubmitVerification(true)}
-        />
       </div>
-    );
-  }
+    </>
+  );
+}
 
-  // ------------------------------------------------------------------
-  // Step 3 — Your work photos (Figma 1:2999)
-  // ------------------------------------------------------------------
-  if (step === 3) {
-    return (
-      <div className="min-h-screen bg-white flex flex-col">
-        <StepHeader step={4} title="Your work photos" onBack={() => setStep(2)} />
-        <div className="px-5 py-4 flex justify-center">
-          <div className="relative bg-surface rounded-[8px] w-full max-w-[353px] aspect-square">
-            {photoCount === 0 ? (
-              <div className="absolute left-1/2 -translate-x-1/2 top-[72px]">
-                <ImageIcon className="w-[58px] h-[52px] text-[#c9c6da]" />
-              </div>
-            ) : (
-              <div className="absolute left-0 right-0 top-[24px] px-5 grid grid-cols-3 gap-2">
-                {photos.slice(0, 6).map((photo) => (
-                  <img
-                    key={photo.id}
-                    src={photo.url}
-                    alt=""
-                    className="w-full aspect-square object-cover rounded-[8px]"
-                  />
-                ))}
-              </div>
-            )}
-            <div className="absolute left-0 right-0 top-[161px] flex flex-col gap-1 items-center justify-center text-center">
-              {photoCount === 0 ? (
-                <>
-                  <p className="text-sm font-semibold leading-5 text-black">No photos added yet</p>
-                  <p className="text-[10px] font-semibold leading-[14px] text-muted">
-                    Showcase your best projects to stand out
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm font-semibold leading-5 text-black">
-                  {photoCount} photo{photoCount === 1 ? '' : 's'} uploaded
-                </p>
-              )}
-              {photoError && (
-                <p className="text-[10px] font-semibold leading-[14px] text-red-600 px-6">{photoError}</p>
-              )}
-            </div>
-            <input
-              ref={photoInputRef}
-              type="file"
-              multiple
-              accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
-              className="hidden"
-              onChange={handlePhotoSelect}
-            />
-            <button
-              type="button"
-              disabled={uploadingPhotos}
-              onClick={() => photoInputRef.current?.click()}
-              className="absolute left-1/2 -translate-x-1/2 top-[232px] bg-ink text-white rounded-pill px-8 py-4 text-sm font-semibold leading-5 whitespace-nowrap disabled:opacity-60"
-            >
-              {uploadingPhotos ? 'Uploading…' : 'Add to Gallery'}
-            </button>
-          </div>
+/** The instant/request-only pair. */
+function BookingModeCards({ f }: { f: Fields }) {
+  return (
+    <div>
+      <p className="text-xs font-bold leading-4 text-ink mb-2">Booking Mode</p>
+      <div className="grid grid-cols-2 gap-3">
+        <div
+          className={`bg-white rounded-[12px] p-3 cursor-pointer border ${
+            f.bookingMode === 'instant' ? 'border-ink border-2' : 'border-[#d2dbe9] border-[0.75px]'
+          }`}
+          onClick={() => f.setBookingMode('instant')}
+        >
+          <Zap className="w-5 h-5 text-ink mb-1" />
+          <p className="text-xs font-semibold text-ink">Instant</p>
+          <p className="text-[10px] text-muted">Booking Confirmed</p>
         </div>
-        <div className="flex-1" />
-        <BottomActions
-          primaryLabel={saving ? 'Saving…' : 'Continue'}
-          primaryDisabled={saving || uploadingPhotos}
-          onPrimary={() => handleSavePhotos(false)}
-          secondaryLabel="Skip for now"
-          onSecondary={() => handleSavePhotos(true)}
-        />
-      </div>
-    );
-  }
-
-  // ------------------------------------------------------------------
-  // Step 4 — Services (Figma 1:3033; reuses BarberServices logic/UI)
-  // ------------------------------------------------------------------
-  if (step === 4) {
-    return (
-      <div className="min-h-screen bg-white pb-40 relative">
-        <StepHeader step={5} title="Services" onBack={() => setStep(3)} />
-        <BarberServices embedded />
-        <div className="fixed bottom-0 left-0 right-0 bg-white px-5 pb-5 pt-2 max-w-md mx-auto flex flex-col gap-1">
-          <button
-            type="button"
-            onClick={() => goToStep(5)}
-            className="w-full bg-ink text-white rounded-pill px-9 py-[18px] text-sm font-semibold leading-5 text-center"
-          >
-            Go Online
-          </button>
-          <button
-            type="button"
-            onClick={async () => {
-              // Services are saved to the `services` table as they're added
-              // (BarberServices posts each one). This just confirms what the
-              // server actually holds rather than claiming a phantom save.
-              try {
-                const r = await authFetch('/api/barber/services');
-                const mine = r.ok ? await r.json() : [];
-                const n = Array.isArray(mine) ? mine.length : 0;
-                setServicesCount(n);
-                toast.success(`${n} service${n === 1 ? '' : 's'} saved`);
-              } catch (err) {
-        console.error(`[BarberOnboarding] restoring saved onboarding progress failed:`, err);
-                toast.error('Could not confirm saved services');
-              }
-            }}
-            className="w-full rounded-pill px-9 py-[18px] text-sm font-semibold leading-5 text-center text-muted"
-          >
-            Save Changes
-          </button>
+        <div
+          className={`bg-white rounded-[12px] p-3 cursor-pointer border ${
+            f.bookingMode === 'request_only' ? 'border-ink border-2' : 'border-[#d2dbe9] border-[0.75px]'
+          }`}
+          onClick={() => f.setBookingMode('request_only')}
+        >
+          <PhoneCall className="w-5 h-5 text-ink mb-1" />
+          <p className="text-xs font-semibold text-ink">Request Only</p>
+          <p className="text-[10px] text-muted">Approve all clients</p>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
-  // ------------------------------------------------------------------
-  // Step 5 — Where do you work? (Figma 1:3097)
-  // ------------------------------------------------------------------
-  if (step === 5) {
-    return (
-      <div className="min-h-screen bg-white flex flex-col">
-        <StepHeader step={6} title="Where do you work?" onBack={() => setStep(4)} />
-        <div className="px-5 py-4 flex flex-col gap-3">
-          {/* In-shop card */}
-          <div
-            className="bg-white border-[0.75px] border-[#d2dbe9] rounded-[12px] p-3 flex flex-col gap-3 cursor-pointer"
-            onClick={toggleShopMode}
-          >
-            <div className="flex items-start justify-between w-full">
-              <div className="flex gap-3 items-center">
-                <div className="size-[38px] bg-surface-2 rounded-[8px] flex items-center justify-center shrink-0">
-                  <Store className="w-4 h-4 text-ink" />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <p className="text-xs font-semibold leading-4 text-ink">In-shop</p>
-                  <p className="text-[10px] font-semibold leading-[14px] text-muted">
-                    Customers come to your location
-                  </p>
-                </div>
-              </div>
-              <span
-                className={`size-3 rounded-[2px] border border-ink shrink-0 flex items-center justify-center ${
-                  hasShop ? 'bg-ink' : 'bg-white'
-                }`}
-              >
-                {hasShop && <Check className="w-2.5 h-2.5 text-white" />}
-              </span>
-            </div>
-            {hasShop && (
-              <div className="bg-[#fafafa] rounded-[12px] p-3" onClick={(e) => e.stopPropagation()}>
-                <div className="flex flex-col gap-2">
-                  <div className="relative w-full">
-                    <input
-                      placeholder="Shop Address"
-                      value={shopAddress}
-                      onChange={(e) => setShopAddress(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') setAddressSearchNonce((n) => n + 1); }}
-                      className="w-full bg-white border border-[#e5e7eb] rounded-pill pl-4 pr-11 py-4 text-sm font-medium leading-[18px] text-ink placeholder:text-[#848992]"
-                    />
-                    <button type="button" aria-label="Find address on map" onClick={() => setAddressSearchNonce((n) => n + 1)} className="absolute right-4 top-1/2 -translate-y-1/2">
-                      <Crosshair className="w-[18px] h-[18px] text-[#848992]" />
-                    </button>
-                  </div>
-                  <p className="text-[10px] font-semibold leading-[14px] text-muted">
-                    Set precise pin on map
-                  </p>
-                  <ShopLocationMap
-                    latitude={shopLat}
-                    longitude={shopLng}
-                    searchQuery={shopAddress}
-                    searchNonce={addressSearchNonce}
-                    onChange={(lat, lng, address, parts) => {
-                      setShopLat(lat);
-                      setShopLng(lng);
-                      setShopAddress(address);
-                      if (parts?.city) setGeoCity(parts.city);
-                      if (parts?.region) setGeoRegion(parts.region);
-                      if (parts?.country) setGeoCountry(parts.country);
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Come to customer card */}
-          <div
-            className="bg-white border-[0.75px] border-[#d2dbe9] rounded-[12px] p-3 cursor-pointer"
-            onClick={toggleMobileMode}
-          >
-            <div className="flex items-start justify-between w-full">
-              <div className="flex gap-3 items-center">
-                <div className="size-[38px] bg-surface-2 rounded-[8px] flex items-center justify-center shrink-0">
-                  <Car className="w-4 h-4 text-ink" />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <p className="text-xs font-semibold leading-4 text-ink">Come to customer</p>
-                  <p className="text-[10px] font-semibold leading-[14px] text-muted">
-                    You travel to the customer&apos;s site
-                  </p>
-                </div>
-              </div>
-              <span
-                className={`size-3 rounded-[2px] border border-ink shrink-0 flex items-center justify-center ${
-                  hasMobile ? 'bg-ink' : 'bg-white'
-                }`}
-              >
-                {hasMobile && <Check className="w-2.5 h-2.5 text-white" />}
-              </span>
-            </div>
-          </div>
-        </div>
-        <div className="flex-1" />
-        <BottomActions
-          primaryLabel={saving ? 'Saving…' : 'Continue'}
-          primaryDisabled={saving}
-          onPrimary={handleSaveWorkLocation}
-          secondaryLabel="Go Back"
-          onSecondary={() => setStep(4)}
-        />
-      </div>
-    );
-  }
-
-  // ------------------------------------------------------------------
-  // Step 6 — Availability (step 7 of 7; no dedicated Figma frame — styled
-  // to match the onboarding system: StepHeader + bordered cards + pill CTA)
-  // ------------------------------------------------------------------
+/** The two sliders. Grouped together because they are the same control drawn
+ *  twice with different units. */
+function RadiusAndBufferFields({ f }: { f: Fields }) {
   const bufferPresets = [5, 15, 30, 45];
 
   return (
+    <>
+      <div>
+        <div className="flex justify-between items-baseline mb-1">
+          <p className="text-xs font-bold leading-4 text-ink">Service Radius</p>
+          <span className="text-[10px] font-semibold text-muted">{f.radiusKm} km</span>
+        </div>
+        <input
+          type="range"
+          min={1}
+          max={50}
+          value={f.radiusKm}
+          onChange={(e) => f.setRadiusKm(Number(e.target.value))}
+          className="w-full accent-ink"
+        />
+      </div>
+
+      <div>
+        <div className="flex justify-between items-baseline mb-1">
+          <p className="text-xs font-bold leading-4 text-ink">Buffer Time</p>
+          <span className="text-[10px] font-semibold text-muted">{f.bufferMin} min</span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={60}
+          value={f.bufferMin}
+          onChange={(e) => f.setBufferMin(Number(e.target.value))}
+          className="w-full mb-2 accent-ink"
+        />
+        <div className="flex gap-2">
+          {bufferPresets.map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => f.setBufferMin(m)}
+              className={`px-3 py-1 rounded-pill text-xs font-semibold ${
+                f.bufferMin === m ? 'bg-ink text-white' : 'bg-surface text-ink'
+              }`}
+            >
+              {m}m
+            </button>
+          ))}
+        </div>
+        <p className="text-[10px] font-medium leading-[14px] text-muted mt-2">
+          Setting a 15-minute buffer helps you handle travel time or clean-up without running
+          late for the next client.
+        </p>
+      </div>
+    </>
+  );
+}
+
+/** The two red panels: what we can see is missing, and what the server said
+ *  was missing. Kept together because only ever one of them shows. */
+function MissingPanels({ f, liveMissing }: { f: Fields; liveMissing: LiveMissing }) {
+  return (
+    <>
+      {liveMissing.length > 0 && (
+        <div className="rounded-[12px] border border-red-200 bg-red-50 p-4">
+          <p className="text-sm font-semibold text-red-700 mb-1">Missing before you can finish:</p>
+          <ul className="text-xs text-red-600 space-y-1">
+            {liveMissing.map((m) => (
+              <li key={m.key}>
+                <button
+                  type="button"
+                  onClick={() => f.setStep(m.step)}
+                  className="underline underline-offset-2 decoration-red-300 hover:decoration-red-600"
+                >
+                  {m.label} — tap to fix
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {f.missing.length > 0 && liveMissing.length === 0 && (
+        <div className="rounded-[12px] border border-red-200 bg-red-50 p-4">
+          <p className="text-sm font-semibold text-red-700 mb-1">Server rejected the submission:</p>
+          <ul className="text-xs text-red-600 list-disc pl-4 space-y-0.5">
+            {f.missing.map((m) => (
+              <li key={m}>{m}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ------------------------------------------------------------------
+// Step 6 — Availability (step 7 of 7; no dedicated Figma frame — styled
+// to match the onboarding system: StepHeader + bordered cards + pill CTA)
+// ------------------------------------------------------------------
+function StepAvailability({ f, a, liveMissing }: { f: Fields; a: Actions; liveMissing: LiveMissing }) {
+  return (
     <div className="min-h-screen bg-white pb-8">
-      <StepHeader step={7} title="Availability" onBack={() => setStep(5)} />
+      <StepHeader step={7} title="Availability" onBack={() => f.setStep(5)} />
       <div className="px-5 space-y-4">
-        <div className="bg-white border-[0.75px] border-[#d2dbe9] rounded-[12px] p-3 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold leading-4 text-ink">Status: {online ? 'Online' : 'Offline'}</p>
-            <p className="text-[10px] font-semibold leading-[14px] text-muted mt-1">
-              {online ? 'You are visible to customers' : 'You are currently hidden'}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setOnline((v) => !v)}
-            className={`w-12 h-7 rounded-pill transition-colors flex items-center px-1 ${online ? 'bg-ink' : 'bg-border'}`}
-          >
-            <div className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${online ? 'translate-x-5' : 'translate-x-0'}`} />
-          </button>
-        </div>
+        <AvailabilityStatusCard f={f} />
 
-        <div>
-          <p className="text-xs font-bold leading-4 text-ink mb-2">Working Hours</p>
-          <div className="flex gap-3">
-            <div className="relative flex-1">
-              <Clock className="w-4 h-4 text-[#848992] absolute left-4 top-1/2 -translate-y-1/2" />
-              <input
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className="w-full pl-11 pr-3 py-3 bg-white border border-[#e5e7eb] rounded-[8px] text-xs font-medium"
-              />
-            </div>
-            <div className="relative flex-1">
-              <Clock className="w-4 h-4 text-[#848992] absolute left-4 top-1/2 -translate-y-1/2" />
-              <input
-                type="time"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                className="w-full pl-11 pr-3 py-3 bg-white border border-[#e5e7eb] rounded-[8px] text-xs font-medium"
-              />
-            </div>
-          </div>
-        </div>
+        <WorkingHoursFields f={f} />
 
-        <div>
-          <p className="text-xs font-bold leading-4 text-ink mb-2">Active Days</p>
-          <div className="flex justify-between">
-            {DAYS.map((d, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() =>
-                  setActiveDays((prev) => prev.map((v, idx) => (idx === i ? !v : v)))
-                }
-                className={`w-9 h-9 rounded-full text-xs font-bold flex items-center justify-center ${
-                  activeDays[i] ? 'bg-ink text-white' : 'bg-surface text-muted'
-                }`}
-              >
-                {d}
-              </button>
-            ))}
-          </div>
-        </div>
+        <BookingModeCards f={f} />
 
-        <div>
-          <p className="text-xs font-bold leading-4 text-ink mb-2">Booking Mode</p>
-          <div className="grid grid-cols-2 gap-3">
-            <div
-              className={`bg-white rounded-[12px] p-3 cursor-pointer border ${
-                bookingMode === 'instant' ? 'border-ink border-2' : 'border-[#d2dbe9] border-[0.75px]'
-              }`}
-              onClick={() => setBookingMode('instant')}
-            >
-              <Zap className="w-5 h-5 text-ink mb-1" />
-              <p className="text-xs font-semibold text-ink">Instant</p>
-              <p className="text-[10px] text-muted">Booking Confirmed</p>
-            </div>
-            <div
-              className={`bg-white rounded-[12px] p-3 cursor-pointer border ${
-                bookingMode === 'request_only' ? 'border-ink border-2' : 'border-[#d2dbe9] border-[0.75px]'
-              }`}
-              onClick={() => setBookingMode('request_only')}
-            >
-              <PhoneCall className="w-5 h-5 text-ink mb-1" />
-              <p className="text-xs font-semibold text-ink">Request Only</p>
-              <p className="text-[10px] text-muted">Approve all clients</p>
-            </div>
-          </div>
-        </div>
+        <RadiusAndBufferFields f={f} />
 
-        <div>
-          <div className="flex justify-between items-baseline mb-1">
-            <p className="text-xs font-bold leading-4 text-ink">Service Radius</p>
-            <span className="text-[10px] font-semibold text-muted">{radiusKm} km</span>
-          </div>
-          <input
-            type="range"
-            min={1}
-            max={50}
-            value={radiusKm}
-            onChange={(e) => setRadiusKm(Number(e.target.value))}
-            className="w-full accent-ink"
-          />
-        </div>
-
-        <div>
-          <div className="flex justify-between items-baseline mb-1">
-            <p className="text-xs font-bold leading-4 text-ink">Buffer Time</p>
-            <span className="text-[10px] font-semibold text-muted">{bufferMin} min</span>
-          </div>
-          <input
-            type="range"
-            min={0}
-            max={60}
-            value={bufferMin}
-            onChange={(e) => setBufferMin(Number(e.target.value))}
-            className="w-full mb-2 accent-ink"
-          />
-          <div className="flex gap-2">
-            {bufferPresets.map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setBufferMin(m)}
-                className={`px-3 py-1 rounded-pill text-xs font-semibold ${
-                  bufferMin === m ? 'bg-ink text-white' : 'bg-surface text-ink'
-                }`}
-              >
-                {m}m
-              </button>
-            ))}
-          </div>
-          <p className="text-[10px] font-medium leading-[14px] text-muted mt-2">
-            Setting a 15-minute buffer helps you handle travel time or clean-up without running
-            late for the next client.
-          </p>
-        </div>
-
-        {liveMissing.length > 0 && (
-          <div className="rounded-[12px] border border-red-200 bg-red-50 p-4">
-            <p className="text-sm font-semibold text-red-700 mb-1">Missing before you can finish:</p>
-            <ul className="text-xs text-red-600 space-y-1">
-              {liveMissing.map((m) => (
-                <li key={m.key}>
-                  <button
-                    type="button"
-                    onClick={() => setStep(m.step)}
-                    className="underline underline-offset-2 decoration-red-300 hover:decoration-red-600"
-                  >
-                    {m.label} — tap to fix
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {missing.length > 0 && liveMissing.length === 0 && (
-          <div className="rounded-[12px] border border-red-200 bg-red-50 p-4">
-            <p className="text-sm font-semibold text-red-700 mb-1">Server rejected the submission:</p>
-            <ul className="text-xs text-red-600 list-disc pl-4 space-y-0.5">
-              {missing.map((m) => (
-                <li key={m}>{m}</li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <MissingPanels f={f} liveMissing={liveMissing} />
 
         <button
           type="button"
-          disabled={saving || servicesCount === null || liveMissing.length > 0}
-          onClick={handleFinishSetup}
+          disabled={f.saving || f.servicesCount === null || liveMissing.length > 0}
+          onClick={a.handleFinishSetup}
           className="w-full bg-ink text-white rounded-pill px-9 py-[18px] text-sm font-semibold leading-5 text-center disabled:opacity-50"
         >
-          {saving
+          {f.saving
             ? 'Finishing…'
-            : servicesCount === null
+            : f.servicesCount === null
             ? 'Checking your setup…'
             : liveMissing.length > 0
             ? `Complete ${liveMissing.length} more step${liveMissing.length > 1 ? 's' : ''} to finish`
@@ -1229,4 +1391,37 @@ export default function BarberOnboarding() {
       </div>
     </div>
   );
+}
+
+export default function BarberOnboarding() {
+  const { user, setUser } = useAuthStore();
+  const f: Fields = {
+    ...useProfileFields(user),
+    ...useLocationFields(),
+    ...useAvailabilityFields(),
+  };
+
+  useOnboardingHydration(f, user);
+  useOnboardingStepEffects(f);
+
+  const a: Actions = {
+    ...useMediaActions(f, user, setUser),
+    ...useStepActions(f),
+    ...useFinishActions(f, user, setUser),
+  };
+
+  const liveMissing = useLiveMissing(f);
+
+  if (f.submitted) {
+    return <BarberPendingVerification />;
+  }
+
+  if (f.step === 0) return <StepIntro goToStep={a.goToStep} />;
+  if (f.step === 1) return <StepProfile f={f} a={a} />;
+  if (f.step === 2) return <StepVerification f={f} a={a} />;
+  if (f.step === 3) return <StepWorkPhotos f={f} a={a} />;
+  if (f.step === 4) return <StepServices f={f} a={a} />;
+  if (f.step === 5) return <StepWorkLocation f={f} a={a} />;
+
+  return <StepAvailability f={f} a={a} liveMissing={liveMissing} />;
 }

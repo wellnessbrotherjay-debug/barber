@@ -18,6 +18,53 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>;
 
+// The brand block at the top of the card carries no state, so it stands alone.
+function LoginHeader() {
+  return (
+    <div className="text-center space-y-2">
+      <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto shadow-lg shadow-black/10 mb-4">
+        <ShorterMark tone="light" className="w-9" />
+      </div>
+      <h1 className="text-3xl font-bold tracking-tight">Welcome to Shorter</h1>
+      <p className="text-neutral-500">Get a hair cut, wherever, whenever</p>
+    </div>
+  );
+}
+
+// The customer/barber switch is a small control over a single piece of state, so
+// it is clearer as its own named component than as two near-identical buttons
+// in the middle of the page.
+function RoleToggle({
+  role,
+  onSelect,
+}: {
+  role: 'customer' | 'barber';
+  onSelect: (r: 'customer' | 'barber') => void;
+}) {
+  return (
+    <div className="flex p-1 bg-stone-100 rounded-2xl">
+      <button
+        onClick={() => onSelect('customer')}
+        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${
+          role === 'customer' ? 'bg-white shadow-sm text-primary' : 'text-neutral-500'
+        }`}
+      >
+        <UserIcon className="w-4 h-4" />
+        Customer
+      </button>
+      <button
+        onClick={() => onSelect('barber')}
+        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${
+          role === 'barber' ? 'bg-white shadow-sm text-primary' : 'text-neutral-500'
+        }`}
+      >
+        <Scissors className="w-4 h-4" />
+        Barber
+      </button>
+    </div>
+  );
+}
+
 export default function Login() {
   const navigate = useNavigate();
   const { setUser, setSession, setLoading } = useAuthStore();
@@ -69,35 +116,10 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-stone-50 p-4">
       <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-[2.5rem] shadow-xl shadow-black/5 border border-stone-100">
-        <div className="text-center space-y-2">
-          <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto shadow-lg shadow-black/10 mb-4">
-            <ShorterMark tone="light" className="w-9" />
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight">Welcome to Shorter</h1>
-          <p className="text-neutral-500">Get a hair cut, wherever, whenever</p>
-        </div>
+        <LoginHeader />
 
         {/* Role Toggle */}
-        <div className="flex p-1 bg-stone-100 rounded-2xl">
-          <button
-            onClick={() => setRole('customer')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${
-              role === 'customer' ? 'bg-white shadow-sm text-primary' : 'text-neutral-500'
-            }`}
-          >
-            <UserIcon className="w-4 h-4" />
-            Customer
-          </button>
-          <button
-            onClick={() => setRole('barber')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${
-              role === 'barber' ? 'bg-white shadow-sm text-primary' : 'text-neutral-500'
-            }`}
-          >
-            <Scissors className="w-4 h-4" />
-            Barber
-          </button>
-        </div>
+        <RoleToggle role={role} onSelect={setRole} />
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
           <div className="space-y-4">

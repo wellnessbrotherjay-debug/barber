@@ -80,26 +80,15 @@ function statusBadge(status: string) {
   );
 }
 
-export function AdminDashboard() {
-  const navigate = useNavigate();
-  const [view, setView] = useState<View>('dashboard');
-  const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
-
+// The overview figures load once on mount, whereas the two list views load lazily
+// when you switch to them. Keeping those two jobs apart is what lets the screen
+// component below stay short enough to read in one go.
+function useDashboardOverviewData() {
   // Dashboard
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [revenue, setRevenue] = useState<RevenueData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
-  // Companies
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [companiesLoading, setCompaniesLoading] = useState(false);
-  const [companiesError, setCompaniesError] = useState('');
-
-  // Cross-platform bookings
-  const [allBookings, setAllBookings] = useState<CrossPlatformBooking[]>([]);
-  const [bookingsLoading, setBookingsLoading] = useState(false);
-  const [bookingsError, setBookingsError] = useState('');
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -120,6 +109,24 @@ export function AdminDashboard() {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  return { stats, revenue, loading, error };
+}
+
+function useAdminListData(view: View) {
+  // Companies
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [companiesLoading, setCompaniesLoading] = useState(false);
+  const [companiesError, setCompaniesError] = useState('');
+
+  // Cross-platform bookings
+  const [allBookings, setAllBookings] = useState<CrossPlatformBooking[]>([]);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
+  const [bookingsError, setBookingsError] = useState('');
 
   const fetchCompanies = useCallback(async () => {
     try {
@@ -159,48 +166,341 @@ export function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
-
-  useEffect(() => {
     if (view === 'companies') fetchCompanies();
     if (view === 'bookings') fetchAllBookings();
   }, [view, fetchCompanies, fetchAllBookings]);
 
-  function openCompany(id: number) {
-    setSelectedCompanyId(id);
-    setView('company-detail');
-  }
+  return {
+    companies, companiesLoading, companiesError,
+    allBookings, bookingsLoading, bookingsError,
+  };
+}
 
-  const NavBar = (
+// The top navigation is a self-contained control: it only needs the current view
+// and the two things a click can do.
+function AdminNavBar({
+  view, onSelectView, onGoHome,
+}: { view: View; onSelectView: (next: View) => void; onGoHome: () => void }) {
+  return (
     <div className="flex items-center gap-2 mb-8 flex-wrap">
       <Button
         variant={view === 'dashboard' ? 'primary' : 'secondary'}
         size="sm"
-        onClick={() => setView('dashboard')}
+        onClick={() => onSelectView('dashboard')}
       >
         <TrendingUp className="w-4 h-4" /> Overview
       </Button>
       <Button
         variant={view === 'companies' || view === 'company-detail' ? 'primary' : 'secondary'}
         size="sm"
-        onClick={() => setView('companies')}
+        onClick={() => onSelectView('companies')}
       >
         <Building2 className="w-4 h-4" /> Companies
       </Button>
       <Button
         variant={view === 'bookings' ? 'primary' : 'secondary'}
         size="sm"
-        onClick={() => setView('bookings')}
+        onClick={() => onSelectView('bookings')}
       >
         <CalendarClock className="w-4 h-4" /> All Bookings
       </Button>
       <div className="flex-1" />
-      <Button variant="secondary" size="sm" onClick={() => navigate('/')}>
+      <Button variant="secondary" size="sm" onClick={onGoHome}>
         ← Back to Home
       </Button>
     </div>
   );
+}
+
+// The dashboard failure banner is a distinct thing from the dashboard content, so
+// it is kept separate from the cards it appears above.
+function DashboardErrorCard({ error }: { error: string }) {
+  return (
+    <Card className="mb-6 border-l-4 border-red-500 bg-red-50">
+      <div className="flex items-start gap-3">
+        <AlertCircle className="w-5 h-5 text-red-500 mt-1 flex-shrink-0" />
+        <div>
+          <p className="font-semibold text-red-900">Error loading dashboard</p>
+          <p className="text-red-700">{error}</p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// The two stat rows are separate components because they are separate grids with
+// different column counts, shown as two distinct bands on the page.
+function PlatformStatCards({ stats }: { stats: DashboardStats }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+      <Card className="bg-white border border-[#d4d2e3]">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[#a09cab] text-sm mb-1">Active Companies</p>
+            <p className="text-3xl font-bold text-[#1c1b1f]">{stats.active_companies}</p>
+          </div>
+          <Users className="w-10 h-10 text-[#C8A96A]" />
+        </div>
+      </Card>
+
+      <Card className="bg-white border border-[#d4d2e3]">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[#a09cab] text-sm mb-1">Suspended</p>
+            <p className="text-3xl font-bold text-[#1c1b1f]">{stats.suspended_companies}</p>
+          </div>
+          <AlertCircle className="w-10 h-10 text-orange-500" />
+        </div>
+      </Card>
+
+      <Card className="bg-white border border-[#d4d2e3]">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[#a09cab] text-sm mb-1">Total Companies</p>
+            <p className="text-3xl font-bold text-[#1c1b1f]">{stats.total_companies}</p>
+          </div>
+          <Building2 className="w-10 h-10 text-blue-500" />
+        </div>
+      </Card>
+
+      <Card className="bg-white border border-[#d4d2e3]">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[#a09cab] text-sm mb-1">Total Barber Slots</p>
+            <p className="text-3xl font-bold text-[#1c1b1f]">{stats.total_max_barbers || 0}</p>
+          </div>
+          <Users className="w-10 h-10 text-emerald-500" />
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function RealTotalsCards({ stats }: { stats: DashboardStats }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+      <Card className="bg-white border border-[#d4d2e3]">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[#a09cab] text-sm mb-1">Total Real Bookings (all tenants)</p>
+            <p className="text-3xl font-bold text-[#1c1b1f]">{stats.total_bookings}</p>
+          </div>
+          <CalendarClock className="w-10 h-10 text-[#C8A96A]" />
+        </div>
+      </Card>
+      <Card className="bg-white border border-[#d4d2e3]">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[#a09cab] text-sm mb-1">Total Real Revenue (paid, all tenants)</p>
+            <p className="text-3xl font-bold text-[#1c1b1f]">{money(stats.total_revenue)}</p>
+          </div>
+          <DollarSign className="w-10 h-10 text-emerald-500" />
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// The chart carries a lot of configuration that has nothing to do with the rest of
+// the page, so it lives on its own.
+function RevenueTrendCard({ revenue }: { revenue: RevenueData[] }) {
+  return (
+    <Card className="mb-8 bg-white border border-[#d4d2e3]">
+      <div className="mb-6">
+        <h2 className="text-xl font-bold text-[#1c1b1f] flex items-center gap-2">
+          <DollarSign className="w-5 h-5 text-[#C8A96A]" />
+          30-Day Revenue Trend (real, computed from tenant bookings)
+        </h2>
+      </div>
+
+      {revenue.length > 0 ? (
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={revenue}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#d4d2e3" />
+            <XAxis dataKey="date" stroke="#a09cab" />
+            <YAxis stroke="#a09cab" />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: '#f2f1fa',
+                border: '1px solid #d4d2e3',
+                borderRadius: '8px',
+              }}
+            />
+            <Legend />
+            <Line
+              type="monotone"
+              dataKey="revenue"
+              stroke="#C8A96A"
+              strokeWidth={2}
+              dot={{ fill: '#C8A96A' }}
+              name="Revenue ($)"
+            />
+            <Line
+              type="monotone"
+              dataKey="bookings"
+              stroke="#10b981"
+              strokeWidth={2}
+              dot={{ fill: '#10b981' }}
+              name="Bookings"
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      ) : (
+        <div className="h-80 flex flex-col items-center justify-center text-[#a09cab] gap-2">
+          <CalendarClock className="w-10 h-10" />
+          <p>No revenue data yet — no paid bookings in the last 30 days across any tenant.</p>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// The overview view is the error banner, two stat bands and the chart, in order.
+function DashboardOverview({
+  stats, revenue, error,
+}: { stats: DashboardStats | null; revenue: RevenueData[]; error: string }) {
+  return (
+    <>
+      {error && <DashboardErrorCard error={error} />}
+
+      {stats && <PlatformStatCards stats={stats} />}
+
+      {stats && <RealTotalsCards stats={stats} />}
+
+      <RevenueTrendCard revenue={revenue} />
+    </>
+  );
+}
+
+// The companies view is a single card with its own loading and error states.
+function CompaniesCard({
+  companies, loading, error, onOpenCompany,
+}: { companies: Company[]; loading: boolean; error: string; onOpenCompany: (id: number) => void }) {
+  return (
+    <Card className="bg-white border border-[#d4d2e3]">
+      <h2 className="text-xl font-bold text-[#1c1b1f] mb-4 flex items-center gap-2">
+        <Building2 className="w-5 h-5 text-[#C8A96A]" /> Companies
+      </h2>
+      {error && <p className="text-red-700 mb-4">{error}</p>}
+      {loading ? (
+        <p className="text-[#a09cab]">Loading companies...</p>
+      ) : companies.length === 0 ? (
+        <p className="text-[#a09cab]">No companies yet.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[#a09cab] border-b border-[#d4d2e3]">
+                <th className="py-2 pr-4">Name</th>
+                <th className="py-2 pr-4">Owner Email</th>
+                <th className="py-2 pr-4">Tier</th>
+                <th className="py-2 pr-4">Status</th>
+                <th className="py-2 pr-4">Max Barbers</th>
+                <th className="py-2 pr-4">Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {companies.map((c) => (
+                <tr
+                  key={c.id}
+                  className="border-b border-[#f2f1fa] hover:bg-[#f2f1fa] cursor-pointer"
+                  onClick={() => onOpenCompany(c.id)}
+                >
+                  <td className="py-3 pr-4 font-semibold text-[#1c1b1f]">{c.name}</td>
+                  <td className="py-3 pr-4 text-[#1c1b1f]">{c.owner_email}</td>
+                  <td className="py-3 pr-4">
+                    <Badge variant="outline">{c.subscription_tier}</Badge>
+                  </td>
+                  <td className="py-3 pr-4">{statusBadge(c.status)}</td>
+                  <td className="py-3 pr-4 text-[#1c1b1f]">{c.max_barbers}</td>
+                  <td className="py-3 pr-4 text-[#a09cab]">
+                    {c.created_at ? new Date(c.created_at).toLocaleDateString() : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// The cross-tenant bookings view is a separate card from the companies one: a
+// different payload, different columns, and it is reached from a different tab.
+function AllBookingsCard({
+  bookings, loading, error, onOpenCompany,
+}: { bookings: CrossPlatformBooking[]; loading: boolean; error: string; onOpenCompany: (id: number) => void }) {
+  return (
+    <Card className="bg-white border border-[#d4d2e3]">
+      <h2 className="text-xl font-bold text-[#1c1b1f] mb-4 flex items-center gap-2">
+        <CalendarClock className="w-5 h-5 text-[#C8A96A]" /> All Bookings (across every tenant)
+      </h2>
+      {error && <p className="text-red-700 mb-4">{error}</p>}
+      {loading ? (
+        <p className="text-[#a09cab]">Loading bookings...</p>
+      ) : bookings.length === 0 ? (
+        <p className="text-[#a09cab]">No bookings yet across any tenant.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[#a09cab] border-b border-[#d4d2e3]">
+                <th className="py-2 pr-4">Company</th>
+                <th className="py-2 pr-4">Reference</th>
+                <th className="py-2 pr-4">Date</th>
+                <th className="py-2 pr-4">Barber</th>
+                <th className="py-2 pr-4">Service</th>
+                <th className="py-2 pr-4">Status</th>
+                <th className="py-2 pr-4">Payment</th>
+                <th className="py-2 pr-4">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {bookings.map((b) => (
+                <tr
+                  key={`${b.company_id}-${b.id}`}
+                  className="border-b border-[#f2f1fa] hover:bg-[#f2f1fa] cursor-pointer"
+                  onClick={() => onOpenCompany(b.company_id)}
+                >
+                  <td className="py-3 pr-4 font-semibold text-[#1c1b1f]">{b.company_name}</td>
+                  <td className="py-3 pr-4 font-mono text-xs text-[#1c1b1f]">{b.booking_reference}</td>
+                  <td className="py-3 pr-4 text-[#1c1b1f]">
+                    {b.booking_date} {b.start_time}
+                  </td>
+                  <td className="py-3 pr-4 text-[#1c1b1f]">{b.barber_name}</td>
+                  <td className="py-3 pr-4 text-[#1c1b1f]">{b.service_name}</td>
+                  <td className="py-3 pr-4">
+                    <Badge variant="outline">{b.status}</Badge>
+                  </td>
+                  <td className="py-3 pr-4">
+                    <Badge variant={b.payment_status === 'paid' ? 'success' : 'warning'}>
+                      {b.payment_status}
+                    </Badge>
+                  </td>
+                  <td className="py-3 pr-4 text-[#1c1b1f]">{money(b.total_amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+export function AdminDashboard() {
+  const navigate = useNavigate();
+  const [view, setView] = useState<View>('dashboard');
+  const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
+
+  const { stats, revenue, loading, error } = useDashboardOverviewData();
+  const lists = useAdminListData(view);
+
+  function openCompany(id: number) {
+    setSelectedCompanyId(id);
+    setView('company-detail');
+  }
 
   if (loading && view === 'dashboard') {
     return (
@@ -221,186 +521,19 @@ export function AdminDashboard() {
           <p className="text-[#a09cab]">Manage all barber companies and monitor platform performance</p>
         </div>
 
-        {NavBar}
+        <AdminNavBar view={view} onSelectView={(next) => setView(next)} onGoHome={() => navigate('/')} />
 
         {view === 'dashboard' && (
-          <>
-            {error && (
-              <Card className="mb-6 border-l-4 border-red-500 bg-red-50">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-red-500 mt-1 flex-shrink-0" />
-                  <div>
-                    <p className="font-semibold text-red-900">Error loading dashboard</p>
-                    <p className="text-red-700">{error}</p>
-                  </div>
-                </div>
-              </Card>
-            )}
-
-            {stats && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                <Card className="bg-white border border-[#d4d2e3]">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[#a09cab] text-sm mb-1">Active Companies</p>
-                      <p className="text-3xl font-bold text-[#1c1b1f]">{stats.active_companies}</p>
-                    </div>
-                    <Users className="w-10 h-10 text-[#C8A96A]" />
-                  </div>
-                </Card>
-
-                <Card className="bg-white border border-[#d4d2e3]">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[#a09cab] text-sm mb-1">Suspended</p>
-                      <p className="text-3xl font-bold text-[#1c1b1f]">{stats.suspended_companies}</p>
-                    </div>
-                    <AlertCircle className="w-10 h-10 text-orange-500" />
-                  </div>
-                </Card>
-
-                <Card className="bg-white border border-[#d4d2e3]">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[#a09cab] text-sm mb-1">Total Companies</p>
-                      <p className="text-3xl font-bold text-[#1c1b1f]">{stats.total_companies}</p>
-                    </div>
-                    <Building2 className="w-10 h-10 text-blue-500" />
-                  </div>
-                </Card>
-
-                <Card className="bg-white border border-[#d4d2e3]">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[#a09cab] text-sm mb-1">Total Barber Slots</p>
-                      <p className="text-3xl font-bold text-[#1c1b1f]">{stats.total_max_barbers || 0}</p>
-                    </div>
-                    <Users className="w-10 h-10 text-emerald-500" />
-                  </div>
-                </Card>
-              </div>
-            )}
-
-            {stats && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                <Card className="bg-white border border-[#d4d2e3]">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[#a09cab] text-sm mb-1">Total Real Bookings (all tenants)</p>
-                      <p className="text-3xl font-bold text-[#1c1b1f]">{stats.total_bookings}</p>
-                    </div>
-                    <CalendarClock className="w-10 h-10 text-[#C8A96A]" />
-                  </div>
-                </Card>
-                <Card className="bg-white border border-[#d4d2e3]">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[#a09cab] text-sm mb-1">Total Real Revenue (paid, all tenants)</p>
-                      <p className="text-3xl font-bold text-[#1c1b1f]">{money(stats.total_revenue)}</p>
-                    </div>
-                    <DollarSign className="w-10 h-10 text-emerald-500" />
-                  </div>
-                </Card>
-              </div>
-            )}
-
-            <Card className="mb-8 bg-white border border-[#d4d2e3]">
-              <div className="mb-6">
-                <h2 className="text-xl font-bold text-[#1c1b1f] flex items-center gap-2">
-                  <DollarSign className="w-5 h-5 text-[#C8A96A]" />
-                  30-Day Revenue Trend (real, computed from tenant bookings)
-                </h2>
-              </div>
-
-              {revenue.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={revenue}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#d4d2e3" />
-                    <XAxis dataKey="date" stroke="#a09cab" />
-                    <YAxis stroke="#a09cab" />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#f2f1fa',
-                        border: '1px solid #d4d2e3',
-                        borderRadius: '8px',
-                      }}
-                    />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="revenue"
-                      stroke="#C8A96A"
-                      strokeWidth={2}
-                      dot={{ fill: '#C8A96A' }}
-                      name="Revenue ($)"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="bookings"
-                      stroke="#10b981"
-                      strokeWidth={2}
-                      dot={{ fill: '#10b981' }}
-                      name="Bookings"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-80 flex flex-col items-center justify-center text-[#a09cab] gap-2">
-                  <CalendarClock className="w-10 h-10" />
-                  <p>No revenue data yet — no paid bookings in the last 30 days across any tenant.</p>
-                </div>
-              )}
-            </Card>
-          </>
+          <DashboardOverview stats={stats} revenue={revenue} error={error} />
         )}
 
         {view === 'companies' && (
-          <Card className="bg-white border border-[#d4d2e3]">
-            <h2 className="text-xl font-bold text-[#1c1b1f] mb-4 flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-[#C8A96A]" /> Companies
-            </h2>
-            {companiesError && <p className="text-red-700 mb-4">{companiesError}</p>}
-            {companiesLoading ? (
-              <p className="text-[#a09cab]">Loading companies...</p>
-            ) : companies.length === 0 ? (
-              <p className="text-[#a09cab]">No companies yet.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-[#a09cab] border-b border-[#d4d2e3]">
-                      <th className="py-2 pr-4">Name</th>
-                      <th className="py-2 pr-4">Owner Email</th>
-                      <th className="py-2 pr-4">Tier</th>
-                      <th className="py-2 pr-4">Status</th>
-                      <th className="py-2 pr-4">Max Barbers</th>
-                      <th className="py-2 pr-4">Created</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {companies.map((c) => (
-                      <tr
-                        key={c.id}
-                        className="border-b border-[#f2f1fa] hover:bg-[#f2f1fa] cursor-pointer"
-                        onClick={() => openCompany(c.id)}
-                      >
-                        <td className="py-3 pr-4 font-semibold text-[#1c1b1f]">{c.name}</td>
-                        <td className="py-3 pr-4 text-[#1c1b1f]">{c.owner_email}</td>
-                        <td className="py-3 pr-4">
-                          <Badge variant="outline">{c.subscription_tier}</Badge>
-                        </td>
-                        <td className="py-3 pr-4">{statusBadge(c.status)}</td>
-                        <td className="py-3 pr-4 text-[#1c1b1f]">{c.max_barbers}</td>
-                        <td className="py-3 pr-4 text-[#a09cab]">
-                          {c.created_at ? new Date(c.created_at).toLocaleDateString() : '—'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Card>
+          <CompaniesCard
+            companies={lists.companies}
+            loading={lists.companiesLoading}
+            error={lists.companiesError}
+            onOpenCompany={openCompany}
+          />
         )}
 
         {view === 'company-detail' && selectedCompanyId && (
@@ -408,60 +541,12 @@ export function AdminDashboard() {
         )}
 
         {view === 'bookings' && (
-          <Card className="bg-white border border-[#d4d2e3]">
-            <h2 className="text-xl font-bold text-[#1c1b1f] mb-4 flex items-center gap-2">
-              <CalendarClock className="w-5 h-5 text-[#C8A96A]" /> All Bookings (across every tenant)
-            </h2>
-            {bookingsError && <p className="text-red-700 mb-4">{bookingsError}</p>}
-            {bookingsLoading ? (
-              <p className="text-[#a09cab]">Loading bookings...</p>
-            ) : allBookings.length === 0 ? (
-              <p className="text-[#a09cab]">No bookings yet across any tenant.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-[#a09cab] border-b border-[#d4d2e3]">
-                      <th className="py-2 pr-4">Company</th>
-                      <th className="py-2 pr-4">Reference</th>
-                      <th className="py-2 pr-4">Date</th>
-                      <th className="py-2 pr-4">Barber</th>
-                      <th className="py-2 pr-4">Service</th>
-                      <th className="py-2 pr-4">Status</th>
-                      <th className="py-2 pr-4">Payment</th>
-                      <th className="py-2 pr-4">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {allBookings.map((b) => (
-                      <tr
-                        key={`${b.company_id}-${b.id}`}
-                        className="border-b border-[#f2f1fa] hover:bg-[#f2f1fa] cursor-pointer"
-                        onClick={() => openCompany(b.company_id)}
-                      >
-                        <td className="py-3 pr-4 font-semibold text-[#1c1b1f]">{b.company_name}</td>
-                        <td className="py-3 pr-4 font-mono text-xs text-[#1c1b1f]">{b.booking_reference}</td>
-                        <td className="py-3 pr-4 text-[#1c1b1f]">
-                          {b.booking_date} {b.start_time}
-                        </td>
-                        <td className="py-3 pr-4 text-[#1c1b1f]">{b.barber_name}</td>
-                        <td className="py-3 pr-4 text-[#1c1b1f]">{b.service_name}</td>
-                        <td className="py-3 pr-4">
-                          <Badge variant="outline">{b.status}</Badge>
-                        </td>
-                        <td className="py-3 pr-4">
-                          <Badge variant={b.payment_status === 'paid' ? 'success' : 'warning'}>
-                            {b.payment_status}
-                          </Badge>
-                        </td>
-                        <td className="py-3 pr-4 text-[#1c1b1f]">{money(b.total_amount)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Card>
+          <AllBookingsCard
+            bookings={lists.allBookings}
+            loading={lists.bookingsLoading}
+            error={lists.bookingsError}
+            onOpenCompany={openCompany}
+          />
         )}
       </div>
     </div>

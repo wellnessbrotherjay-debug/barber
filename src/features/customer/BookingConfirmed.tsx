@@ -39,6 +39,55 @@ function formatBookingTime(value: string): string {
   return `${display}:${m ?? '00'} ${suffix}`;
 }
 
+// Chat & call v1 (SCOPE_RECONCILIATION §5): honour the Figma promise
+// by opening the device's native SMS composer / dialler with the
+// barber's number, which the API only reveals after acceptance. If
+// the barber has no phone on file, the buttons stay disabled.
+//
+// These two buttons are their own component because each has an enabled and a
+// disabled form, which is four blocks of markup the screen does not need to
+// carry itself.
+function ContactButtons({ phone }: { phone?: string | null }) {
+  return (
+    <div className="flex flex-col gap-3">
+      {phone ? (
+        <a
+          href={`sms:${phone}`}
+          className="w-full flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full py-4 text-[15px] font-semibold text-ink"
+        >
+          <MessageCircle className="w-5 h-5" strokeWidth={1.8} /> Chat
+        </a>
+      ) : (
+        <button
+          type="button"
+          disabled
+          title="Chat unlocks when your barber's number is available"
+          className="w-full flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full py-4 text-[15px] font-semibold text-ink opacity-60"
+        >
+          <MessageCircle className="w-5 h-5" strokeWidth={1.8} /> Chat
+        </button>
+      )}
+      {phone ? (
+        <a
+          href={`tel:${phone}`}
+          className="w-full flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full py-4 text-[15px] font-semibold text-ink"
+        >
+          <Phone className="w-5 h-5" strokeWidth={1.8} /> Call
+        </a>
+      ) : (
+        <button
+          type="button"
+          disabled
+          title="Call unlocks when your barber's number is available"
+          className="w-full flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full py-4 text-[15px] font-semibold text-ink opacity-60"
+        >
+          <Phone className="w-5 h-5" strokeWidth={1.8} /> Call
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function BookingConfirmed() {
   const { id: bookingId } = useParams();
   const navigate = useNavigate();
@@ -126,46 +175,7 @@ export default function BookingConfirmed() {
           </p>
         </Card>
 
-        {/* Chat & call v1 (SCOPE_RECONCILIATION §5): honour the Figma promise
-            by opening the device's native SMS composer / dialler with the
-            barber's number, which the API only reveals after acceptance. If
-            the barber has no phone on file, the buttons stay disabled. */}
-        <div className="flex flex-col gap-3">
-          {booking?.barber_phone ? (
-            <a
-              href={`sms:${booking.barber_phone}`}
-              className="w-full flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full py-4 text-[15px] font-semibold text-ink"
-            >
-              <MessageCircle className="w-5 h-5" strokeWidth={1.8} /> Chat
-            </a>
-          ) : (
-            <button
-              type="button"
-              disabled
-              title="Chat unlocks when your barber's number is available"
-              className="w-full flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full py-4 text-[15px] font-semibold text-ink opacity-60"
-            >
-              <MessageCircle className="w-5 h-5" strokeWidth={1.8} /> Chat
-            </button>
-          )}
-          {booking?.barber_phone ? (
-            <a
-              href={`tel:${booking.barber_phone}`}
-              className="w-full flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full py-4 text-[15px] font-semibold text-ink"
-            >
-              <Phone className="w-5 h-5" strokeWidth={1.8} /> Call
-            </a>
-          ) : (
-            <button
-              type="button"
-              disabled
-              title="Call unlocks when your barber's number is available"
-              className="w-full flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-full py-4 text-[15px] font-semibold text-ink opacity-60"
-            >
-              <Phone className="w-5 h-5" strokeWidth={1.8} /> Call
-            </button>
-          )}
-        </div>
+        <ContactButtons phone={booking?.barber_phone} />
       </div>
     </div>
   );

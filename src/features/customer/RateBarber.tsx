@@ -24,6 +24,111 @@ const TAGS = [
   { label: 'Clean Tools', icon: Sparkles },
 ] as const;
 
+// The header is pulled out because the only thing it varies on is the
+// appointment time, so it reads better as one named piece.
+function RateHeader({ startTime }: { startTime?: string }) {
+  return (
+    <>
+      {/* Figma 1:139 header: 100px image placeholder, title 18px, subtitle 12px */}
+      <div className="flex flex-col items-center px-4 pt-[56px]">
+        <div className="w-[100px] h-[100px] rounded-[8px] bg-surface flex items-center justify-center">
+          <ImageIcon className="w-[41px] h-[38px] text-muted" />
+        </div>
+      </div>
+
+      <div className="flex flex-col items-center gap-1 px-5 pt-4">
+        <h1 className="text-[18px] leading-[24px] font-bold text-ink">Rate your barber</h1>
+        <p className="text-[12px] leading-[16px] font-medium text-muted text-center">
+          How was your appointment{startTime ? ` today at ${formatTime(startTime)}` : ' today'}?
+        </p>
+      </div>
+    </>
+  );
+}
+
+// The star row is its own component because it is a small, self-contained
+// control: it only needs the current rating and a way to report a new one.
+function StarRating({ rating, onRate }: { rating: number; onRate: (n: number) => void }) {
+  return (
+    <div className="flex justify-center gap-1 pt-3 pb-4">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button key={n} type="button" onClick={() => onRate(n)} className="transition-transform hover:scale-110">
+          <Star
+            className={cn(
+              'w-6 h-6 transition-colors',
+              n <= rating ? 'fill-ink text-ink' : 'fill-border text-border',
+            )}
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// The tag chips are separated so the toggle markup for each chip sits in one
+// small place instead of nested three levels deep inside the screen.
+function TagChips({ tags, onToggle }: { tags: string[]; onToggle: (label: string) => void }) {
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-[14px] leading-[20px] font-semibold text-ink">What stood out?</p>
+      <div className="flex flex-wrap gap-[9px]">
+        {TAGS.map(({ label, icon: Icon }) => {
+          const on = tags.includes(label);
+          return (
+            <button
+              key={label}
+              type="button"
+              onClick={() => onToggle(label)}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-2.5 rounded-[8px] text-[12px] leading-[16px] font-semibold transition-colors',
+                on
+                  ? 'bg-ink text-white'
+                  : 'border-[0.75px] border-[#d2dbe9] text-[#514e59] bg-transparent',
+              )}
+            >
+              <Icon className="w-4 h-4" />
+              {label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// The two footer buttons are a distinct block with no state of their own.
+function BottomActions({
+  disabled,
+  submitting,
+  onSubmit,
+  onSkip,
+}: {
+  disabled: boolean;
+  submitting: boolean;
+  onSubmit: () => void;
+  onSkip: () => void;
+}) {
+  return (
+    <div className="px-5 mt-8 flex flex-col gap-1">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onSubmit}
+        className="w-full bg-ink text-white rounded-[999px] px-9 py-[18px] text-[14px] leading-[20px] font-semibold disabled:opacity-50"
+      >
+        {submitting ? 'Submitting…' : 'Submit Rating'}
+      </button>
+      <button
+        type="button"
+        onClick={onSkip}
+        className="w-full px-9 py-[18px] text-[14px] leading-[20px] font-semibold text-muted"
+      >
+        Skip
+      </button>
+    </div>
+  );
+}
+
 export default function RateBarber() {
   const navigate = useNavigate();
   const { id } = useParams(); // booking id
@@ -95,33 +200,10 @@ export default function RateBarber() {
 
   return (
     <div className="min-h-screen bg-white pb-8">
-      {/* Figma 1:139 header: 100px image placeholder, title 18px, subtitle 12px */}
-      <div className="flex flex-col items-center px-4 pt-[56px]">
-        <div className="w-[100px] h-[100px] rounded-[8px] bg-surface flex items-center justify-center">
-          <ImageIcon className="w-[41px] h-[38px] text-muted" />
-        </div>
-      </div>
-
-      <div className="flex flex-col items-center gap-1 px-5 pt-4">
-        <h1 className="text-[18px] leading-[24px] font-bold text-ink">Rate your barber</h1>
-        <p className="text-[12px] leading-[16px] font-medium text-muted text-center">
-          How was your appointment{booking?.start_time ? ` today at ${formatTime(booking.start_time)}` : ' today'}?
-        </p>
-      </div>
+      <RateHeader startTime={booking?.start_time} />
 
       {/* Star Rating — 24px stars, 4px gap (Figma 1:167) */}
-      <div className="flex justify-center gap-1 pt-3 pb-4">
-        {[1, 2, 3, 4, 5].map((n) => (
-          <button key={n} type="button" onClick={() => setRating(n)} className="transition-transform hover:scale-110">
-            <Star
-              className={cn(
-                'w-6 h-6 transition-colors',
-                n <= rating ? 'fill-ink text-ink' : 'fill-border text-border',
-              )}
-            />
-          </button>
-        ))}
-      </div>
+      <StarRating rating={rating} onRate={setRating} />
 
       <div className="px-5 space-y-6">
         {loading && <p className="text-sm text-muted text-center">Loading…</p>}
@@ -129,34 +211,14 @@ export default function RateBarber() {
 
         {/* Figma 1:179 card: bg #fafafa, radius 12, p-4, 24px section gap */}
         <div className="bg-[#fafafa] rounded-[12px] p-4 flex flex-col gap-6">
-          <div className="flex flex-col gap-4">
-            <p className="text-[14px] leading-[20px] font-semibold text-ink">What stood out?</p>
-            <div className="flex flex-wrap gap-[9px]">
-              {TAGS.map(({ label, icon: Icon }) => {
-                const on = tags.includes(label);
-                return (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() =>
-                      setTags((prev) =>
-                        prev.includes(label) ? prev.filter((t) => t !== label) : [...prev, label],
-                      )
-                    }
-                    className={cn(
-                      'flex items-center gap-1.5 px-3 py-2.5 rounded-[8px] text-[12px] leading-[16px] font-semibold transition-colors',
-                      on
-                        ? 'bg-ink text-white'
-                        : 'border-[0.75px] border-[#d2dbe9] text-[#514e59] bg-transparent',
-                    )}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          <TagChips
+            tags={tags}
+            onToggle={(label) =>
+              setTags((prev) =>
+                prev.includes(label) ? prev.filter((t) => t !== label) : [...prev, label],
+              )
+            }
+          />
 
           <div className="flex flex-col gap-4">
             <p className="text-[14px] leading-[20px] font-semibold text-ink">Write a quick review (optional)</p>
@@ -172,23 +234,12 @@ export default function RateBarber() {
       </div>
 
       {/* Bottom actions — pill submit + Skip (Figma 1:212) */}
-      <div className="px-5 mt-8 flex flex-col gap-1">
-        <button
-          type="button"
-          disabled={!rating || !booking || submitting}
-          onClick={handleSubmit}
-          className="w-full bg-ink text-white rounded-[999px] px-9 py-[18px] text-[14px] leading-[20px] font-semibold disabled:opacity-50"
-        >
-          {submitting ? 'Submitting…' : 'Submit Rating'}
-        </button>
-        <button
-          type="button"
-          onClick={() => navigate('/customer/bookings')}
-          className="w-full px-9 py-[18px] text-[14px] leading-[20px] font-semibold text-muted"
-        >
-          Skip
-        </button>
-      </div>
+      <BottomActions
+        disabled={!rating || !booking || submitting}
+        submitting={submitting}
+        onSubmit={handleSubmit}
+        onSkip={() => navigate('/customer/bookings')}
+      />
     </div>
   );
 }

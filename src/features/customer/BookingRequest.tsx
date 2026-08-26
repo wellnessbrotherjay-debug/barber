@@ -13,6 +13,232 @@ interface Service {
   duration_minutes: number;
 }
 
+// The list of services with the selected one drawn in black. Its own piece
+// because it is the only part of the form driven by data fetched from the API,
+// including the three states it can be in before that data arrives.
+function ServiceSection({
+  services,
+  service,
+  setService,
+  loading,
+  error,
+}: {
+  services: Service[];
+  service: string;
+  setService: (id: string) => void;
+  loading: boolean;
+  error: string;
+}) {
+  return (
+    <>
+      <div className="flex items-center gap-2 mt-8">
+        <Scissors className="w-5 h-5 text-ink" strokeWidth={1.8} />
+        <h2 className="text-[20px] font-bold text-ink">Service</h2>
+      </div>
+      {loading && <p className="text-sm text-muted mt-4">Loading services…</p>}
+      {error && <p className="text-sm text-red-600 mt-4">{error}</p>}
+      {!loading && !error && services.length === 0 && (
+        <p className="text-sm text-muted mt-4">No services available for this barber.</p>
+      )}
+      <div className="space-y-4 mt-4">
+        {services.map((s) => {
+          const selected = service === s.id;
+          return (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setService(s.id)}
+              className={cn(
+                'w-full flex items-center justify-between rounded-[16px] p-5 text-left transition-colors',
+                selected
+                  ? 'bg-ink text-white'
+                  : 'bg-white border-[0.75px] border-[#d2dbe9]'
+              )}
+            >
+              <span>
+                <span className={cn('block text-[16px] font-bold', selected ? 'text-white' : 'text-ink')}>
+                  {s.name}
+                </span>
+                <span className={cn('block text-[13px] mt-1.5', selected ? 'text-white/70' : 'text-muted')}>
+                  {s.duration_minutes}m duration
+                </span>
+              </span>
+              <span className={cn('text-[19px] font-bold', selected ? 'text-white' : 'text-ink')}>
+                ${s.price}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+// In-shop versus mobile. A single either/or question, so a single piece.
+function LocationPreferenceSection({
+  locationPref,
+  setLocationPref,
+}: {
+  locationPref: 'in_shop' | 'mobile';
+  setLocationPref: (p: 'in_shop' | 'mobile') => void;
+}) {
+  return (
+    <>
+      <div className="flex items-center gap-2 mt-9">
+        <Send className="w-5 h-5 text-ink" strokeWidth={1.8} />
+        <h2 className="text-[20px] font-bold text-ink">Location Preference</h2>
+      </div>
+      <div className="grid grid-cols-2 gap-3 mt-4">
+        <button
+          type="button"
+          onClick={() => setLocationPref('in_shop')}
+          className={cn(
+            'rounded-[16px] p-3 flex items-center gap-3 text-left transition-colors',
+            locationPref === 'in_shop' ? 'bg-ink' : 'bg-[#f6f7fb]'
+          )}
+        >
+          <span
+            className={cn(
+              'w-11 h-11 rounded-[10px] flex items-center justify-center shrink-0',
+              locationPref === 'in_shop' ? 'bg-white' : 'bg-white'
+            )}
+          >
+            <Store className="w-5 h-5 text-ink" strokeWidth={1.8} />
+          </span>
+          <span>
+            <span className={cn('block text-[11px]', locationPref === 'in_shop' ? 'text-white/60' : 'text-muted')}>
+              In-shop
+            </span>
+            <span className={cn('block text-[15px] font-bold mt-0.5', locationPref === 'in_shop' ? 'text-white' : 'text-ink')}>
+              Available
+            </span>
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setLocationPref('mobile')}
+          className={cn(
+            'rounded-[16px] p-3 flex items-center gap-3 text-left transition-colors',
+            locationPref === 'mobile' ? 'bg-ink' : 'bg-[#f6f7fb]'
+          )}
+        >
+          <span className="w-11 h-11 rounded-[10px] bg-white flex items-center justify-center shrink-0">
+            <Truck className="w-5 h-5 text-ink" strokeWidth={1.8} />
+          </span>
+          <span>
+            <span className={cn('block text-[11px]', locationPref === 'mobile' ? 'text-white/60' : 'text-muted')}>
+              Mobile
+            </span>
+            <span className={cn('block text-[15px] font-bold mt-0.5', locationPref === 'mobile' ? 'text-white' : 'text-ink')}>
+              Will Travel
+            </span>
+          </span>
+        </button>
+      </div>
+    </>
+  );
+}
+
+// Name, phone and the optional note. Grouped because they are the three things
+// the barber needs about the person, and nothing else on the screen is typed.
+function ContactDetailsSection({
+  name,
+  setName,
+  phone,
+  setPhone,
+  note,
+  setNote,
+}: {
+  name: string;
+  setName: (v: string) => void;
+  phone: string;
+  setPhone: (v: string) => void;
+  note: string;
+  setNote: (v: string) => void;
+}) {
+  return (
+    <>
+      <div className="flex items-center gap-2 mt-9">
+        <User className="w-5 h-5 text-ink" strokeWidth={1.8} />
+        <h2 className="text-[20px] font-bold text-ink">Contact Details</h2>
+      </div>
+      <div className="space-y-4 mt-4">
+        <label className="flex items-center gap-3 border-[0.75px] border-[#d2dbe9] rounded-full px-5 py-4">
+          <User className="w-5 h-5 text-muted shrink-0" strokeWidth={1.8} />
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Enter Name"
+            className="flex-1 text-[15px] text-ink placeholder:text-muted bg-transparent focus:outline-none"
+          />
+        </label>
+        <label className="flex items-center gap-3 border-[0.75px] border-[#d2dbe9] rounded-full px-5 py-4">
+          <Phone className="w-5 h-5 text-muted shrink-0" strokeWidth={1.8} />
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="Enter Phone Number"
+            className="flex-1 text-[15px] text-ink placeholder:text-muted bg-transparent focus:outline-none"
+          />
+        </label>
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          rows={5}
+          placeholder="Additional Notes (Optional)"
+          className="w-full border-[0.75px] border-[#d2dbe9] rounded-[20px] px-5 py-4 text-[15px] text-ink placeholder:text-muted resize-none focus:outline-none focus:border-ink/40 transition-colors"
+        />
+      </div>
+    </>
+  );
+}
+
+// The title bar. Its own piece for the same reason as the sections below it:
+// it is one visual unit on the board. It is not the shared ScreenHeader —
+// this bar has no spacer on the right and pads the title instead, which is
+// what the board draws.
+function BookingRequestHeader({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="flex items-center px-6 pt-16 pb-4">
+      <button type="button" aria-label="Back" onClick={onBack}>
+        <ChevronLeft className="w-6 h-6 text-ink" strokeWidth={2.25} />
+      </button>
+      <p className="flex-1 text-center text-[18px] font-bold text-ink pr-6">Book Your Service</p>
+    </div>
+  );
+}
+
+// The footer call to action: the deposit warning and the button it warns
+// about. Kept together because the sentence exists to explain the button.
+function BookingRequestFooter({
+  disabled,
+  submitting,
+  onSubmit,
+}: {
+  disabled: boolean;
+  submitting: boolean;
+  onSubmit: () => void;
+}) {
+  return (
+    <>
+      <p className="text-[13px] text-muted text-center leading-5 mt-6">
+        A small non-refundable deposit is required to secure your appointment time.
+      </p>
+
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onSubmit}
+        className="w-full bg-ink text-white text-[16px] font-semibold py-[20px] rounded-full mt-3 disabled:opacity-50"
+      >
+        {submitting ? 'Sending…' : 'Pay Booking Fee'}
+      </button>
+    </>
+  );
+}
+
 // Figma page 22 — "Book Your Service": service cards (selected = black),
 // In-shop vs Mobile location preference, contact details, Pay Booking Fee CTA.
 export default function BookingRequest() {
@@ -91,158 +317,42 @@ export default function BookingRequest() {
   return (
     <div className="min-h-screen bg-white pb-8">
       {/* Header */}
-      <div className="flex items-center px-6 pt-16 pb-4">
-        <button type="button" aria-label="Back" onClick={() => navigate(-1)}>
-          <ChevronLeft className="w-6 h-6 text-ink" strokeWidth={2.25} />
-        </button>
-        <p className="flex-1 text-center text-[18px] font-bold text-ink pr-6">Book Your Service</p>
-      </div>
+      <BookingRequestHeader onBack={() => navigate(-1)} />
 
       <div className="px-6">
         <h1 className="text-[22px] font-bold text-ink mt-2">Book Your Service</h1>
         <p className="text-[14px] text-muted mt-1">Complete the details below to secure your spot.</p>
 
         {/* Service */}
-        <div className="flex items-center gap-2 mt-8">
-          <Scissors className="w-5 h-5 text-ink" strokeWidth={1.8} />
-          <h2 className="text-[20px] font-bold text-ink">Service</h2>
-        </div>
-        {loading && <p className="text-sm text-muted mt-4">Loading services…</p>}
-        {error && <p className="text-sm text-red-600 mt-4">{error}</p>}
-        {!loading && !error && services.length === 0 && (
-          <p className="text-sm text-muted mt-4">No services available for this barber.</p>
-        )}
-        <div className="space-y-4 mt-4">
-          {services.map((s) => {
-            const selected = service === s.id;
-            return (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => setService(s.id)}
-                className={cn(
-                  'w-full flex items-center justify-between rounded-[16px] p-5 text-left transition-colors',
-                  selected
-                    ? 'bg-ink text-white'
-                    : 'bg-white border-[0.75px] border-[#d2dbe9]'
-                )}
-              >
-                <span>
-                  <span className={cn('block text-[16px] font-bold', selected ? 'text-white' : 'text-ink')}>
-                    {s.name}
-                  </span>
-                  <span className={cn('block text-[13px] mt-1.5', selected ? 'text-white/70' : 'text-muted')}>
-                    {s.duration_minutes}m duration
-                  </span>
-                </span>
-                <span className={cn('text-[19px] font-bold', selected ? 'text-white' : 'text-ink')}>
-                  ${s.price}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        <ServiceSection
+          services={services}
+          service={service}
+          setService={setService}
+          loading={loading}
+          error={error}
+        />
 
         {/* Location Preference */}
-        <div className="flex items-center gap-2 mt-9">
-          <Send className="w-5 h-5 text-ink" strokeWidth={1.8} />
-          <h2 className="text-[20px] font-bold text-ink">Location Preference</h2>
-        </div>
-        <div className="grid grid-cols-2 gap-3 mt-4">
-          <button
-            type="button"
-            onClick={() => setLocationPref('in_shop')}
-            className={cn(
-              'rounded-[16px] p-3 flex items-center gap-3 text-left transition-colors',
-              locationPref === 'in_shop' ? 'bg-ink' : 'bg-[#f6f7fb]'
-            )}
-          >
-            <span
-              className={cn(
-                'w-11 h-11 rounded-[10px] flex items-center justify-center shrink-0',
-                locationPref === 'in_shop' ? 'bg-white' : 'bg-white'
-              )}
-            >
-              <Store className="w-5 h-5 text-ink" strokeWidth={1.8} />
-            </span>
-            <span>
-              <span className={cn('block text-[11px]', locationPref === 'in_shop' ? 'text-white/60' : 'text-muted')}>
-                In-shop
-              </span>
-              <span className={cn('block text-[15px] font-bold mt-0.5', locationPref === 'in_shop' ? 'text-white' : 'text-ink')}>
-                Available
-              </span>
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setLocationPref('mobile')}
-            className={cn(
-              'rounded-[16px] p-3 flex items-center gap-3 text-left transition-colors',
-              locationPref === 'mobile' ? 'bg-ink' : 'bg-[#f6f7fb]'
-            )}
-          >
-            <span className="w-11 h-11 rounded-[10px] bg-white flex items-center justify-center shrink-0">
-              <Truck className="w-5 h-5 text-ink" strokeWidth={1.8} />
-            </span>
-            <span>
-              <span className={cn('block text-[11px]', locationPref === 'mobile' ? 'text-white/60' : 'text-muted')}>
-                Mobile
-              </span>
-              <span className={cn('block text-[15px] font-bold mt-0.5', locationPref === 'mobile' ? 'text-white' : 'text-ink')}>
-                Will Travel
-              </span>
-            </span>
-          </button>
-        </div>
+        <LocationPreferenceSection
+          locationPref={locationPref}
+          setLocationPref={setLocationPref}
+        />
 
         {/* Contact Details */}
-        <div className="flex items-center gap-2 mt-9">
-          <User className="w-5 h-5 text-ink" strokeWidth={1.8} />
-          <h2 className="text-[20px] font-bold text-ink">Contact Details</h2>
-        </div>
-        <div className="space-y-4 mt-4">
-          <label className="flex items-center gap-3 border-[0.75px] border-[#d2dbe9] rounded-full px-5 py-4">
-            <User className="w-5 h-5 text-muted shrink-0" strokeWidth={1.8} />
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Enter Name"
-              className="flex-1 text-[15px] text-ink placeholder:text-muted bg-transparent focus:outline-none"
-            />
-          </label>
-          <label className="flex items-center gap-3 border-[0.75px] border-[#d2dbe9] rounded-full px-5 py-4">
-            <Phone className="w-5 h-5 text-muted shrink-0" strokeWidth={1.8} />
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="Enter Phone Number"
-              className="flex-1 text-[15px] text-ink placeholder:text-muted bg-transparent focus:outline-none"
-            />
-          </label>
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            rows={5}
-            placeholder="Additional Notes (Optional)"
-            className="w-full border-[0.75px] border-[#d2dbe9] rounded-[20px] px-5 py-4 text-[15px] text-ink placeholder:text-muted resize-none focus:outline-none focus:border-ink/40 transition-colors"
-          />
-        </div>
+        <ContactDetailsSection
+          name={name}
+          setName={setName}
+          phone={phone}
+          setPhone={setPhone}
+          note={note}
+          setNote={setNote}
+        />
 
-        <p className="text-[13px] text-muted text-center leading-5 mt-6">
-          A small non-refundable deposit is required to secure your appointment time.
-        </p>
-
-        <button
-          type="button"
+        <BookingRequestFooter
           disabled={!service || submitting || loading}
-          onClick={handleSubmit}
-          className="w-full bg-ink text-white text-[16px] font-semibold py-[20px] rounded-full mt-3 disabled:opacity-50"
-        >
-          {submitting ? 'Sending…' : 'Pay Booking Fee'}
-        </button>
+          submitting={submitting}
+          onSubmit={handleSubmit}
+        />
       </div>
     </div>
   );

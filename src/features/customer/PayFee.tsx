@@ -104,6 +104,109 @@ function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
+// Both faces of this screen draw the same title bar with a different title, so
+// it is written once here. It is deliberately not the shared ScreenHeader: the
+// board gives this bar a white background and a smaller arrow than that
+// component has, and the design is contractually fixed.
+function PayFeeHeader({ title, onBack }: { title: string; onBack: () => void }) {
+  return (
+    <div className="bg-white flex items-center gap-1.5 px-5 py-4 pt-14">
+      <button
+        type="button"
+        onClick={onBack}
+        className="w-6 h-6 flex items-center justify-center shrink-0"
+        aria-label="Back"
+      >
+        <ChevronLeft className="w-5 h-5 text-[#1c1b1f]" />
+      </button>
+      <p className="flex-1 text-center text-[16px] font-bold leading-6 text-[#1c1b1f]">
+        {title}
+      </p>
+      <span className="w-6 h-6 shrink-0" />
+    </div>
+  );
+}
+
+// The appointment summary that opens the page-30 review state. Its own piece
+// because it is a self-contained card of facts about the booking, with no
+// bearing on the fee arithmetic below it.
+function AuthorizeAppointmentSummary() {
+  return (
+    <div className="px-5 mt-2">
+      <div className="bg-[#fafafa] rounded-[12px] p-4 flex flex-col gap-4">
+        <div className="flex items-center gap-3">
+          <IconTile>
+            <Scissors className="w-4 h-4 text-[#1c1b1f]" />
+          </IconTile>
+          <div className="flex flex-col gap-1">
+            <p className="text-[11px] font-medium leading-[14px] text-[#a09cab]">
+              Classic Fade &amp; Beard
+            </p>
+            <p className="text-[13px] font-semibold leading-4 text-[#1c1b1f]">with Marcus V.</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <IconTile>
+            <Calendar className="w-4 h-4 text-[#1c1b1f]" />
+          </IconTile>
+          <div className="flex flex-col gap-1">
+            <p className="text-[11px] font-medium leading-[14px] text-[#a09cab]">Oct 24</p>
+            <p className="text-[13px] font-semibold leading-4 text-[#1c1b1f]">2:30 PM</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// The money: what the service costs, what the fee is, what is left to pay at
+// the shop, and which card will pay it. One card on the board, one piece here.
+function AuthorizeFeeBreakdown() {
+  return (
+    <div className="px-5 mt-4">
+      <div className="rounded-[16px] border-[0.75px] border-[#d2dbe9] bg-white p-4">
+        <div className="flex items-center justify-between py-2">
+          <p className="text-[13px] font-semibold text-[#1c1b1f]">Service Total</p>
+          <p className="text-[13px] font-bold text-[#1c1b1f]">$45.00</p>
+        </div>
+        <div className="border-t border-dashed border-[#d2dbe9]" />
+        <div className="flex items-center justify-between py-2">
+          <p className="text-[13px] font-semibold text-[#1c1b1f]">Booking Fee</p>
+          <p className="text-[13px] font-bold text-[#1c1b1f]">$20.00</p>
+        </div>
+        <div className="border-t border-dashed border-[#d2dbe9]" />
+        <div className="flex items-center justify-between py-2">
+          <p className="text-[13px] font-semibold text-[#1c1b1f]">Due at shop</p>
+          <p className="text-[13px] font-bold text-[#1c1b1f]">$25.00</p>
+        </div>
+        <div className="border-t border-dashed border-[#d2dbe9]" />
+
+        <div className="bg-[#f8f8f8] rounded-[10px] px-4 py-4 mt-3">
+          <p className="text-[13px] font-medium text-[#1c1b1f]">
+            &ldquo;We&rsquo;ll only charge after the barber accepts.&rdquo;
+          </p>
+        </div>
+
+        <p className="text-[16px] font-bold text-[#1c1b1f] mt-5">Select Payment Method</p>
+        {/* This row used to show "•••• 4242" with a Change button: digits
+            nobody had typed, for a card nobody had added, on an account with
+            no card on file. Inventing a person's own payment details on
+            screen is worse than showing none. The card the customer actually
+            pays with is added on the payment step, which is switched on with
+            the booking fee. */}
+        <div className="rounded-[12px] border-[0.75px] border-[#d2dbe9] bg-white p-4 mt-3 flex items-center gap-3">
+          <div className="bg-[#f8f8f8] rounded-[8px] w-[38px] h-[38px] flex items-center justify-center shrink-0">
+            <CreditCard className="w-4 h-4 text-[#1c1b1f]" />
+          </div>
+          <p className="flex-1 text-[14px] font-medium text-[#6c6a75]">
+            You&rsquo;ll enter your card on the next step
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Board page 30 — "Authorizes Payment". A distinct pre-checkout state of this
 // screen: summary + fee breakdown + saved card, reached with ?view=authorize.
 // Confirming drops the param and hands off to the real Stripe checkout below.
@@ -112,89 +215,13 @@ function AuthorizesPayment({ onConfirm }: { onConfirm: () => void }) {
   return (
     <div className="min-h-screen bg-white pb-8 flex flex-col">
       {/* Header */}
-      <div className="bg-white flex items-center gap-1.5 px-5 py-4 pt-14">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="w-6 h-6 flex items-center justify-center shrink-0"
-          aria-label="Back"
-        >
-          <ChevronLeft className="w-5 h-5 text-[#1c1b1f]" />
-        </button>
-        <p className="flex-1 text-center text-[16px] font-bold leading-6 text-[#1c1b1f]">
-          Authorizes Payment
-        </p>
-        <span className="w-6 h-6 shrink-0" />
-      </div>
+      <PayFeeHeader title="Authorizes Payment" onBack={() => navigate(-1)} />
 
       {/* Appointment summary */}
-      <div className="px-5 mt-2">
-        <div className="bg-[#fafafa] rounded-[12px] p-4 flex flex-col gap-4">
-          <div className="flex items-center gap-3">
-            <IconTile>
-              <Scissors className="w-4 h-4 text-[#1c1b1f]" />
-            </IconTile>
-            <div className="flex flex-col gap-1">
-              <p className="text-[11px] font-medium leading-[14px] text-[#a09cab]">
-                Classic Fade &amp; Beard
-              </p>
-              <p className="text-[13px] font-semibold leading-4 text-[#1c1b1f]">with Marcus V.</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <IconTile>
-              <Calendar className="w-4 h-4 text-[#1c1b1f]" />
-            </IconTile>
-            <div className="flex flex-col gap-1">
-              <p className="text-[11px] font-medium leading-[14px] text-[#a09cab]">Oct 24</p>
-              <p className="text-[13px] font-semibold leading-4 text-[#1c1b1f]">2:30 PM</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <AuthorizeAppointmentSummary />
 
       {/* Breakdown + payment method */}
-      <div className="px-5 mt-4">
-        <div className="rounded-[16px] border-[0.75px] border-[#d2dbe9] bg-white p-4">
-          <div className="flex items-center justify-between py-2">
-            <p className="text-[13px] font-semibold text-[#1c1b1f]">Service Total</p>
-            <p className="text-[13px] font-bold text-[#1c1b1f]">$45.00</p>
-          </div>
-          <div className="border-t border-dashed border-[#d2dbe9]" />
-          <div className="flex items-center justify-between py-2">
-            <p className="text-[13px] font-semibold text-[#1c1b1f]">Booking Fee</p>
-            <p className="text-[13px] font-bold text-[#1c1b1f]">$20.00</p>
-          </div>
-          <div className="border-t border-dashed border-[#d2dbe9]" />
-          <div className="flex items-center justify-between py-2">
-            <p className="text-[13px] font-semibold text-[#1c1b1f]">Due at shop</p>
-            <p className="text-[13px] font-bold text-[#1c1b1f]">$25.00</p>
-          </div>
-          <div className="border-t border-dashed border-[#d2dbe9]" />
-
-          <div className="bg-[#f8f8f8] rounded-[10px] px-4 py-4 mt-3">
-            <p className="text-[13px] font-medium text-[#1c1b1f]">
-              &ldquo;We&rsquo;ll only charge after the barber accepts.&rdquo;
-            </p>
-          </div>
-
-          <p className="text-[16px] font-bold text-[#1c1b1f] mt-5">Select Payment Method</p>
-          {/* This row used to show "•••• 4242" with a Change button: digits
-              nobody had typed, for a card nobody had added, on an account with
-              no card on file. Inventing a person's own payment details on
-              screen is worse than showing none. The card the customer actually
-              pays with is added on the payment step, which is switched on with
-              the booking fee. */}
-          <div className="rounded-[12px] border-[0.75px] border-[#d2dbe9] bg-white p-4 mt-3 flex items-center gap-3">
-            <div className="bg-[#f8f8f8] rounded-[8px] w-[38px] h-[38px] flex items-center justify-center shrink-0">
-              <CreditCard className="w-4 h-4 text-[#1c1b1f]" />
-            </div>
-            <p className="flex-1 text-[14px] font-medium text-[#6c6a75]">
-              You&rsquo;ll enter your card on the next step
-            </p>
-          </div>
-        </div>
-      </div>
+      <AuthorizeFeeBreakdown />
 
       {/* CTA */}
       <div className="mt-auto px-5 pt-10 flex flex-col gap-1">
@@ -210,6 +237,150 @@ function AuthorizesPayment({ onConfirm }: { onConfirm: () => void }) {
         </p>
       </div>
     </div>
+  );
+}
+
+// The appointment being paid for — Figma 1:1996. Its own component because it
+// is a block of fixed facts that has nothing to do with the payment machinery
+// that surrounds it.
+function AppointmentSection() {
+  return (
+    <div className="bg-white flex flex-col gap-4 px-5 py-4">
+      <div className="flex items-center gap-1.5 w-full">
+        <FileText className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.75} />
+        <p className="text-[18px] font-semibold leading-6 text-[#1c1b1f]">Appointment</p>
+      </div>
+      <div className="bg-[#fafafa] rounded-[12px] p-3 flex flex-col gap-4 w-full">
+        <div className="flex flex-col gap-4 w-full">
+          <div className="flex items-center gap-3">
+            <IconTile>
+              <Scissors className="w-4 h-4 text-[#1c1b1f]" />
+            </IconTile>
+            <div className="flex flex-col gap-1">
+              <p className="text-[10px] font-semibold leading-[14px] text-[#a09cab]">
+                Service Selected
+              </p>
+              <p className="text-[12px] font-semibold leading-4 text-[#1c1b1f]">
+                Signature Skin Fade &amp; Beard Trim
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <IconTile>
+              <Calendar className="w-4 h-4 text-[#1c1b1f]" />
+            </IconTile>
+            <div className="flex flex-col gap-1">
+              <p className="text-[10px] font-semibold leading-[14px] text-[#a09cab]">
+                Date &amp; Time
+              </p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-[12px] font-semibold leading-4 text-[#1c1b1f]">
+                  Tuesday, Oct 24
+                </p>
+                <span className="w-1 h-1 rounded-full bg-[#a09cab]" />
+                <p className="text-[12px] font-semibold leading-4 text-[#1c1b1f]">10:00 AM</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p className="text-[12px] font-semibold leading-4 text-[#1c1b1f]">
+          with Marcus 'The Fade' Rivera
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// The fee itself and the sentence explaining when it is charged — Figma
+// 1:2022. Separated so the amount and its caveat stay next to each other.
+function BookingFeeSection() {
+  return (
+    <div className="bg-white flex flex-col gap-4 px-5 py-4">
+      <div className="flex items-center justify-between w-full">
+        <p className="text-[18px] font-semibold leading-6 text-[#1c1b1f]">Booking Fee</p>
+        <p className="text-[12px] font-bold leading-4 text-[#1c1b1f]">$20.00</p>
+      </div>
+      <div className="bg-[#f6f7fb] rounded-[12px] p-4 flex items-center justify-between w-full">
+        <div className="flex flex-col gap-1">
+          <p className="text-[10px] font-semibold leading-[14px] text-[#a09cab]">
+            To confirm appointment
+          </p>
+          <p className="text-[12px] font-semibold leading-4 text-[#1c1b1f]">Booking Fee</p>
+        </div>
+        <p className="text-[12px] font-bold leading-4 text-[#1c1b1f]">$20.00</p>
+      </div>
+      <p className="text-[12px] font-medium leading-4 text-[#1c1b1f]">
+        Your card is temporarily authorizes. The booking fee will only be charged once the
+        barber accepts your request.
+      </p>
+    </div>
+  );
+}
+
+// What the fee buys — Figma 1:2034. A persuasion card, not a functional one,
+// which is why it stands apart from the payment code.
+function WhatThisUnlocksSection() {
+  return (
+    <div className="px-5">
+      <div className="bg-[#fafafa] rounded-[12px] p-3 flex flex-col gap-4 w-full">
+        <p className="text-[18px] font-semibold leading-6 text-[#1c1b1f]">What this unlocks:</p>
+        <div className="flex items-center gap-3 w-full">
+          <IconTile>
+            <Scissors className="w-4 h-4 text-[#1c1b1f]" />
+          </IconTile>
+          <div className="flex flex-col gap-1">
+            <p className="text-[10px] font-semibold leading-[14px] text-[#a09cab]">
+              Confirmed Request
+            </p>
+            <p className="text-[12px] font-semibold leading-4 text-[#1c1b1f] max-w-[279px]">
+              Your card is temporarily authorizes. The booking fee will only be charged once the
+              barber accepts your request.
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-2 w-full">
+          <span className="flex-1 flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-[999px] px-7 py-3.5 text-[14px] font-semibold leading-5 text-[#1c1b1f]">
+            <MessageCircle className="w-5 h-5" /> Chat
+          </span>
+          <span className="flex-1 flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-[999px] px-7 py-3.5 text-[14px] font-semibold leading-5 text-[#1c1b1f]">
+            <Phone className="w-5 h-5" /> Call
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// The honest "cards aren't switched on here yet" state, with the CTA shown but
+// dead. Kept as its own piece so this deliberate fallback is easy to find and
+// impossible to confuse with the working checkout.
+function PaymentsNotEnabledNotice() {
+  return (
+    <>
+      <Card className="p-5 flex items-start gap-3 border-amber-200 bg-amber-50">
+        <CreditCard className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-semibold text-ink">Card payments aren't enabled yet</p>
+          <p className="text-xs text-muted mt-1">
+            Your booking fee will be collected another way for now. We're finishing
+            the setup with our payment provider — this screen will accept cards
+            automatically once that's live, no action needed from you.
+          </p>
+        </div>
+      </Card>
+      <div className="flex flex-col gap-1 w-full">
+        <button
+          type="button"
+          disabled
+          className="w-full bg-[#1c1b1f] text-white rounded-[999px] px-9 py-[18px] text-[14px] font-semibold leading-5 text-center opacity-40"
+        >
+          Pay Booking Fee &amp; Send Request
+        </button>
+        <p className="w-full px-9 py-[18px] text-[14px] font-semibold leading-5 text-[#a09cab] text-center">
+          Secure Payment via Stripe
+        </p>
+      </div>
+    </>
   );
 }
 
@@ -290,145 +461,20 @@ export default function PayFee() {
   return (
     <div className="min-h-screen bg-white pb-8">
       {/* Top navigation bar — Figma 1:1985 */}
-      <div className="bg-white flex items-center gap-1.5 px-5 py-4 pt-14">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="w-6 h-6 flex items-center justify-center shrink-0"
-          aria-label="Back"
-        >
-          <ChevronLeft className="w-5 h-5 text-[#1c1b1f]" />
-        </button>
-        <p className="flex-1 text-center text-[16px] font-bold leading-6 text-[#1c1b1f]">
-          Pay Booking Fee
-        </p>
-        <span className="w-6 h-6 shrink-0" />
-      </div>
+      <PayFeeHeader title="Pay Booking Fee" onBack={() => navigate(-1)} />
 
       {/* Appointment — Figma 1:1996 */}
-      <div className="bg-white flex flex-col gap-4 px-5 py-4">
-        <div className="flex items-center gap-1.5 w-full">
-          <FileText className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.75} />
-          <p className="text-[18px] font-semibold leading-6 text-[#1c1b1f]">Appointment</p>
-        </div>
-        <div className="bg-[#fafafa] rounded-[12px] p-3 flex flex-col gap-4 w-full">
-          <div className="flex flex-col gap-4 w-full">
-            <div className="flex items-center gap-3">
-              <IconTile>
-                <Scissors className="w-4 h-4 text-[#1c1b1f]" />
-              </IconTile>
-              <div className="flex flex-col gap-1">
-                <p className="text-[10px] font-semibold leading-[14px] text-[#a09cab]">
-                  Service Selected
-                </p>
-                <p className="text-[12px] font-semibold leading-4 text-[#1c1b1f]">
-                  Signature Skin Fade &amp; Beard Trim
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <IconTile>
-                <Calendar className="w-4 h-4 text-[#1c1b1f]" />
-              </IconTile>
-              <div className="flex flex-col gap-1">
-                <p className="text-[10px] font-semibold leading-[14px] text-[#a09cab]">
-                  Date &amp; Time
-                </p>
-                <div className="flex items-center gap-1.5">
-                  <p className="text-[12px] font-semibold leading-4 text-[#1c1b1f]">
-                    Tuesday, Oct 24
-                  </p>
-                  <span className="w-1 h-1 rounded-full bg-[#a09cab]" />
-                  <p className="text-[12px] font-semibold leading-4 text-[#1c1b1f]">10:00 AM</p>
-                </div>
-              </div>
-            </div>
-          </div>
-          <p className="text-[12px] font-semibold leading-4 text-[#1c1b1f]">
-            with Marcus 'The Fade' Rivera
-          </p>
-        </div>
-      </div>
+      <AppointmentSection />
 
       {/* Booking Fee — Figma 1:2022 */}
-      <div className="bg-white flex flex-col gap-4 px-5 py-4">
-        <div className="flex items-center justify-between w-full">
-          <p className="text-[18px] font-semibold leading-6 text-[#1c1b1f]">Booking Fee</p>
-          <p className="text-[12px] font-bold leading-4 text-[#1c1b1f]">$20.00</p>
-        </div>
-        <div className="bg-[#f6f7fb] rounded-[12px] p-4 flex items-center justify-between w-full">
-          <div className="flex flex-col gap-1">
-            <p className="text-[10px] font-semibold leading-[14px] text-[#a09cab]">
-              To confirm appointment
-            </p>
-            <p className="text-[12px] font-semibold leading-4 text-[#1c1b1f]">Booking Fee</p>
-          </div>
-          <p className="text-[12px] font-bold leading-4 text-[#1c1b1f]">$20.00</p>
-        </div>
-        <p className="text-[12px] font-medium leading-4 text-[#1c1b1f]">
-          Your card is temporarily authorizes. The booking fee will only be charged once the
-          barber accepts your request.
-        </p>
-      </div>
+      <BookingFeeSection />
 
       {/* What this unlocks — Figma 1:2034 */}
-      <div className="px-5">
-        <div className="bg-[#fafafa] rounded-[12px] p-3 flex flex-col gap-4 w-full">
-          <p className="text-[18px] font-semibold leading-6 text-[#1c1b1f]">What this unlocks:</p>
-          <div className="flex items-center gap-3 w-full">
-            <IconTile>
-              <Scissors className="w-4 h-4 text-[#1c1b1f]" />
-            </IconTile>
-            <div className="flex flex-col gap-1">
-              <p className="text-[10px] font-semibold leading-[14px] text-[#a09cab]">
-                Confirmed Request
-              </p>
-              <p className="text-[12px] font-semibold leading-4 text-[#1c1b1f] max-w-[279px]">
-                Your card is temporarily authorizes. The booking fee will only be charged once the
-                barber accepts your request.
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2 w-full">
-            <span className="flex-1 flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-[999px] px-7 py-3.5 text-[14px] font-semibold leading-5 text-[#1c1b1f]">
-              <MessageCircle className="w-5 h-5" /> Chat
-            </span>
-            <span className="flex-1 flex items-center justify-center gap-2 bg-[#f6f7fb] rounded-[999px] px-7 py-3.5 text-[14px] font-semibold leading-5 text-[#1c1b1f]">
-              <Phone className="w-5 h-5" /> Call
-            </span>
-          </div>
-        </div>
-      </div>
+      <WhatThisUnlocksSection />
 
       {/* Payment / CTA */}
       <div className="px-5 mt-4 space-y-4">
-        {notConfigured && (
-          <>
-            <Card className="p-5 flex items-start gap-3 border-amber-200 bg-amber-50">
-              <CreditCard className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-semibold text-ink">Card payments aren't enabled yet</p>
-                <p className="text-xs text-muted mt-1">
-                  Your booking fee will be collected another way for now. We're finishing
-                  the setup with our payment provider — this screen will accept cards
-                  automatically once that's live, no action needed from you.
-                </p>
-              </div>
-            </Card>
-            <div className="flex flex-col gap-1 w-full">
-              <button
-                type="button"
-                disabled
-                className="w-full bg-[#1c1b1f] text-white rounded-[999px] px-9 py-[18px] text-[14px] font-semibold leading-5 text-center opacity-40"
-              >
-                Pay Booking Fee &amp; Send Request
-              </button>
-              <p className="w-full px-9 py-[18px] text-[14px] font-semibold leading-5 text-[#a09cab] text-center">
-                Secure Payment via Stripe
-              </p>
-            </div>
-          </>
-        )}
+        {notConfigured && <PaymentsNotEnabledNotice />}
 
         {!notConfigured && error && (
           <Card className="p-5 flex items-start gap-3 border-red-200 bg-red-50">

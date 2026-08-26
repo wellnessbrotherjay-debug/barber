@@ -23,6 +23,92 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'reviews', label: 'Reviews' },
 ];
 
+type BarberService = NonNullable<BarberDetail['services']>[number];
+
+// The identity card at the top only needs the barber record, so it reads better
+// as its own named piece than as twelve more lines in the screen body.
+function ProfileCard({ barber }: { barber: BarberDetail | null }) {
+  return (
+    <div className="border-[0.75px] border-[#d2dbe9] rounded-[20px] px-6 py-8 flex flex-col items-center">
+      <div className="w-[136px] h-[136px] rounded-full bg-surface" />
+      <h1 className="text-[28px] font-bold text-ink mt-6">{barber?.display_name || '—'}</h1>
+      <p className="mt-2 text-[14px]">
+        <span className="font-bold text-ink">★ {barber?.rating_avg ?? '—'}</span>{' '}
+        <span className="text-muted">({barber?.rating_count ?? 0})</span>{' '}
+        <span className="text-muted">• {barber?.address_text?.split(',')[0] || 'Near you'}</span>
+      </p>
+      <span className="flex items-center gap-1.5 bg-[#f6f6fb] rounded-full px-4 py-2 mt-4">
+        <CircleCheck className="w-4 h-4 text-ink" strokeWidth={1.8} />
+        <span className="text-[13px] font-medium text-ink">Verified</span>
+      </span>
+    </div>
+  );
+}
+
+// Three fixed tiles with no data of their own — a natural standalone piece.
+function StatCards() {
+  return (
+    <div className="grid grid-cols-3 gap-3 mt-5">
+      {[
+        { icon: Scissors, caption: 'Expertise', value: 'Stylist' },
+        { icon: Clock, caption: 'Exp.', value: '8 years' },
+        { icon: Calendar, caption: 'Booked', value: '90% Full' },
+      ].map(({ icon: Icon, caption, value }) => (
+        <div key={caption} className="bg-white rounded-[18px] shadow-[0px_6px_20px_rgba(28,27,31,0.06)] py-6 flex flex-col items-center">
+          <span className="w-12 h-12 rounded-[12px] bg-[#f6f6fb] flex items-center justify-center">
+            <Icon className="w-5 h-5 text-ink" strokeWidth={1.8} />
+          </span>
+          <span className="text-[13px] text-muted mt-4">{caption}</span>
+          <span className="text-[17px] font-bold text-ink mt-1">{value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// The services tab is the largest of the three tab bodies, so it is separated to
+// keep the screen from being dominated by one branch.
+function ServicesTab({
+  services,
+  selectedService,
+  onSelect,
+}: {
+  services: BarberService[];
+  selectedService: string | null;
+  onSelect: (id: string | null) => void;
+}) {
+  return (
+    <div className="mt-6 space-y-4">
+      {services.length === 0 && (
+        <p className="text-sm text-muted text-center py-6">No services listed yet.</p>
+      )}
+      {services.map((s) => (
+        <div key={s.id} className="border-[0.75px] border-[#d2dbe9] rounded-[18px] p-5 flex items-start justify-between">
+          <div>
+            <p className="text-[16px] font-bold text-ink">{s.name}</p>
+            <p className="text-[13px] text-muted mt-2">{s.duration_minutes} mins</p>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            <p className="text-[17px] font-bold text-ink">
+              ${Number(s.price ?? 0).toFixed(2).padStart(5, '0')}
+            </p>
+            <button
+              type="button"
+              onClick={() => onSelect(s.id)}
+              className={cn(
+                'px-4 py-1.5 rounded-full text-[13px] font-medium',
+                selectedService === s.id ? 'bg-ink text-white' : 'bg-[#f6f6fb] text-ink'
+              )}
+            >
+              Select
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Figma pages 26–27 — "Barbar Profile" (sic, per design copy) with profile card,
 // three stat cards, and Services / About / Reviews segmented tabs.
 export default function BarberProfileTabs() {
@@ -61,36 +147,10 @@ export default function BarberProfileTabs() {
 
       <div className="px-6">
         {/* Profile card */}
-        <div className="border-[0.75px] border-[#d2dbe9] rounded-[20px] px-6 py-8 flex flex-col items-center">
-          <div className="w-[136px] h-[136px] rounded-full bg-surface" />
-          <h1 className="text-[28px] font-bold text-ink mt-6">{barber?.display_name || '—'}</h1>
-          <p className="mt-2 text-[14px]">
-            <span className="font-bold text-ink">★ {barber?.rating_avg ?? '—'}</span>{' '}
-            <span className="text-muted">({barber?.rating_count ?? 0})</span>{' '}
-            <span className="text-muted">• {barber?.address_text?.split(',')[0] || 'Near you'}</span>
-          </p>
-          <span className="flex items-center gap-1.5 bg-[#f6f6fb] rounded-full px-4 py-2 mt-4">
-            <CircleCheck className="w-4 h-4 text-ink" strokeWidth={1.8} />
-            <span className="text-[13px] font-medium text-ink">Verified</span>
-          </span>
-        </div>
+        <ProfileCard barber={barber} />
 
         {/* Stat cards */}
-        <div className="grid grid-cols-3 gap-3 mt-5">
-          {[
-            { icon: Scissors, caption: 'Expertise', value: 'Stylist' },
-            { icon: Clock, caption: 'Exp.', value: '8 years' },
-            { icon: Calendar, caption: 'Booked', value: '90% Full' },
-          ].map(({ icon: Icon, caption, value }) => (
-            <div key={caption} className="bg-white rounded-[18px] shadow-[0px_6px_20px_rgba(28,27,31,0.06)] py-6 flex flex-col items-center">
-              <span className="w-12 h-12 rounded-[12px] bg-[#f6f6fb] flex items-center justify-center">
-                <Icon className="w-5 h-5 text-ink" strokeWidth={1.8} />
-              </span>
-              <span className="text-[13px] text-muted mt-4">{caption}</span>
-              <span className="text-[17px] font-bold text-ink mt-1">{value}</span>
-            </div>
-          ))}
-        </div>
+        <StatCards />
 
         {/* Segmented tabs */}
         <div className="flex items-center bg-[#eff1f5] rounded-full p-[3px] mt-6">
@@ -111,34 +171,7 @@ export default function BarberProfileTabs() {
 
         {/* Tab content */}
         {tab === 'services' && (
-          <div className="mt-6 space-y-4">
-            {services.length === 0 && (
-              <p className="text-sm text-muted text-center py-6">No services listed yet.</p>
-            )}
-            {services.map((s) => (
-              <div key={s.id} className="border-[0.75px] border-[#d2dbe9] rounded-[18px] p-5 flex items-start justify-between">
-                <div>
-                  <p className="text-[16px] font-bold text-ink">{s.name}</p>
-                  <p className="text-[13px] text-muted mt-2">{s.duration_minutes} mins</p>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  <p className="text-[17px] font-bold text-ink">
-                    ${Number(s.price ?? 0).toFixed(2).padStart(5, '0')}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedService(s.id)}
-                    className={cn(
-                      'px-4 py-1.5 rounded-full text-[13px] font-medium',
-                      selectedService === s.id ? 'bg-ink text-white' : 'bg-[#f6f6fb] text-ink'
-                    )}
-                  >
-                    Select
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+          <ServicesTab services={services} selectedService={selectedService} onSelect={setSelectedService} />
         )}
 
         {tab === 'about' && (

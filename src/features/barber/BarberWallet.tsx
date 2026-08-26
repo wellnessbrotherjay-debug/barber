@@ -48,6 +48,100 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+interface StatCard {
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  label: string[];
+  value: string;
+}
+
+// The three summary tiles are one repeated shape, so they live in their own
+// component rather than as a loop inside the screen body.
+function StatCards({ cards }: { cards: StatCard[] }) {
+  return (
+    <div className="px-5 py-4 grid grid-cols-3 gap-3">
+      {cards.map((card) => {
+        const Icon = card.icon;
+        return (
+          <div key={card.label.join(' ')} className="bg-white border-[0.75px] border-[#d2dbe9] rounded-[12px] p-3 flex flex-col gap-3">
+            <div className="w-[42px] h-[42px] bg-[#f2f1fa] rounded-[8px] flex items-center justify-center">
+              <Icon className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
+            </div>
+            <p className="text-[12px] leading-4 font-medium text-[#a09cab]">
+              {card.label[0]}
+              <br />
+              {card.label[1]}
+            </p>
+            <p className="text-[18px] leading-6 font-bold text-[#1c1b1f]">{card.value}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// A single card driven by two numbers — separated to keep the screen body short.
+function NoShowPanel({ loading, count, penalty }: { loading: boolean; count: number; penalty: number }) {
+  return (
+    <>
+      {/* No-show & Penalties — Figma page 56 */}
+      <div className="px-5 py-4">
+        <h2 className="text-[18px] leading-6 font-bold text-[#1c1b1f]">No-show &amp; Penalties</h2>
+      </div>
+      <div className="px-5">
+        <div className="bg-white border-[0.75px] border-[#d2dbe9] rounded-[12px] p-3 flex items-start justify-between">
+          <div className="flex flex-col gap-1">
+            <p className="text-[12px] leading-4 font-medium text-[#a09cab]">No-show reports (this month)</p>
+            <p className="text-[16px] leading-6 font-bold text-[#1c1b1f]">{loading ? '—' : count}</p>
+          </div>
+          <div className="flex flex-col gap-1 items-end text-right">
+            <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Penalty applied</p>
+            <p className="text-[16px] leading-6 font-bold text-[#1c1b1f]">${penalty.toFixed(2)}</p>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// The filter strip is a small self-contained control over one piece of state.
+function HistoryFilters({ filter, onSelect }: { filter: Filter; onSelect: (f: Filter) => void }) {
+  return (
+    <div className="px-5 flex gap-[9px] flex-wrap">
+      {FILTERS.map((f) => (
+        <button
+          key={f.key}
+          type="button"
+          onClick={() => onSelect(f.key)}
+          className={`px-4 py-3 rounded-[10px] text-[12px] leading-4 font-semibold transition-colors ${
+            filter === f.key ? 'bg-[#1c1b1f] text-white' : 'border-[0.75px] border-[#d2dbe9] text-[#514e59]'
+          }`}
+        >
+          {f.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// One history row, kept apart so the list stays readable.
+function HistoryRow({ booking, amount, label }: { booking: Booking; amount: string; label: string }) {
+  return (
+    <div className="bg-white border-[0.75px] border-[#d2dbe9] rounded-[12px] p-3 flex items-start justify-between">
+      <div className="flex flex-col gap-2">
+        <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f]">{booking.users?.full_name || 'Customer'}</p>
+        <div className="flex items-center gap-2">
+          <span className="text-[12px] leading-4 font-medium text-[#a09cab]">{formatDate(booking.booking_date)}</span>
+          <StatusPill label={statusLabel(booking.status)} />
+        </div>
+      </div>
+      <div className="flex flex-col gap-1 items-end text-right">
+        <p className="text-[16px] leading-6 font-bold text-[#1c1b1f]">{amount}</p>
+        <p className="text-[12px] leading-4 font-medium text-[#a09cab]">{label}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function BarberWallet() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
@@ -125,61 +219,16 @@ export default function BarberWallet() {
       <ScreenHeader title="Wallet" />
 
       {/* Stat cards row */}
-      <div className="px-5 py-4 grid grid-cols-3 gap-3">
-        {STAT_CARDS.map((card) => {
-          const Icon = card.icon;
-          return (
-            <div key={card.label.join(' ')} className="bg-white border-[0.75px] border-[#d2dbe9] rounded-[12px] p-3 flex flex-col gap-3">
-              <div className="w-[42px] h-[42px] bg-[#f2f1fa] rounded-[8px] flex items-center justify-center">
-                <Icon className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
-              </div>
-              <p className="text-[12px] leading-4 font-medium text-[#a09cab]">
-                {card.label[0]}
-                <br />
-                {card.label[1]}
-              </p>
-              <p className="text-[18px] leading-6 font-bold text-[#1c1b1f]">{card.value}</p>
-            </div>
-          );
-        })}
-      </div>
+      <StatCards cards={STAT_CARDS} />
 
-      {/* No-show & Penalties — Figma page 56 */}
-      <div className="px-5 py-4">
-        <h2 className="text-[18px] leading-6 font-bold text-[#1c1b1f]">No-show &amp; Penalties</h2>
-      </div>
-      <div className="px-5">
-        <div className="bg-white border-[0.75px] border-[#d2dbe9] rounded-[12px] p-3 flex items-start justify-between">
-          <div className="flex flex-col gap-1">
-            <p className="text-[12px] leading-4 font-medium text-[#a09cab]">No-show reports (this month)</p>
-            <p className="text-[16px] leading-6 font-bold text-[#1c1b1f]">{loading ? '—' : noShowStats.count}</p>
-          </div>
-          <div className="flex flex-col gap-1 items-end text-right">
-            <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Penalty applied</p>
-            <p className="text-[16px] leading-6 font-bold text-[#1c1b1f]">${noShowStats.penalty.toFixed(2)}</p>
-          </div>
-        </div>
-      </div>
+      <NoShowPanel loading={loading} count={noShowStats.count} penalty={noShowStats.penalty} />
 
       {/* History — Figma page 56 */}
       <div className="px-5 py-4 mt-2">
         <h2 className="text-[18px] leading-6 font-bold text-[#1c1b1f]">History</h2>
       </div>
 
-      <div className="px-5 flex gap-[9px] flex-wrap">
-        {FILTERS.map((f) => (
-          <button
-            key={f.key}
-            type="button"
-            onClick={() => setFilter(f.key)}
-            className={`px-4 py-3 rounded-[10px] text-[12px] leading-4 font-semibold transition-colors ${
-              filter === f.key ? 'bg-[#1c1b1f] text-white' : 'border-[0.75px] border-[#d2dbe9] text-[#514e59]'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
+      <HistoryFilters filter={filter} onSelect={setFilter} />
 
       <div className="px-5 py-4 space-y-4">
         {loading ? (
@@ -188,19 +237,7 @@ export default function BarberWallet() {
           <p className="text-center text-sm text-[#a09cab] py-8">No transactions yet</p>
         ) : (
           filtered.map((b) => (
-            <div key={b.id} className="bg-white border-[0.75px] border-[#d2dbe9] rounded-[12px] p-3 flex items-start justify-between">
-              <div className="flex flex-col gap-2">
-                <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f]">{b.users?.full_name || 'Customer'}</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-[12px] leading-4 font-medium text-[#a09cab]">{formatDate(b.booking_date)}</span>
-                  <StatusPill label={statusLabel(b.status)} />
-                </div>
-              </div>
-              <div className="flex flex-col gap-1 items-end text-right">
-                <p className="text-[16px] leading-6 font-bold text-[#1c1b1f]">{feeAmount(b)}</p>
-                <p className="text-[12px] leading-4 font-medium text-[#a09cab]">{feeLabel(b)}</p>
-              </div>
-            </div>
+            <HistoryRow key={b.id} booking={b} amount={feeAmount(b)} label={feeLabel(b)} />
           ))
         )}
       </div>

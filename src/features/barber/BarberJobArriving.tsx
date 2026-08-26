@@ -6,6 +6,34 @@ import { toast } from 'sonner';
 import { useAuthStore } from '@/store/useAuthStore';
 import { fetchBarberJobs, type Job } from './BarberJobs';
 
+// The two "running late" buttons are a self-contained pair with no data of their
+// own, so they read better as one named piece of the screen.
+function RunningLate() {
+  return (
+    <div className="px-5 pt-8">
+      <h2 className="text-[20px] leading-6 font-bold text-[#1c1b1f]">Running late</h2>
+      <div className="mt-4 flex gap-3">
+        <button
+          type="button"
+          onClick={() => toast.message('Note sent: running 10 mins late')}
+          className="flex-1 text-left border-[0.75px] border-[#d2dbe9] rounded-[12px] p-4"
+        >
+          <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f]">10 mins</p>
+          <p className="text-[12px] leading-4 font-medium text-[#a09cab] mt-1">Send quick note</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => toast.message('Note sent: running 20+ mins late')}
+          className="flex-1 text-left border-[0.75px] border-[#d2dbe9] rounded-[12px] p-4"
+        >
+          <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f]">20+ mins</p>
+          <p className="text-[12px] leading-4 font-medium text-[#a09cab] mt-1">Inform Customer</p>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* Barber Arriving — Figma p54 */
 export default function BarberJobArriving() {
   const navigate = useNavigate();
@@ -79,27 +107,7 @@ export default function BarberJobArriving() {
       </div>
 
       {/* Running late */}
-      <div className="px-5 pt-8">
-        <h2 className="text-[20px] leading-6 font-bold text-[#1c1b1f]">Running late</h2>
-        <div className="mt-4 flex gap-3">
-          <button
-            type="button"
-            onClick={() => toast.message('Note sent: running 10 mins late')}
-            className="flex-1 text-left border-[0.75px] border-[#d2dbe9] rounded-[12px] p-4"
-          >
-            <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f]">10 mins</p>
-            <p className="text-[12px] leading-4 font-medium text-[#a09cab] mt-1">Send quick note</p>
-          </button>
-          <button
-            type="button"
-            onClick={() => toast.message('Note sent: running 20+ mins late')}
-            className="flex-1 text-left border-[0.75px] border-[#d2dbe9] rounded-[12px] p-4"
-          >
-            <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f]">20+ mins</p>
-            <p className="text-[12px] leading-4 font-medium text-[#a09cab] mt-1">Inform Customer</p>
-          </button>
-        </div>
-      </div>
+      <RunningLate />
 
       {/* Actions */}
       <div className="px-5 mt-auto pt-8">

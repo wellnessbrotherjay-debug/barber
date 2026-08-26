@@ -318,12 +318,12 @@ systemctl reload nginx
 curl https://barber.safetykat.com/health
 
 # Admin dashboard (with API key)
-curl -H "Authorization: Bearer YOUR_API_KEY" \
+curl -H "Authorization: Bearer <the key from the environment>" \
   -H "X-Admin-Role: true" \
   https://barber.safetykat.com/admin/dashboard
 
 # Company dashboard
-curl -H "Authorization: Bearer COMPANY_API_KEY" \
+curl -H "Authorization: Bearer <the key from the environment>" \
   https://barber.safetykat.com/api/v1/company/dashboard
 ```
 
@@ -362,7 +362,7 @@ lsof -p $(pgrep -f "barber-app")
 ```bash
 # API call to admin endpoint
 curl -X POST https://barber.safetykat.com/admin/companies \
-  -H "Authorization: Bearer ADMIN_API_KEY" \
+  -H "Authorization: Bearer <the admin key from the environment>" \
   -H "X-Admin-Role: true" \
   -H "Content-Type: application/json" \
   -d '{

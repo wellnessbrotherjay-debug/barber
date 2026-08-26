@@ -231,7 +231,7 @@ WantedBy=multi-user.target
 ### Nginx Reverse Proxy
 ```nginx
 upstream barber_backend {
-  server 127.0.0.1:5000;
+  server <the server, over the private network>:5000;
 }
 
 server {

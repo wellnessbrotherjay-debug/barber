@@ -11,7 +11,7 @@ Complete guide to deploy the barber app as a production systemd service on LOKI 
 
 ## Prerequisites
 
-- SSH access to LOKI server (root@75.119.140.69 or via Tailscale 100.84.100.96)
+- SSH access to LOKI server (root@<the server> or via Tailscale <the server, over the private network>)
 - Domain name pointing to LOKI IP
 - PostgreSQL running on LOKI (port 5432)
 - Node.js 18+ installed
@@ -23,7 +23,7 @@ Complete guide to deploy the barber app as a production systemd service on LOKI 
 
 ```bash
 # SSH to LOKI
-ssh root@100.84.100.96
+ssh root@<the server>
 
 # Connect to PostgreSQL
 psql -U postgres
@@ -70,7 +70,7 @@ psql -U postgres -l | grep barber
 
 ```bash
 # Add A record to your domain registrar
-barber.safetykat.com  A  75.119.140.69
+barber.safetykat.com  A  <the server, over the private network>
 
 # Verify
 nslookup barber.safetykat.com
@@ -80,7 +80,7 @@ nslookup barber.safetykat.com
 
 ```bash
 # SSH to LOKI
-ssh root@100.84.100.96
+ssh root@<the server>
 
 # Install certbot
 apt-get update
@@ -109,20 +109,20 @@ npm run build
 npm run build:server
 
 # Deploy to LOKI
-ssh root@100.84.100.96 'mkdir -p /opt/htf/barber-app'
-scp -r dist root@100.84.100.96:/opt/htf/barber-app/
-scp -r docs root@100.84.100.96:/opt/htf/barber-app/
-scp package.json package-lock.json root@100.84.100.96:/opt/htf/barber-app/
+ssh root@<the server> 'mkdir -p /opt/htf/barber-app'
+scp -r dist root@<the server>:/opt/htf/barber-app/
+scp -r docs root@<the server>:/opt/htf/barber-app/
+scp package.json package-lock.json root@<the server>:/opt/htf/barber-app/
 
 # Install production dependencies on LOKI
-ssh root@100.84.100.96 'cd /opt/htf/barber-app && npm install --production'
+ssh root@<the server> 'cd /opt/htf/barber-app && npm install --production'
 ```
 
 ### 2. Create Environment Configuration
 
 ```bash
 # SSH to LOKI
-ssh root@100.84.100.96
+ssh root@<the server>
 
 # Create .env.production
 cat > /opt/htf/barber-app/.env.production <<'EOF'
@@ -145,7 +145,7 @@ chmod 600 /opt/htf/barber-app/.env.production
 
 ```bash
 # SSH to LOKI
-ssh root@100.84.100.96
+ssh root@<the server>
 
 # Create systemd unit file
 cat > /etc/systemd/system/barber-app.service <<'EOF'
@@ -205,7 +205,7 @@ journalctl -u barber-app.service -f  # Follow logs
 
 ```bash
 # SSH to LOKI
-ssh root@100.84.100.96
+ssh root@<the server>
 
 # Create nginx config
 cat > /etc/nginx/sites-available/barber.safetykat.com <<'EOF'
@@ -250,7 +250,7 @@ server {
 
   # CORS/API Proxy
   location / {
-    proxy_pass http://127.0.0.1:5000;
+    proxy_pass http://<the server, over the private network>:5000;
     proxy_http_version 1.1;
 
     # Headers
@@ -289,7 +289,7 @@ server {
 
   # Health check
   location /health {
-    proxy_pass http://127.0.0.1:5000/health;
+    proxy_pass http://<the server, over the private network>:5000/health;
     access_log off;
   }
 
@@ -386,7 +386,7 @@ curl -X POST https://barber.safetykat.com/admin/companies \
 
 ```bash
 # SSH to LOKI
-ssh root@100.84.100.96
+ssh root@<the server>
 
 # Clone template for new tenant
 psql -U postgres <<'EOF'

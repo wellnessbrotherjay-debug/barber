@@ -22,3 +22,14 @@ docs/ADMIN_DATABASE_SCHEMA.sql
 # Capacitor scaffold example tests - never written, never run.
 android/app/src/androidTest/
 android/app/src/test/
+
+# Superseded deployment guides and progress snapshots. They named databases
+# that were renamed on 26 August 2026, so following them built the wrong thing.
+# The current documentation is the README in each folder.
+BACKEND_SETUP.md
+DEPLOYMENT_COMPLETE.md
+DEPLOYMENT_QUICKSTART.md
+PROJECT_COMPLETE.txt
+docs/LOKI_SETUP_GUIDE.md
+docs/PROJECT_STATUS.md
+docs/MULTITENANT_PROJECT_STATUS.md

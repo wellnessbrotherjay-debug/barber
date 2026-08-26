@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import ScreenHeader from '../../components/ScreenHeader';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, Clock, MapPin, Image as ImageIcon } from 'lucide-react';
+import { Clock, MapPin, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/store/useAuthStore';
 import { fetchBarberJobs, type Job } from './BarberJobs';
@@ -41,13 +42,7 @@ export default function BarberJobArriving() {
   return (
     <div className="min-h-screen bg-white flex flex-col pb-8">
       {/* Top Navigation Bar */}
-      <div className="flex items-center justify-center gap-1.5 px-5 py-4 pt-14 bg-white">
-        <button type="button" aria-label="Back" onClick={() => navigate(-1)} className="w-6 h-6 flex items-center justify-center shrink-0">
-          <ChevronLeft className="w-6 h-6 text-[#1c1b1f]" strokeWidth={2} />
-        </button>
-        <p className="flex-1 text-center text-[16px] leading-6 font-bold text-[#1c1b1f]">Barber Arriving</p>
-        <span className="w-6 h-6 shrink-0" />
-      </div>
+      <ScreenHeader title="Barber Arriving" />
 
       {loading && <p className="text-center text-sm text-[#a09cab] py-4">Loading…</p>}
 

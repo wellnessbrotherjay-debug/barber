@@ -981,8 +981,8 @@ app.post('/api/bookings/:id/accept', requireBarberAuth, async (req: Request, res
   try {
     const { id } = req.params;
     // SECURITY: only the barber the booking was addressed to may accept it.
-    const barberId = await getOwnBarberProfileId(req.tenant!.pool, req.tenant!.userId!);
-    if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
+    const barberId = await requireOwnBarberProfileId(req, res);
+    if (!barberId) return;
 
     const result = await req.tenant!.pool.query(
       'SELECT * FROM barber.accept_booking(booking_id_ => $1, barber_id_ => $2)',
@@ -1015,8 +1015,8 @@ app.post('/api/bookings/:id/complete', requireBarberAuth, async (req: Request, r
   try {
     const { id } = req.params;
     // SECURITY: only the assigned barber may mark their own job complete.
-    const barberId = await getOwnBarberProfileId(req.tenant!.pool, req.tenant!.userId!);
-    if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
+    const barberId = await requireOwnBarberProfileId(req, res);
+    if (!barberId) return;
 
     const result = await req.tenant!.pool.query(
       'SELECT * FROM barber.complete_booking(booking_id_ => $1, barber_id_ => $2)',
@@ -1221,6 +1221,26 @@ async function getOwnBarberProfileId(pool: any, userId: string): Promise<string 
   return result.rows[0]?.id || null;
 }
 
+/**
+ * The signed-in barber's own profile id, or nothing - and if there is nothing,
+ * the 404 has already been sent by the time this returns.
+ *
+ * Sixteen handlers opened with the same two lines: look the barber up, and
+ * answer "Barber profile not found" if there was none. Written out sixteen
+ * times, it only takes one of them to be forgotten for an endpoint to carry on
+ * with no barber at all, which is the one mistake this guard exists to prevent.
+ *
+ * The id always comes from the token, never from anything the caller sends.
+ */
+async function requireOwnBarberProfileId(req: Request, res: Response): Promise<string | null> {
+  const barberId = await getOwnBarberProfileId(req.tenant!.pool, req.tenant!.userId!);
+  if (!barberId) {
+    res.status(404).json({ error: 'Barber profile not found' });
+    return null;
+  }
+  return barberId;
+}
+
 // ============================================================================
 // NOTIFICATIONS (Figma: Notifications screen + customer nav tab)
 // Rows are written server-side on booking lifecycle events and read back by
@@ -1377,8 +1397,8 @@ app.get('/api/barber/services', requireBarberAuth, async (req: Request, res: Res
   try {
     const pool = req.tenant!.pool;
     const userId = req.tenant!.userId!;
-    const barberId = await getOwnBarberProfileId(pool, userId);
-    if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
+    const barberId = await requireOwnBarberProfileId(req, res);
+    if (!barberId) return;
     const result = await pool.query(
       'SELECT * FROM barber.get_own_services(barber_id_ => $1)',
       [barberId]
@@ -1395,8 +1415,8 @@ app.get('/api/barber/schedule', requireBarberAuth, async (req: Request, res: Res
   try {
     const pool = req.tenant!.pool;
     const userId = req.tenant!.userId!;
-    const barberId = await getOwnBarberProfileId(pool, userId);
-    if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
+    const barberId = await requireOwnBarberProfileId(req, res);
+    if (!barberId) return;
     const result = await pool.query(
       'SELECT * FROM barber.get_barber_schedule(barber_id_ => $1)',
       [barberId]
@@ -1429,8 +1449,8 @@ app.put('/api/barber/profile', requireBarberAuth, async (req: Request, res: Resp
   try {
     const pool = req.tenant!.pool;
     const userId = req.tenant!.userId!;
-    const barberId = await getOwnBarberProfileId(pool, userId);
-    if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
+    const barberId = await requireOwnBarberProfileId(req, res);
+    if (!barberId) return;
 
     const {
       shop_name,
@@ -1559,8 +1579,8 @@ app.patch('/api/barber/online', requireBarberAuth, async (req: Request, res: Res
   try {
     const pool = req.tenant!.pool;
     const userId = req.tenant!.userId!;
-    const barberId = await getOwnBarberProfileId(pool, userId);
-    if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
+    const barberId = await requireOwnBarberProfileId(req, res);
+    if (!barberId) return;
 
     const { is_online } = req.body || {};
     if (typeof is_online !== 'boolean') {
@@ -1583,8 +1603,8 @@ app.post('/api/barber/services', requireBarberAuth, async (req: Request, res: Re
   try {
     const pool = req.tenant!.pool;
     const userId = req.tenant!.userId!;
-    const barberId = await getOwnBarberProfileId(pool, userId);
-    if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
+    const barberId = await requireOwnBarberProfileId(req, res);
+    if (!barberId) return;
 
     const { name, description, price, duration_minutes, category_id } = req.body || {};
     if (!name || price == null || !duration_minutes) {
@@ -1608,8 +1628,8 @@ app.put('/api/barber/services/:id', requireBarberAuth, async (req: Request, res:
   try {
     const pool = req.tenant!.pool;
     const userId = req.tenant!.userId!;
-    const barberId = await getOwnBarberProfileId(pool, userId);
-    if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
+    const barberId = await requireOwnBarberProfileId(req, res);
+    if (!barberId) return;
 
     const { name, description, price, duration_minutes, category_id, is_active } = req.body || {};
 
@@ -1634,8 +1654,8 @@ app.delete('/api/barber/services/:id', requireBarberAuth, async (req: Request, r
   try {
     const pool = req.tenant!.pool;
     const userId = req.tenant!.userId!;
-    const barberId = await getOwnBarberProfileId(pool, userId);
-    if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
+    const barberId = await requireOwnBarberProfileId(req, res);
+    if (!barberId) return;
 
     const result = await pool.query(
       'SELECT * FROM barber.delete_service(service_id_ => $1, barber_id_ => $2)',
@@ -1659,8 +1679,8 @@ app.put('/api/barber/schedule', requireBarberAuth, async (req: Request, res: Res
   try {
     const pool = req.tenant!.pool;
     const userId = req.tenant!.userId!;
-    const barberId = await getOwnBarberProfileId(pool, userId);
-    if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
+    const barberId = await requireOwnBarberProfileId(req, res);
+    if (!barberId) return;
 
     const { schedule } = req.body || {};
     if (!Array.isArray(schedule)) {
@@ -1695,8 +1715,8 @@ app.post('/api/barber/onboarding/complete', requireBarberAuth, async (req: Reque
   try {
     const pool = req.tenant!.pool;
     const userId = req.tenant!.userId!;
-    const barberId = await getOwnBarberProfileId(pool, userId);
-    if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
+    const barberId = await requireOwnBarberProfileId(req, res);
+    if (!barberId) return;
 
     const checkResult = await pool.query(
       'SELECT * FROM barber.get_onboarding_check(barber_id_ => $1)',
@@ -1732,8 +1752,8 @@ app.post('/api/barber/verification/submit', requireBarberAuth, async (req: Reque
   try {
     const pool = req.tenant!.pool;
     const userId = req.tenant!.userId!;
-    const barberId = await getOwnBarberProfileId(pool, userId);
-    if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
+    const barberId = await requireOwnBarberProfileId(req, res);
+    if (!barberId) return;
 
     const { documentTypes } = req.body || {};
     if (!Array.isArray(documentTypes) || documentTypes.length === 0) {
@@ -1764,8 +1784,8 @@ app.get('/api/barber/verification/documents', requireBarberAuth, async (req: Req
   try {
     const pool = req.tenant!.pool;
     const userId = req.tenant!.userId!;
-    const barberId = await getOwnBarberProfileId(pool, userId);
-    if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
+    const barberId = await requireOwnBarberProfileId(req, res);
+    if (!barberId) return;
 
     const result = await pool.query(
       'SELECT * FROM barber.list_verification_documents(barber_id_ => $1)',
@@ -1784,8 +1804,8 @@ app.patch('/api/barber/profile/photos', requireBarberAuth, async (req: Request, 
   try {
     const pool = req.tenant!.pool;
     const userId = req.tenant!.userId!;
-    const barberId = await getOwnBarberProfileId(pool, userId);
-    if (!barberId) return res.status(404).json({ error: 'Barber profile not found' });
+    const barberId = await requireOwnBarberProfileId(req, res);
+    if (!barberId) return;
 
     const { count } = req.body || {};
     if (typeof count !== 'number' || count < 0) {

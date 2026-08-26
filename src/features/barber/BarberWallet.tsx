@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import ScreenHeader from '../../components/ScreenHeader';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Calendar, CircleCheck, TrendingUp } from 'lucide-react';
+import { Calendar, CircleCheck, TrendingUp } from 'lucide-react';
 import BarberNav from '@/components/BarberNav';
 import { fetchBarberBookingsForUser } from '@/lib/api';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -121,13 +122,7 @@ export default function BarberWallet() {
   return (
     <div className="min-h-screen bg-white pb-[88px]">
       {/* Top Navigation Bar — Figma page 56 */}
-      <div className="flex items-center justify-center gap-1.5 px-5 py-4 pt-14 bg-white">
-        <button type="button" aria-label="Back" onClick={() => navigate(-1)} className="w-6 h-6 flex items-center justify-center shrink-0">
-          <ChevronLeft className="w-6 h-6 text-[#1c1b1f]" strokeWidth={2} />
-        </button>
-        <p className="flex-1 text-center text-[16px] leading-6 font-bold text-[#1c1b1f]">Wallet</p>
-        <span className="w-6 h-6 shrink-0" />
-      </div>
+      <ScreenHeader title="Wallet" />
 
       {/* Stat cards row */}
       <div className="px-5 py-4 grid grid-cols-3 gap-3">

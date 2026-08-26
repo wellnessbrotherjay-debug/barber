@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import ScreenHeader from '../../components/ScreenHeader';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Star, UserRound } from 'lucide-react';
+import { Star, UserRound } from 'lucide-react';
 import BarberNav from '@/components/BarberNav';
 import { authFetch } from '@/lib/api';
 
@@ -83,13 +84,7 @@ export default function BarberReviews() {
   return (
     <div className="min-h-screen bg-white pb-[180px]">
       {/* Top Navigation Bar — Figma page 57 */}
-      <div className="flex items-center justify-center gap-1.5 px-5 py-4 pt-14 bg-white">
-        <button type="button" aria-label="Back" onClick={() => navigate(-1)} className="w-6 h-6 flex items-center justify-center shrink-0">
-          <ChevronLeft className="w-6 h-6 text-[#1c1b1f]" strokeWidth={2} />
-        </button>
-        <p className="flex-1 text-center text-[16px] leading-6 font-bold text-[#1c1b1f]">Reviews</p>
-        <span className="w-6 h-6 shrink-0" />
-      </div>
+      <ScreenHeader title="Reviews" />
 
       {/* Reviews headline row */}
       <div className="px-5 py-4 flex items-start justify-between">

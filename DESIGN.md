@@ -3,7 +3,7 @@
 > Get a hair cut, wherever, whenever.
 
 Source of truth for Shorter's visual identity. Derived from `Shorter_BRANDKIT.pdf`.
-Contact: Armen@getshorter.app
+Contact: <an email address>
 
 ## Brand
 

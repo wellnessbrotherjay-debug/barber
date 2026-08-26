@@ -367,7 +367,7 @@ curl -X POST https://barber.safetykat.com/admin/companies \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Elite Barbershop",
-    "owner_email": "owner@elite-barber.com",
+    "owner_email": "<an email address>",
     "subscription_tier": "pro",
     "max_barbers": 5
   }'
@@ -376,7 +376,7 @@ curl -X POST https://barber.safetykat.com/admin/companies \
 # {
 #   "id": 2,
 #   "name": "Elite Barbershop",
-#   "owner_email": "owner@elite-barber.com",
+#   "owner_email": "<an email address>",
 #   "api_key": "sk_live_...",
 #   "subscription_tier": "pro"
 # }

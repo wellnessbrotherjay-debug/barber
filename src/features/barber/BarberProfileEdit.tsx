@@ -180,7 +180,8 @@ export default function BarberProfileEdit() {
             setJobsCompleted(rows.filter((b: any) => b.status === 'completed').length);
           }
         }
-      } catch {
+      } catch (err) {
+        console.error(`[BarberProfileEdit] saving the barber profile failed:`, err);
         // leave defaults
       } finally {
         if (!cancelled) setLoading(false);

@@ -66,7 +66,8 @@ export default function BarberWallet() {
         if (!res.ok) throw new Error(`Failed to load bookings: ${res.status}`);
         const data = await res.json();
         if (!cancelled) setBookings(Array.isArray(data) ? data : []);
-      } catch {
+      } catch (err) {
+        console.error(`[BarberWallet] loading wallet takings failed:`, err);
         if (!cancelled) setBookings([]);
       } finally {
         if (!cancelled) setLoading(false);

@@ -13,3 +13,12 @@ coverage/
 # Capacitor copies the built web bundle in here on every sync - generated
 # output, never source, and scanning it reports the bundler own code as ours.
 android/app/src/main/assets/public/
+
+# Superseded schema dumps. The schema is migrations/, applied in order;
+# these hand-kept copies had drifted behind the real database.
+docs/DATABASE_SCHEMA.sql
+docs/ADMIN_DATABASE_SCHEMA.sql
+
+# Capacitor scaffold example tests - never written, never run.
+android/app/src/androidTest/
+android/app/src/test/

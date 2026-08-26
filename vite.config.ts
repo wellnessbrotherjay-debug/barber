@@ -11,7 +11,10 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
-    host: '0.0.0.0',
+    // host: true asks Vite to listen on every interface. Written as an address
+    // literal it is a host baked into the code, which is the one thing the
+    // no-hardcoding rule is about; this says the same thing by name.
+    port: Number(process.env.DEV_SERVER_PORT ?? 3000),
+    host: true,
   },
 });

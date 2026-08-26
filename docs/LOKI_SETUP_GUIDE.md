@@ -29,13 +29,13 @@ psql -U postgres -l | grep shorter_app
 
 ```bash
 # From your local machine, copy schema to LOKI
-scp docs/DATABASE_SCHEMA.sql root@75.119.140.69:/tmp/
+# the schema is migrations/, applied in order by scripts/deploy-to-loki.sh
 
 # Connect to LOKI and run schema
 ssh root@75.119.140.69
 
 # Run the schema migration
-psql -U postgres -d shorter_app -f /tmp/DATABASE_SCHEMA.sql
+LOKI_HOST=... LOKI_USER=<the application role> LOKI_DB=... ./scripts/deploy-to-loki.sh
 
 # Verify tables were created
 psql -U postgres -d shorter_app -c "\dt"
@@ -255,4 +255,4 @@ Solution:
 ## Support
 
 For LOKI access issues, contact your infrastructure team.
-For database schema questions, refer to DATABASE_SCHEMA.sql comments.
+For database schema questions, read migrations/ - they are the schema.

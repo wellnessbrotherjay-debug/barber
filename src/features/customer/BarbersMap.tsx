@@ -53,7 +53,8 @@ export default function BarbersMap() {
         if (cancelled) return;
         setBarbers(list);
         setSelected(list.find((b) => Number.isFinite(Number((b as any).latitude))) || list[0] || null);
-      } catch {
+      } catch (err) {
+        console.error(`[BarbersMap] loading barbers for the map failed:`, err);
         /* map still renders; card just stays empty */
       }
     })();

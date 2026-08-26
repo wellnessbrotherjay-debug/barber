@@ -65,7 +65,8 @@ export default function DeleteAccountDialog({ onClose }: { onClose: () => void }
       logout();
       clearToken();
       navigate('/welcome', { replace: true });
-    } catch {
+    } catch (err) {
+        console.error(`[DeleteAccountDialog] deleting the account failed:`, err);
       setError('Network error. Please check your connection and try again.');
       setBusy(false);
     }

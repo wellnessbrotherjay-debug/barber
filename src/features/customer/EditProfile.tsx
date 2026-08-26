@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { uploadMyAvatar } from '../../lib/api';
 import {
   ChevronLeft,
   ChevronRight,
@@ -40,6 +41,8 @@ function PillInput({
 
 export default function EditProfile() {
   const navigate = useNavigate();
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const { user, setUser } = useAuthStore();
 
   const [fullName, setFullName] = useState(user?.full_name || '');
@@ -95,12 +98,35 @@ export default function EditProfile() {
         <h1 className="text-[22px] font-bold text-[#1c1b1f] mt-6">
           {fullName || user?.full_name || 'Your Name'}
         </h1>
+        <input
+          ref={photoInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/heic"
+          className="hidden"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            e.target.value = '';
+            if (!file) return;
+            try {
+              setUploadingPhoto(true);
+              const url = await uploadMyAvatar(file);
+              setUser(user ? { ...user, avatar_url: url } : user);
+              toast.success('Photo updated');
+            } catch (err) {
+              console.error('[EditProfile] photo upload failed:', err);
+              toast.error(err instanceof Error ? err.message : 'Photo upload failed');
+            } finally {
+              setUploadingPhoto(false);
+            }
+          }}
+        />
         <button
           type="button"
-          onClick={() => toast.info('Photo upload is coming soon')}
-          className="text-[14px] font-medium text-[#6c6a75] mt-1"
+          disabled={uploadingPhoto}
+          onClick={() => photoInputRef.current?.click()}
+          className="text-[14px] font-medium text-[#6c6a75] mt-1 disabled:opacity-50"
         >
-          Change Photo
+          {uploadingPhoto ? 'Uploading…' : 'Change Photo'}
         </button>
         <p className="text-[13px] font-medium text-[#a09cab] text-center leading-5 mt-2 max-w-[330px]">
           This information helps barbers identify you and find your location easily.
@@ -211,7 +237,7 @@ export default function EditProfile() {
           </div>
           <button
             type="button"
-            onClick={() => toast.info('Role switching is coming soon')}
+            onClick={() => navigate('/welcome')}
             className="text-[14px] font-bold text-[#1c1b1f]"
           >
             Switch Role

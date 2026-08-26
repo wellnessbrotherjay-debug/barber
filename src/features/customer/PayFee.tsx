@@ -179,20 +179,19 @@ function AuthorizesPayment({ onConfirm }: { onConfirm: () => void }) {
           </div>
 
           <p className="text-[16px] font-bold text-[#1c1b1f] mt-5">Select Payment Method</p>
+          {/* This row used to show "•••• 4242" with a Change button: digits
+              nobody had typed, for a card nobody had added, on an account with
+              no card on file. Inventing a person's own payment details on
+              screen is worse than showing none. The card the customer actually
+              pays with is added on the payment step, which is switched on with
+              the booking fee. */}
           <div className="rounded-[12px] border-[0.75px] border-[#d2dbe9] bg-white p-4 mt-3 flex items-center gap-3">
             <div className="bg-[#f8f8f8] rounded-[8px] w-[38px] h-[38px] flex items-center justify-center shrink-0">
               <CreditCard className="w-4 h-4 text-[#1c1b1f]" />
             </div>
-            <p className="flex-1 text-[14px] font-bold text-[#1c1b1f] tracking-wide">
-              &bull;&bull;&bull;&bull; 4242
+            <p className="flex-1 text-[14px] font-medium text-[#6c6a75]">
+              You&rsquo;ll enter your card on the next step
             </p>
-            <button
-              type="button"
-              onClick={() => toast.info('Card management is coming soon')}
-              className="text-[13px] font-medium text-[#a09cab]"
-            >
-              Change
-            </button>
           </div>
         </div>
       </div>

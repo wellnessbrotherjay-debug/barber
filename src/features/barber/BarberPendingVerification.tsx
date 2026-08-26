@@ -58,7 +58,8 @@ export default function BarberPendingVerification() {
           const docBody = await docsRes.json();
           if (!cancelled) setDocs(docBody);
         }
-      } catch {
+      } catch (err) {
+        console.error(`[BarberPendingVerification] checking verification status failed:`, err);
         // network hiccup — leave existing state, don't block the screen
       } finally {
         if (!cancelled) setLoading(false);

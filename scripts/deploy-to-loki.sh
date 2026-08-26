@@ -11,25 +11,27 @@ NC='\033[0m'
 
 echo -e "${YELLOW}🚀 Barber App - LOKI Database Deployment${NC}"
 
-# Default to Tailscale IP (secure private network)
-LOKI_HOST=${LOKI_HOST:-100.84.100.96}
+# Nothing about the destination is written into this script. A default host is
+# how a deployment silently lands on the wrong machine, and the address of a
+# server is not something a repository should carry.
+LOKI_HOST=${LOKI_HOST:?LOKI_HOST must be set - this script never assumes which server it is talking to}
 LOKI_USER=${LOKI_USER:?LOKI_USER must be set - the superuser is never used (RULES_NEVER_POSTGRES_USER); use the application role}
 LOKI_PASSWORD=${LOKI_PASSWORD:-}
-LOKI_PORT=${LOKI_PORT:-5432}
-LOKI_DB=${LOKI_DB:-shorter_admin}
+LOKI_PORT=${LOKI_PORT:?LOKI_PORT must be set}
+LOKI_DB=${LOKI_DB:?LOKI_DB must be set - name the database you mean}
 
 # Check required variables
 if [ -z "$LOKI_PASSWORD" ]; then
   echo -e "${RED}❌ LOKI_PASSWORD environment variable required${NC}"
   echo ""
   echo "Usage:"
-  echo "  LOKI_PASSWORD='your-password' ./scripts/deploy-to-loki.sh"
+  echo "  LOKI_PASSWORD=... LOKI_HOST=... LOKI_USER=... LOKI_PORT=... LOKI_DB=... ./scripts/deploy-to-loki.sh"
   echo ""
   echo "Optional:"
-  echo "  LOKI_HOST=100.84.100.96 (default: Tailscale private IP)"
+  echo "  LOKI_HOST=<the server, over the private network>"
   echo "  LOKI_USER=<the application role - never the superuser>"
-  echo "  LOKI_PORT=5432 (default)"
-  echo "  LOKI_DB=shorter_admin (default)"
+  echo "  LOKI_PORT=<the database port>"
+  echo "  LOKI_DB=<the database to deploy into>"
   exit 1
 fi
 
@@ -52,7 +54,18 @@ PGPASSWORD="$LOKI_PASSWORD" psql -h "$LOKI_HOST" -p "$LOKI_PORT" -U "$LOKI_USER"
 
 # Run schema migration
 echo -e "${YELLOW}Deploying schema...${NC}"
-if [ ! -f "docs/DATABASE_SCHEMA.sql" ]; then
+# THE SCHEMA IS THE MIGRATIONS, IN ORDER. This used to apply a hand-kept copy in
+# docs/ that had drifted two tables behind the real database - so a database
+# built by this script was not the database the application expects.
+if [ ! -d "migrations" ]; then
+  echo -e "${RED}Schema folder not found: migrations/${NC}"
+  exit 1
+fi
+
+for MIGRATION in migrations/*.sql; do
+  echo -e "${YELLOW}applying $(basename "$MIGRATION")${NC}"
+  PGPASSWORD="$LOKI_PASSWORD" psql -h "$LOKI_HOST" -p "$LOKI_PORT" -U "$LOKI_USER" -d "$LOKI_DB" -v ON_ERROR_STOP=1 -f "$MIGRATION" || exit 1
+done
   echo -e "${RED}❌ Schema file not found: docs/DATABASE_SCHEMA.sql${NC}"
   exit 1
 fi

@@ -55,7 +55,8 @@ export default function BarberReviews() {
             if (!cancelled) setReviews(Array.isArray(data) ? data : []);
           }
         }
-      } catch {
+      } catch (err) {
+        console.error(`[BarberReviews] loading reviews failed:`, err);
         if (!cancelled) setReviews([]);
       } finally {
         if (!cancelled) setLoading(false);

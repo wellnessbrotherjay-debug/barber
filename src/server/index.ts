@@ -274,7 +274,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // Barber image uploads (avatar + work gallery). Mounted after tenantMiddleware
 // so req.tenant is populated; every route inside is requireBarberAuth-guarded
 // and resolves the owning barber server-side from the JWT.
-app.use(createUploadsRouter(requireBarberAuth));
+app.use(createUploadsRouter(requireBarberAuth, requireUserAuth));
 
 // Database connection test
 app.get('/api/health', async (req: Request, res: Response) => {

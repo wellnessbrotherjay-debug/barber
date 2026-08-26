@@ -318,7 +318,8 @@ export default function BarberOnboarding() {
             if (sample?.end_time) setEndTime(String(sample.end_time).slice(0, 5));
           }
         }
-      } catch {
+      } catch (err) {
+        console.error(`[BarberOnboarding] restoring saved onboarding progress failed:`, err);
         // Keep defaults — the user can still fill the flow in from scratch.
       } finally {
         if (!cancelled) setHydrated(true);
@@ -915,7 +916,8 @@ export default function BarberOnboarding() {
                 const n = Array.isArray(mine) ? mine.length : 0;
                 setServicesCount(n);
                 toast.success(`${n} service${n === 1 ? '' : 's'} saved`);
-              } catch {
+              } catch (err) {
+        console.error(`[BarberOnboarding] restoring saved onboarding progress failed:`, err);
                 toast.error('Could not confirm saved services');
               }
             }}

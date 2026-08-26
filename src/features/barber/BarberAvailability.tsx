@@ -53,7 +53,8 @@ export default function BarberAvailability() {
             if (sample?.end_time) setEndTime(String(sample.end_time).slice(0, 5));
           }
         }
-      } catch {
+      } catch (err) {
+        console.error(`[BarberAvailability] loading saved availability failed:`, err);
         // keep defaults
       }
     })();

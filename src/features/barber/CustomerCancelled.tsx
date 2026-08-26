@@ -19,7 +19,8 @@ export default function CustomerCancelled() {
         const data = await fetchBarberJobs(user.id);
         const found = data.find((j) => j.id === id) || null;
         if (!cancelled) setJob(found);
-      } catch {
+      } catch (err) {
+        console.error(`[CustomerCancelled] loading the cancelled booking failed:`, err);
         /* booking overview simply stays empty */
       }
     })();

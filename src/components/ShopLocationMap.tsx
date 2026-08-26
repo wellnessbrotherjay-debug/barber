@@ -43,7 +43,8 @@ export async function forwardGeocode(query: string): Promise<{ lat: number; lng:
     const data = await res.json();
     if (!Array.isArray(data) || !data[0]) return null;
     return { lat: Number(data[0].lat), lng: Number(data[0].lon) };
-  } catch {
+  } catch (err) {
+        console.error(`[ShopLocationMap] looking up the address failed:`, err);
     return null;
   }
 }
@@ -73,7 +74,8 @@ async function reverseGeocode(
         country: a.country || undefined,
       },
     };
-  } catch {
+  } catch (err) {
+        console.error(`[ShopLocationMap] looking up the address failed:`, err);
     return { address: fallback, parts: {} };
   }
 }

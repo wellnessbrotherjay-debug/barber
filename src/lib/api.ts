@@ -91,7 +91,8 @@ async function errorFrom(response: Response, fallback: string): Promise<string> 
   try {
     const body = await response.json();
     return body?.error || `${fallback} (${response.status})`;
-  } catch {
+  } catch (err) {
+        console.error(`[api] reading the response body failed:`, err);
     return `${fallback} (${response.status})`;
   }
 }
@@ -101,6 +102,15 @@ export async function uploadAvatar(file: File): Promise<string> {
   data.append('file', file);
   const response = await authFetch('/api/barber/upload/avatar', { method: 'POST', body: data });
   if (!response.ok) throw new Error(await errorFrom(response, 'Avatar upload failed'));
+  const body = await response.json();
+  return body.url as string;
+}
+
+export async function uploadMyAvatar(file: File): Promise<string> {
+  const data = new FormData();
+  data.append('file', file);
+  const response = await authFetch('/api/account/avatar', { method: 'POST', body: data });
+  if (!response.ok) throw new Error(await errorFrom(response, 'Photo upload failed'));
   const body = await response.json();
   return body.url as string;
 }

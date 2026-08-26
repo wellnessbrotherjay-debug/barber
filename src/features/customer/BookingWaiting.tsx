@@ -78,7 +78,8 @@ export default function BookingWaiting() {
         setRatingAvg((found.barber_profiles as any)?.rating_avg ?? null);
         if (found.status === 'confirmed') setPhase('confirmed');
         else if (found.status === 'cancelled') setPhase('rejected');
-      } catch {
+      } catch (err) {
+        console.error(`[BookingWaiting] polling the booking status failed:`, err);
         // Transient network errors don't change phase — we just try again next tick.
       }
     }

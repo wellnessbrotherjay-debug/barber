@@ -232,7 +232,7 @@ interface PhotoRow {
 
 type Middleware = (req: Request, res: Response, next: express.NextFunction) => void;
 
-export function createUploadsRouter(requireBarberAuth: Middleware): Router {
+export function createUploadsRouter(requireBarberAuth: Middleware, requireUserAuth: Middleware): Router {
   const router = express.Router();
 
   // Ensure the storage root exists at boot so the first upload doesn't race.
@@ -271,6 +271,42 @@ export function createUploadsRouter(requireBarberAuth: Middleware): Router {
       } catch (error) {
         if (error instanceof UploadError) return res.status(400).json({ error: error.message });
         console.error('Avatar upload failed:', error);
+        res.status(500).json({ error: (error as Error).message });
+      }
+    }
+  );
+
+  // -------------------------------------------------------------------------
+  // POST /api/account/avatar  (multipart, field: file)
+  // -> { url }
+  // The signed-in person's own picture, customer or barber. Same storage and
+  // same checks as the barber avatar above — the only difference is that the
+  // owner is the account itself, taken from the token and never from the body.
+  // -------------------------------------------------------------------------
+  router.post(
+    '/api/account/avatar',
+    requireUserAuth,
+    (req: Request, res: Response, next: express.NextFunction) => {
+      upload.single('file')(req, res, (err: unknown) => {
+        if (err) return res.status(400).json({ error: multerMessage(err) });
+        next();
+      });
+    },
+    async (req: Request, res: Response) => {
+      try {
+        const userId = req.tenant!.userId!;
+        const file = req.file;
+        if (!file) return res.status(400).json({ error: 'No file uploaded (expected field "file")' });
+
+        const stored = await storeFile(file, req.tenant!.companyId, userId, 'avatar');
+        await req.tenant!.pool.query(
+          'SELECT * FROM barber.set_user_avatar(user_id_ => $1, avatar_url_ => $2)',
+          [userId, stored.url]
+        );
+        res.json({ url: stored.url });
+      } catch (error) {
+        if (error instanceof UploadError) return res.status(400).json({ error: error.message });
+        console.error('Account avatar upload failed:', error);
         res.status(500).json({ error: (error as Error).message });
       }
     }

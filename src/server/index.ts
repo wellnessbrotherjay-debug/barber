@@ -9,10 +9,10 @@ import path from 'path';
 import fsp from 'fs/promises';
 import { fileURLToPath } from 'url';
 import Stripe from 'stripe';
-import { tenantMiddleware, requireAdmin, requireEntitlement, requireBarberAuth, requireUserAuth, requireCustomerAuth, closeTenantPools, getTenantPool, getJwtSecret, AuthTokenPayload } from './middleware/tenant';
-import { createUploadsRouter, UPLOAD_DIR } from './routes/uploads';
-import { sendEmail } from './mailer';
-import { requiredEnv } from './middleware/tenant';
+import { tenantMiddleware, requireAdmin, requireEntitlement, requireBarberAuth, requireUserAuth, requireCustomerAuth, closeTenantPools, getTenantPool, getJwtSecret, AuthTokenPayload } from './middleware/tenant.js';
+import { createUploadsRouter, UPLOAD_DIR } from './routes/uploads.js';
+import { sendEmail } from './mailer.js';
+import { requiredEnv } from './middleware/tenant.js';
 
 // HARD RULE: no raw SQL in application code. Every data operation below calls a
 // built-in Postgres function in schema `barber` (migrations/003_barber_functions.sql)

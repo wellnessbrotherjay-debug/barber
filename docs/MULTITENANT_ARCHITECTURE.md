@@ -165,11 +165,11 @@ Barber companies receive API keys for programmatic access:
 ```typescript
 // Generate API key
 POST /admin/companies/:id/api-keys
-→ Returns: { apiKey: "sk_live_...", secret: "...", expiresAt: "2027-07-30" }
+→ Returns: { apiKey: <the company key, read from configuration>, secret: "...", expiresAt: "2027-07-30" }
 
 // Rotate API key
 POST /admin/companies/:id/api-keys/rotate
-→ Returns: { newApiKey: "sk_live_...", old: "sk_live_..." }
+→ Returns: { newApiKey: <the company key, read from configuration>, old: "sk_live_..." }
 
 // Revoke API key
 DELETE /admin/companies/:id/api-keys/:keyId
@@ -272,7 +272,7 @@ server {
 
 ```typescript
 // Allow barber company origins only
-const allowedOrigins = ['https://barber.safetykat.com', 'https://api.barber.safetykat.com'];
+const allowedOrigins = ['<the site address, from configuration>', 'https://api.barber.safetykat.com'];
 app.use(cors({
   origin: allowedOrigins,
   credentials: true,

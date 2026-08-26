@@ -4,10 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port=3000 --host=0.0.0.0",
+    "dev": "vite --host",
     "dev:server": "tsx watch src/server/index.ts",
     "build": "vite build",
-    "build:server": "tsc src/server/index.ts --outDir dist/server --module esnext",
+    "build:server": "tsc --project tsconfig.server.json",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",

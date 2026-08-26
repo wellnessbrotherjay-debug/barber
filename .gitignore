@@ -6,3 +6,6 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# AI tooling state — never belongs in the repository (RULES_NO_LOCAL_AI_FILES)
+.claude/

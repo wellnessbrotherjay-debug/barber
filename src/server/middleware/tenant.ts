@@ -63,7 +63,7 @@ declare global {
 // host, user or database name written here is a second source of truth: it
 // silently sends the application somewhere nobody configured, and a missing
 // setting then looks like a working system pointed at the wrong place.
-function requiredEnv(name: string): string {
+export function requiredEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
     throw new Error(`${name} must be set - refusing to start against an unconfigured database`);

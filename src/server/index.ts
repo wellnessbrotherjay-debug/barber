@@ -12,6 +12,7 @@ import Stripe from 'stripe';
 import { tenantMiddleware, requireAdmin, requireEntitlement, requireBarberAuth, requireUserAuth, requireCustomerAuth, closeTenantPools, getTenantPool, getJwtSecret, AuthTokenPayload } from './middleware/tenant';
 import { createUploadsRouter, UPLOAD_DIR } from './routes/uploads';
 import { sendEmail } from './mailer';
+import { requiredEnv } from './middleware/tenant';
 
 // HARD RULE: no raw SQL in application code. Every data operation below calls a
 // built-in Postgres function in schema `barber` (migrations/003_barber_functions.sql)
@@ -28,19 +29,19 @@ const app: Express = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
+// WHICH SITES MAY CALL THIS API IS CONFIGURATION, NOT A LIST IN THE CODE.
+// Written here, a second deployment answers for a host nobody configured and
+// the only way to change it is to edit and redeploy. CORS_ALLOWED_ORIGINS is a
+// comma-separated list; the native shells are part of it because a Capacitor
+// build serves the app from its own scheme (capacitor:// on iOS,
+// http://localhost on Android) and is cross-origin to this API.
+const allowedOrigins = requiredEnv('CORS_ALLOWED_ORIGINS')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'https://barber.safetykat.com',
-    'https://api.barber.safetykat.com',
-    // Native shells. Capacitor serves the bundled app from a custom scheme, so
-    // requests to this API are cross-origin and must be allowlisted explicitly:
-    // iOS uses capacitor://localhost, Android http://localhost, and older
-    // Ionic/WKWebView builds ionic://localhost.
-    'capacitor://localhost',
-    'ionic://localhost',
-    'http://localhost'
-  ],
+  origin: allowedOrigins,
   credentials: true,
   // PATCH is required by /api/barber/online and /api/barber/photos/reorder.
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

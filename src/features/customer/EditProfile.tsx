@@ -126,7 +126,7 @@ export default function EditProfile() {
           />
           <PillInput
             icon={<Mail className="w-5 h-5" strokeWidth={1.5} />}
-            placeholder="sarah@email.com"
+            placeholder="Email address"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}

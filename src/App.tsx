@@ -109,14 +109,14 @@ function AdminDashboardEntry() {
   return <AdminDashboard />;
 }
 
-// TEMP: single-tenant demo mode until company-owner login exists. Seeds the
-// demo company's API key into localStorage so BarberCompanyDashboard's
-// existing Bearer-token fetch (same mechanism the rest of the app already
-// uses via the demo tenant) authenticates against /api/v1/company/*.
-const DEMO_COMPANY_API_KEY = '00afed7c-b585-4421-a68e-ba42b2dd7d17';
+// The company API key is a CREDENTIAL and never belongs in shipped code — a
+// key written here is readable by anyone who opens the bundle. It is supplied
+// at build time instead, and when it is absent the dashboard says so rather
+// than authenticating as somebody's company by accident.
+const DEMO_COMPANY_API_KEY = import.meta.env.VITE_COMPANY_API_KEY ?? '';
 function CompanyDashboardEntry() {
   React.useEffect(() => {
-    localStorage.setItem('companyApiKey', DEMO_COMPANY_API_KEY);
+    if (DEMO_COMPANY_API_KEY) localStorage.setItem('companyApiKey', DEMO_COMPANY_API_KEY);
   }, []);
   return <BarberCompanyDashboard />;
 }

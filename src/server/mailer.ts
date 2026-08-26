@@ -15,8 +15,10 @@ import { spawn } from 'child_process';
 import { existsSync } from 'fs';
 
 const SENDMAIL = '/usr/sbin/sendmail';
-const FROM = 'Shorter <reports@safetykat.com>';
-const ENVELOPE_FROM = 'reports@safetykat.com';
+// Who the mail comes from is configuration, not a constant: a different
+// deployment sends as itself, and nothing has to be edited to do it.
+const ENVELOPE_FROM = process.env.MAIL_FROM;
+const FROM = process.env.MAIL_FROM_DISPLAY || (ENVELOPE_FROM ? `Shorter <${ENVELOPE_FROM}>` : '');
 
 const sendmailAvailable = existsSync(SENDMAIL);
 
@@ -26,6 +28,10 @@ function base64Wrap(text: string): string {
 
 export function sendEmail(to: string, subject: string, bodyText: string): void {
   if (!to || !to.includes('@')) return;
+  if (!ENVELOPE_FROM) {
+    console.error('[mailer] MAIL_FROM is not set - refusing to send as an address nobody configured');
+    return;
+  }
   if (!sendmailAvailable) {
     console.log(`[mailer] sendmail not present — skipping email to ${to} ("${subject}")`);
     return;

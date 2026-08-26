@@ -16,10 +16,11 @@ function adminHeaders() {
   };
 }
 
-function money(n: string | number, currency = 'USD') {
+// The currency belongs to the company being shown, so it is passed in and
+// formatted by the platform rather than assumed to be one country's.
+function money(n: string | number, currency: string) {
   const v = typeof n === 'string' ? parseFloat(n) : n;
-  const symbol = currency === 'USD' ? '$' : `${currency} `;
-  return `${symbol}${(v || 0).toFixed(2)}`;
+  return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(v || 0);
 }
 
 function statusBadge(status: string) {
@@ -118,6 +119,7 @@ interface BarberDetail {
     completed_bookings: string | number;
     cancelled_bookings: string | number;
     total_paid_revenue: string | number;
+    currency: string;
     avg_booking_value: string | number;
   };
 }
@@ -137,7 +139,7 @@ interface Payment {
 
 interface PaymentsResponse {
   payments: Payment[];
-  booking_payment_status_breakdown: { payment_status: string; payment_method: string | null; count: string | number; total_amount: string | number }[];
+  booking_payment_status_breakdown: { payment_status: string; payment_method: string | null; count: string | number; total_amount: string | number; currency: string }[];
 }
 
 interface OnboardingResponse {
@@ -522,7 +524,7 @@ export function CompanyDetail({ companyId, onBack }: { companyId: number; onBack
                   </div>
                   <div>
                     <p className="text-[#a09cab] mb-1">Paid revenue</p>
-                    <p className="text-[#1c1b1f] font-semibold text-lg">{money(barberDetail.stats.total_paid_revenue)}</p>
+                    <p className="text-[#1c1b1f] font-semibold text-lg">{money(barberDetail.stats.total_paid_revenue, barberDetail.stats.currency)}</p>
                   </div>
                   <div>
                     <p className="text-[#a09cab] mb-1">Avg rating</p>
@@ -759,7 +761,7 @@ export function CompanyDetail({ companyId, onBack }: { companyId: number; onBack
                         </td>
                         <td className="py-3 pr-4 text-[#1c1b1f]">{row.payment_method || '—'}</td>
                         <td className="py-3 pr-4 text-[#1c1b1f]">{row.count}</td>
-                        <td className="py-3 pr-4 text-[#1c1b1f]">{money(row.total_amount)}</td>
+                        <td className="py-3 pr-4 text-[#1c1b1f]">{money(row.total_amount, row.currency)}</td>
                       </tr>
                     ))}
                   </tbody>

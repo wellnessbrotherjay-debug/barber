@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import AdminTableHead from './AdminTableHead';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -440,15 +441,7 @@ function BarberRosterCard({
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-[#a09cab] border-b border-[#d4d2e3]">
-                <th className="py-2 pr-4">Name</th>
-                <th className="py-2 pr-4">Shop</th>
-                <th className="py-2 pr-4">Experience</th>
-                <th className="py-2 pr-4">Rating</th>
-                <th className="py-2 pr-4">Verification</th>
-                <th className="py-2 pr-4">Active</th>
-                <th className="py-2 pr-4">Joined</th>
-              </tr>
+              <AdminTableHead columns={['Name', 'Shop', 'Experience', 'Rating', 'Verification', 'Active', 'Joined']} />
             </thead>
             <tbody>
               {barbers.map((b) => (
@@ -603,15 +596,7 @@ function BarberRecentBookingsCard({ recentBookings }: { recentBookings: any[] })
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-[#a09cab] border-b border-[#d4d2e3]">
-                <th className="py-2 pr-4">Reference</th>
-                <th className="py-2 pr-4">Date</th>
-                <th className="py-2 pr-4">Customer</th>
-                <th className="py-2 pr-4">Service</th>
-                <th className="py-2 pr-4">Status</th>
-                <th className="py-2 pr-4">Payment</th>
-                <th className="py-2 pr-4">Amount</th>
-              </tr>
+              <AdminTableHead columns={['Reference', 'Date', 'Customer', 'Service', 'Status', 'Payment', 'Amount']} />
             </thead>
             <tbody>
               {recentBookings.map((b: any) => (
@@ -708,15 +693,7 @@ function CompanyBookingsCard({
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-[#a09cab] border-b border-[#d4d2e3]">
-                <th className="py-2 pr-4">Reference</th>
-                <th className="py-2 pr-4">Date</th>
-                <th className="py-2 pr-4">Barber</th>
-                <th className="py-2 pr-4">Service</th>
-                <th className="py-2 pr-4">Status</th>
-                <th className="py-2 pr-4">Payment</th>
-                <th className="py-2 pr-4">Amount</th>
-              </tr>
+              <AdminTableHead columns={['Reference', 'Date', 'Barber', 'Service', 'Status', 'Payment', 'Amount']} />
             </thead>
             <tbody>
               {bookings.map((b) => (
@@ -757,14 +734,7 @@ function PaymentsListCard({
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-[#a09cab] border-b border-[#d4d2e3]">
-                <th className="py-2 pr-4">Customer</th>
-                <th className="py-2 pr-4">Booking</th>
-                <th className="py-2 pr-4">Amount</th>
-                <th className="py-2 pr-4">Method</th>
-                <th className="py-2 pr-4">Status</th>
-                <th className="py-2 pr-4">Date</th>
-              </tr>
+              <AdminTableHead columns={['Customer', 'Booking', 'Amount', 'Method', 'Status', 'Date']} />
             </thead>
             <tbody>
               {payments.payments.map((p) => (
@@ -804,12 +774,7 @@ function PaymentBreakdownCard({ payments }: { payments: PaymentsResponse | null 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-[#a09cab] border-b border-[#d4d2e3]">
-                <th className="py-2 pr-4">Payment Status</th>
-                <th className="py-2 pr-4">Method</th>
-                <th className="py-2 pr-4">Count</th>
-                <th className="py-2 pr-4">Total Amount</th>
-              </tr>
+              <AdminTableHead columns={['Payment Status', 'Method', 'Count', 'Total Amount']} />
             </thead>
             <tbody>
               {payments.booking_payment_status_breakdown.map((row, i) => (

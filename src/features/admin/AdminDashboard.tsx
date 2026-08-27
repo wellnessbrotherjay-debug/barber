@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import AdminTableHead from './AdminTableHead';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -390,14 +391,7 @@ function CompaniesCard({
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-[#a09cab] border-b border-[#d4d2e3]">
-                <th className="py-2 pr-4">Name</th>
-                <th className="py-2 pr-4">Owner Email</th>
-                <th className="py-2 pr-4">Tier</th>
-                <th className="py-2 pr-4">Status</th>
-                <th className="py-2 pr-4">Max Barbers</th>
-                <th className="py-2 pr-4">Created</th>
-              </tr>
+              <AdminTableHead columns={['Name', 'Owner Email', 'Tier', 'Status', 'Max Barbers', 'Created']} />
             </thead>
             <tbody>
               {companies.map((c) => (
@@ -445,16 +439,7 @@ function AllBookingsCard({
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-[#a09cab] border-b border-[#d4d2e3]">
-                <th className="py-2 pr-4">Company</th>
-                <th className="py-2 pr-4">Reference</th>
-                <th className="py-2 pr-4">Date</th>
-                <th className="py-2 pr-4">Barber</th>
-                <th className="py-2 pr-4">Service</th>
-                <th className="py-2 pr-4">Status</th>
-                <th className="py-2 pr-4">Payment</th>
-                <th className="py-2 pr-4">Amount</th>
-              </tr>
+              <AdminTableHead columns={['Company', 'Reference', 'Date', 'Barber', 'Service', 'Status', 'Payment', 'Amount']} />
             </thead>
             <tbody>
               {bookings.map((b) => (

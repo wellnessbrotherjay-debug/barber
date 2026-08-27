@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { NoteCard } from '../../components/ScreenPieces';
+import { NoteCard, SmallIconTile, TinyLabel } from '../../components/ScreenPieces';
 import {
   ArrowLeft,
   Check,
@@ -18,7 +18,7 @@ import {
   Crosshair,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { authFetch, fetchBarberPhotos, normalisePhone, uploadAvatar, uploadGalleryPhotos, type BarberPhoto } from '@/lib/api';
+import { authFetch, errorMessage, fetchBarberPhotos, normalisePhone, type BarberPhoto, uploadAvatar, uploadGalleryPhotos } from '@/lib/api';
 import { useAuthStore } from '@/store/useAuthStore';
 import BarberServices from './BarberServices';
 import BarberPendingVerification from './BarberPendingVerification';
@@ -473,7 +473,7 @@ function useMediaActions(f: Fields, user: AuthUser, setUser: (u: AuthUser) => vo
       f.setPhotos(updated);
       toast.success(`${selected.length} photo${selected.length === 1 ? '' : 's'} uploaded`);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = errorMessage(err);
       f.setPhotoError(message);
       toast.error(message);
     } finally {
@@ -717,9 +717,9 @@ function StepIntro({ goToStep }: { goToStep: (next: number) => void }) {
           { icon: Calendar, label: 'Sync your schedule', to: 6 },
         ].map(({ icon: Icon, label, to }) => (
           <button key={label} type="button" onClick={() => goToStep(to)} className="flex gap-3 items-center">
-            <div className="size-[38px] bg-surface-2 rounded-[8px] flex items-center justify-center shrink-0">
+            <SmallIconTile>
               <Icon className="w-4 h-4 text-ink" />
-            </div>
+            </SmallIconTile>
             <p className="text-xs font-semibold leading-4 text-ink">{label}</p>
           </button>
         ))}
@@ -871,9 +871,9 @@ function StepVerification({ f, a }: { f: Fields; a: Actions }) {
       <StepHeader step={3} title="Verification" onBack={() => f.setStep(1)} />
       {/* Identity Verification intro (Figma 1:605) */}
       <div className="px-5 py-4 flex gap-2 items-start">
-        <div className="size-[38px] bg-surface-2 rounded-[8px] flex items-center justify-center shrink-0">
+        <SmallIconTile>
           <ShieldCheck className="w-6 h-6 text-ink" />
-        </div>
+        </SmallIconTile>
         <div className="flex flex-col gap-1 flex-1 min-w-0">
           <h2 className="text-lg font-bold leading-6 text-ink">Identity Verification</h2>
           <p className="text-xs font-medium leading-4 text-muted">
@@ -945,9 +945,9 @@ function StepWorkPhotos({ f, a }: { f: Fields; a: Actions }) {
             {f.photoCount === 0 ? (
               <>
                 <p className="text-sm font-semibold leading-5 text-black">No photos added yet</p>
-                <p className="text-[10px] font-semibold leading-[14px] text-muted">
+                <TinyLabel>
                   Showcase your best projects to stand out
-                </p>
+                </TinyLabel>
               </>
             ) : (
               <p className="text-sm font-semibold leading-5 text-black">
@@ -1041,14 +1041,14 @@ function InShopCard({ f }: { f: Fields }) {
     >
       <div className="flex items-start justify-between w-full">
         <div className="flex gap-3 items-center">
-          <div className="size-[38px] bg-surface-2 rounded-[8px] flex items-center justify-center shrink-0">
+          <SmallIconTile>
             <Store className="w-4 h-4 text-ink" />
-          </div>
+          </SmallIconTile>
           <div className="flex flex-col gap-1">
             <p className="text-xs font-semibold leading-4 text-ink">In-shop</p>
-            <p className="text-[10px] font-semibold leading-[14px] text-muted">
+            <TinyLabel>
               Customers come to your location
-            </p>
+            </TinyLabel>
           </div>
         </div>
         <span
@@ -1074,9 +1074,9 @@ function InShopCard({ f }: { f: Fields }) {
                 <Crosshair className="w-[18px] h-[18px] text-[#848992]" />
               </button>
             </div>
-            <p className="text-[10px] font-semibold leading-[14px] text-muted">
+            <TinyLabel>
               Set precise pin on map
-            </p>
+            </TinyLabel>
             <ShopLocationMap
               latitude={f.shopLat}
               longitude={f.shopLng}
@@ -1108,14 +1108,14 @@ function ComeToCustomerCard({ f }: { f: Fields }) {
     >
       <div className="flex items-start justify-between w-full">
         <div className="flex gap-3 items-center">
-          <div className="size-[38px] bg-surface-2 rounded-[8px] flex items-center justify-center shrink-0">
+          <SmallIconTile>
             <Car className="w-4 h-4 text-ink" />
-          </div>
+          </SmallIconTile>
           <div className="flex flex-col gap-1">
             <p className="text-xs font-semibold leading-4 text-ink">Come to customer</p>
-            <p className="text-[10px] font-semibold leading-[14px] text-muted">
+            <TinyLabel>
               You travel to the customer&apos;s site
-            </p>
+            </TinyLabel>
           </div>
         </div>
         <span

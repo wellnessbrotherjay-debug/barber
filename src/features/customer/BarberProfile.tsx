@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { BackArrowIcon, WhiteIconTile } from '../../components/ScreenPieces';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ChevronLeft,
@@ -53,7 +54,7 @@ function ProfileHero({
       )}
       <div className="absolute left-0 right-0 top-0 flex items-center justify-between px-6 pt-16">
         <button type="button" aria-label="Back" onClick={onBack}>
-          <ChevronLeft className="w-6 h-6 text-ink" strokeWidth={2.25} />
+          <BackArrowIcon />
         </button>
         <div className="flex items-center gap-5">
           <Share className="w-[22px] h-[22px] text-ink" strokeWidth={1.8} />
@@ -102,9 +103,9 @@ function ProfileStatCards({ barber }: { barber: BarberDetail }) {
   return (
     <div className="grid grid-cols-2 gap-3 mt-5">
       <div className="bg-[#f6f6fb] rounded-[16px] p-3 flex items-center gap-3">
-        <span className="w-11 h-11 rounded-[10px] bg-white flex items-center justify-center shrink-0">
+        <WhiteIconTile>
           <Store className="w-5 h-5 text-ink" strokeWidth={1.8} />
-        </span>
+        </WhiteIconTile>
         <span className="min-w-0">
           <span className="block text-[11px] text-muted truncate">
             {barber.shop_name || barber.address_text?.split(',')[0] || 'Studio'}
@@ -113,9 +114,9 @@ function ProfileStatCards({ barber }: { barber: BarberDetail }) {
         </span>
       </div>
       <div className="bg-[#f6f6fb] rounded-[16px] p-3 flex items-center gap-3">
-        <span className="w-11 h-11 rounded-[10px] bg-white flex items-center justify-center shrink-0">
+        <WhiteIconTile>
           <Truck className="w-5 h-5 text-ink" strokeWidth={1.8} />
-        </span>
+        </WhiteIconTile>
         <span>
           <span className="block text-[11px] text-muted">ETA</span>
           <span className="block text-[15px] font-bold text-ink mt-0.5">15–20 min</span>

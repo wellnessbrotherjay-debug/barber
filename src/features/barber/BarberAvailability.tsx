@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { NoteCard } from '../../components/ScreenPieces';
+import { Caption, NoteCard } from '../../components/ScreenPieces';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Globe, Zap, Smartphone, Clock, Info } from 'lucide-react';
 import { toast } from 'sonner';
@@ -276,7 +276,7 @@ function ServiceRadiusSection({
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <p className="text-[14px] leading-5 font-semibold text-black">Service Radius</p>
-          <p className="text-[12px] leading-4 font-medium text-[#a09cab]">How far are you willing to travel?</p>
+          <Caption>How far are you willing to travel?</Caption>
         </div>
         <p className="text-[18px] leading-6 font-bold text-[#1c1b1f]">{radius} km</p>
       </div>
@@ -310,7 +310,7 @@ function BufferTimeSection({
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <p className="text-[14px] leading-5 font-semibold text-black">Buffer Time</p>
-          <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Rest time between appointments.</p>
+          <Caption>Rest time between appointments.</Caption>
         </div>
         <p className="text-[18px] leading-6 font-bold text-[#1c1b1f]">{buffer.replace('m', ' mins')}</p>
       </div>
@@ -341,7 +341,7 @@ function AvailabilityHeader({ onBack }: { onBack: () => void }) {
         <ChevronLeft className="w-5 h-5 text-[#1c1b1f]" />
       </button>
       <div className="flex flex-col gap-1">
-        <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Step 7 of 7</p>
+        <Caption>Step 7 of 7</Caption>
         <h1 className="text-[18px] leading-6 font-bold text-[#1c1b1f]">Availability</h1>
       </div>
     </div>
@@ -353,9 +353,9 @@ function BufferAdviceCard() {
     <div className="px-5 py-4">
       <NoteCard>
         <Info className="w-6 h-6 text-[#a09cab] shrink-0" strokeWidth={1.6} />
-        <p className="text-[12px] leading-4 font-medium text-[#a09cab]">
+        <Caption>
           Setting a 15-minute buffer helps you handle travel time or clean-up without running late for the next client.
-        </p>
+        </Caption>
       </NoteCard>
     </div>
   );

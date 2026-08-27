@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PrimaryButton } from '../../components/ScreenPieces';
+import { IconButton, PrimaryButton, SubduedLine } from '../../components/ScreenPieces';
 import ScreenHeader from '../../components/ScreenHeader';
 import { useNavigate, useParams } from 'react-router-dom';
 import { X } from 'lucide-react';
@@ -43,17 +43,17 @@ export default function DeclineBooking() {
       <ScreenHeader
         title="Decline"
         right={
-          <button type="button" aria-label="Close" onClick={() => navigate(-1)} className="w-6 h-6 flex items-center justify-center shrink-0">
+          <IconButton label="Close" onClick={() => navigate(-1)}>
             <X className="w-6 h-6 text-[#1c1b1f]" strokeWidth={2} />
-          </button>
+          </IconButton>
         }
       />
 
       <div className="px-5 pt-4">
         <h1 className="text-[24px] leading-8 font-bold text-[#1c1b1f]">Why are you declining?</h1>
-        <p className="mt-1 text-[14px] leading-5 font-medium text-[#a09cab]">
+        <SubduedLine>
           Please let us know why you're unable to take this request.
-        </p>
+        </SubduedLine>
       </div>
 
       <div className="px-5 pt-6 space-y-3">

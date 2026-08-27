@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PrimaryButton } from '../../components/ScreenPieces';
+import { PrimaryButton, QuietButton, SubduedLine } from '../../components/ScreenPieces';
 import ScreenHeader from '../../components/ScreenHeader';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ShieldAlert } from 'lucide-react';
@@ -45,9 +45,9 @@ export default function CancelJob() {
 
       <div className="px-5 pt-4">
         <h1 className="text-[24px] leading-8 font-bold text-[#1c1b1f]">Why are you cancelling?</h1>
-        <p className="mt-1 text-[14px] leading-5 font-medium text-[#a09cab]">
+        <SubduedLine>
           Please let us know why you can't make it to this appointment.
-        </p>
+        </SubduedLine>
       </div>
 
       <div className="px-5 pt-6 space-y-3">
@@ -88,13 +88,9 @@ export default function CancelJob() {
         <PrimaryButton type="button" onClick={handleConfirm} disabled={submitting}>
           {submitting ? 'Cancelling…' : 'Confirm Cancellation'}
         </PrimaryButton>
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="w-full mt-4 text-center text-[16px] leading-5 font-semibold text-[#a09cab] py-2"
-        >
+        <QuietButton type="button" onClick={() => navigate(-1)}>
           Keep Booking
-        </button>
+        </QuietButton>
       </div>
     </div>
   );

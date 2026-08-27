@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { useBooking } from '../../lib/useBooking';
+import { WhiteIconTile} from '../../components/ScreenPieces';
 import { useNavigate, useParams } from 'react-router-dom';
 import { MessageCircle, Phone, ImageIcon, FileText, Scissors, Calendar, DollarSign } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
@@ -92,21 +94,7 @@ export default function BookingConfirmed() {
   const { id: bookingId } = useParams();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
-  const [booking, setBooking] = useState<Booking | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!user?.id || !bookingId) return;
-    let cancelled = false;
-    authFetch(`/api/bookings`, {
-    })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: Booking[]) => {
-        if (!cancelled) setBooking(data.find((b) => b.id === bookingId) || null);
-      })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [bookingId, user?.id]);
+  const { booking, loading } = useBooking<Booking>(bookingId);
 
   const barberName = booking?.barber_profiles?.display_name || 'your barber';
   const feePaid = booking?.payment_status === 'paid';
@@ -157,9 +145,9 @@ export default function BookingConfirmed() {
         {/* Figma page 32 — offline payment note card */}
         <Card className="p-4 bg-surface border-0">
           <div className="flex items-center gap-3">
-            <span className="w-11 h-11 rounded-[10px] bg-white flex items-center justify-center shrink-0">
+            <WhiteIconTile>
               <DollarSign className="w-5 h-5 text-ink" strokeWidth={1.8} />
-            </span>
+            </WhiteIconTile>
             <p className="text-[16px] font-bold text-ink">Important Note: Offline Payment</p>
           </div>
           <p className="text-[14px] text-ink leading-6 mt-4">

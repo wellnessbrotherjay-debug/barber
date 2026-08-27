@@ -1,9 +1,11 @@
 import React from 'react';
+import { RoleToggle } from '../../components/ScreenPieces';
+import { FormInput} from '../../components/ScreenPieces';
 import { useForm, type FieldErrors, type UseFormRegister } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useAuthStore } from '@/store/useAuthStore';
-import { Scissors, Mail, Lock, User as UserIcon, ArrowRight } from 'lucide-react';
+import { Mail, Lock, User as UserIcon, ArrowRight } from 'lucide-react';
 import { ShorterMark } from '@/components/ShorterLogo';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -42,39 +44,6 @@ function SignupHeading() {
   );
 }
 
-function RoleToggle({
-  role,
-  setRole,
-}: {
-  role: 'customer' | 'barber';
-  setRole: (r: 'customer' | 'barber') => void;
-}) {
-  return (
-    /* Role Toggle */
-    <div className="flex p-1 bg-stone-100 rounded-2xl">
-      <button
-        type="button"
-        onClick={() => setRole('customer')}
-        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${
-          role === 'customer' ? 'bg-white shadow-sm text-primary' : 'text-neutral-500'
-        }`}
-      >
-        <UserIcon className="w-4 h-4" />
-        Customer
-      </button>
-      <button
-        type="button"
-        onClick={() => setRole('barber')}
-        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${
-          role === 'barber' ? 'bg-white shadow-sm text-primary' : 'text-neutral-500'
-        }`}
-      >
-        <Scissors className="w-4 h-4" />
-        Barber
-      </button>
-    </div>
-  );
-}
 
 function SignupFields({
   register,
@@ -88,12 +57,9 @@ function SignupFields({
       <div>
         <div className="relative">
           <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 w-5 h-5" />
-          <input
-            type="text"
+          <FormInput type="text"
             placeholder="Full Name"
-            {...register('fullName')}
-            className="w-full pl-12 pr-4 py-4 bg-stone-50 rounded-2xl border-none focus:ring-2 focus:ring-accent/20 transition-all"
-          />
+            {...register('fullName')} />
         </div>
         {errors.fullName && (
           <p className="text-red-600 text-xs mt-1.5 ml-2">{errors.fullName.message}</p>
@@ -103,12 +69,9 @@ function SignupFields({
       <div>
         <div className="relative">
           <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 w-5 h-5" />
-          <input
-            type="email"
+          <FormInput type="email"
             placeholder="Email Address"
-            {...register('email')}
-            className="w-full pl-12 pr-4 py-4 bg-stone-50 rounded-2xl border-none focus:ring-2 focus:ring-accent/20 transition-all"
-          />
+            {...register('email')} />
         </div>
         {errors.email && (
           <p className="text-red-600 text-xs mt-1.5 ml-2">{errors.email.message}</p>
@@ -118,12 +81,9 @@ function SignupFields({
       <div>
         <div className="relative">
           <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 w-5 h-5" />
-          <input
-            type="password"
+          <FormInput type="password"
             placeholder="Password"
-            {...register('password')}
-            className="w-full pl-12 pr-4 py-4 bg-stone-50 rounded-2xl border-none focus:ring-2 focus:ring-accent/20 transition-all"
-          />
+            {...register('password')} />
         </div>
         {errors.password && (
           <p className="text-red-600 text-xs mt-1.5 ml-2">{errors.password.message}</p>
@@ -133,12 +93,9 @@ function SignupFields({
       <div>
         <div className="relative">
           <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 w-5 h-5" />
-          <input
-            type="password"
+          <FormInput type="password"
             placeholder="Confirm Password"
-            {...register('confirmPassword')}
-            className="w-full pl-12 pr-4 py-4 bg-stone-50 rounded-2xl border-none focus:ring-2 focus:ring-accent/20 transition-all"
-          />
+            {...register('confirmPassword')} />
         </div>
         {errors.confirmPassword && (
           <p className="text-red-600 text-xs mt-1.5 ml-2">{errors.confirmPassword.message}</p>
@@ -244,7 +201,7 @@ export default function Signup() {
       <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-[2.5rem] shadow-xl shadow-black/5 border border-stone-100">
         <SignupHeading />
 
-        <RoleToggle role={role} setRole={setRole} />
+        <RoleToggle role={role} onSelect={setRole} />
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
           <SignupFields register={register} errors={errors} />

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { DotSeparator, QuietButton } from '../../components/ScreenPieces';
 import ScreenHeader from '../../components/ScreenHeader';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Clock, Store, Truck, Scissors, Image as ImageIcon } from 'lucide-react';
@@ -16,7 +17,7 @@ function RequestCard({ job, mm, ss }: { job: Job; mm: number; ss: string }) {
       {/* Header row: pill + countdown */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 bg-[#f8f8f8] rounded-full px-3 py-2">
-          <span className="w-[3px] h-[3px] rounded-full bg-[#514e59]" />
+          <DotSeparator />
           <span className="text-[12px] leading-4 font-medium text-[#514e59]">Payment authorizes</span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -140,14 +141,9 @@ export default function IncomingRequest() {
         >
           Accept Request
         </button>
-        <button
-          type="button"
-          onClick={() => job && navigate(`/barber/decline/${job.id}`)}
-          disabled={!job}
-          className="w-full mt-4 text-center text-[16px] leading-5 font-semibold text-[#a09cab] py-2"
-        >
+        <QuietButton type="button" disabled={!job}>
           Decline
-        </button>
+        </QuietButton>
       </div>
     </div>
   );

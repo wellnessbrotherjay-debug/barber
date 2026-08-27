@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { DotSeparator} from '../../components/ScreenPieces';
 import ScreenHeader from '../../components/ScreenHeader';
 import { useNavigate } from 'react-router-dom';
 import { Clock, MapPin, Check, MessageSquare, Phone } from 'lucide-react';
@@ -68,7 +69,7 @@ export async function fetchBarberJobs(userId: string): Promise<Job[]> {
 function StatusChip({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-1 bg-[#f8f8f8] rounded-full px-3 py-1.5 shrink-0">
-      <span className="w-[3px] h-[3px] rounded-full bg-[#514e59]" />
+      <DotSeparator />
       <span className="text-[10px] leading-3 font-medium text-[#514e59]">{label}</span>
     </div>
   );

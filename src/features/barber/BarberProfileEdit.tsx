@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { CentredTitle, IconButton, PanelCard } from '../../components/ScreenPieces';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import BarberNav from '@/components/BarberNav';
@@ -21,16 +22,7 @@ import {
   User,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  authFetch,
-  deleteBarberPhoto,
-  fetchBarberBookingsForUser,
-  fetchBarberPhotos,
-  normalisePhone,
-  uploadAvatar,
-  uploadGalleryPhotos,
-  type BarberPhoto,
-} from '@/lib/api';
+import { authFetch, deleteBarberPhoto, errorMessage, fetchBarberBookingsForUser, fetchBarberPhotos, normalisePhone, type BarberPhoto, uploadAvatar, uploadGalleryPhotos } from '@/lib/api';
 import { DeleteAccountRow } from '@/components/DeleteAccountDialog';
 
 // Board page 61 — barber "Edit Profile".
@@ -252,7 +244,7 @@ function usePhotoActions(s: State, user: AuthUser, setUser: (u: AuthUser) => voi
       if (user) setUser({ ...user, avatar_url: url });
       toast.success('Photo updated');
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = errorMessage(err);
       s.setAvatarError(message);
       toast.error(message);
     } finally {
@@ -274,7 +266,7 @@ function usePhotoActions(s: State, user: AuthUser, setUser: (u: AuthUser) => voi
       s.setPhotos(await uploadGalleryPhotos(selected));
       toast.success(`${selected.length} photo${selected.length === 1 ? '' : 's'} uploaded`);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = errorMessage(err);
       s.setPhotosError(message);
       toast.error(message);
     } finally {
@@ -289,7 +281,7 @@ function usePhotoActions(s: State, user: AuthUser, setUser: (u: AuthUser) => voi
       s.setPhotos(await deleteBarberPhoto(id));
       toast.success('Photo removed');
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = errorMessage(err);
       s.setPhotosError(message);
       toast.error(message);
     } finally {
@@ -351,17 +343,12 @@ function useSaveProfile(s: State) {
 function EditProfileHeader({ onBack }: { onBack: () => void }) {
   return (
     <div className="flex items-center gap-1.5 px-5 py-4 pt-14">
-      <button
-        type="button"
-        onClick={onBack}
-        className="w-6 h-6 flex items-center justify-center shrink-0"
-        aria-label="Back"
-      >
+      <IconButton label="Back" onClick={onBack}>
         <ChevronLeft className="w-5 h-5 text-[#1c1b1f]" />
-      </button>
-      <p className="flex-1 text-center text-[16px] font-bold leading-6 text-[#1c1b1f]">
+      </IconButton>
+      <CentredTitle>
         Edit Profile
-      </p>
+      </CentredTitle>
       <span className="w-6 h-6 shrink-0" />
     </div>
   );
@@ -516,7 +503,7 @@ function AvailabilitySection({ s }: { s: State }) {
   return (
     <section>
       <h2 className="text-[18px] font-bold text-[#1c1b1f] mb-4">Availability</h2>
-      <div className="rounded-[16px] border-[0.75px] border-[#d2dbe9] bg-white p-4">
+      <PanelCard>
         <div className="flex items-center justify-between">
           <p className="text-[14px] font-semibold text-[#1c1b1f]">Online / Offline</p>
           <button
@@ -551,7 +538,7 @@ function AvailabilitySection({ s }: { s: State }) {
             {s.loading ? 'Loading…' : s.scheduleSummary}
           </p>
         </div>
-      </div>
+      </PanelCard>
     </section>
   );
 }
@@ -609,7 +596,7 @@ function BookingPreferencesSection({ s }: { s: State }) {
 
 function ServicesCard({ s, navigate }: { s: State; navigate: (to: string) => void }) {
   return (
-    <div className="rounded-[16px] border-[0.75px] border-[#d2dbe9] bg-white p-4">
+    <PanelCard>
       <div className="flex items-center justify-between">
         <p className="text-[15px] font-bold text-[#1c1b1f]">Services</p>
         <button
@@ -634,7 +621,7 @@ function ServicesCard({ s, navigate }: { s: State; navigate: (to: string) => voi
       <p className="text-[12px] font-medium text-[#a09cab] mt-3">
         {s.services.length} service{s.services.length === 1 ? '' : 's'} added
       </p>
-    </div>
+    </PanelCard>
   );
 }
 
@@ -648,7 +635,7 @@ function PortfolioCard({
   onDelete: (id: string) => void;
 }) {
   return (
-    <div className="rounded-[16px] border-[0.75px] border-[#d2dbe9] bg-white p-4">
+    <PanelCard>
       <div className="flex items-center justify-between">
         <p className="text-[15px] font-bold text-[#1c1b1f]">Portfolio</p>
         <input
@@ -699,7 +686,7 @@ function PortfolioCard({
       <p className="text-[12px] font-medium text-[#a09cab] mt-3">
         {s.photos.length} photo{s.photos.length === 1 ? '' : 's'} uploaded
       </p>
-    </div>
+    </PanelCard>
   );
 }
 

@@ -153,3 +153,35 @@ export function normalisePhone(input: string): string {
   if (!digits) return '';
   return (hasPlus ? '+' : '') + digits;
 }
+
+/**
+ * What went wrong, as a sentence a person can read.
+ *
+ * Four places worked this out for themselves before showing it. A caught value
+ * in JavaScript can be anything at all, so the check is not optional - and one
+ * place to change it means the wording stays the same everywhere.
+ */
+export function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+/** A barber's standing: the average they are rated, and how many said so. */
+export interface BarberRating {
+  avg: number | null;
+  count: number;
+}
+
+/**
+ * The rating out of a barber profile the API returned.
+ *
+ * Two screens each turned the same two fields into numbers themselves, with the
+ * same null checks. They are always read together and always change together,
+ * so they travel as one thing now rather than two pieces of state that could
+ * disagree.
+ */
+export function ratingFrom(profile: { rating_avg?: unknown; rating_count?: unknown }): BarberRating {
+  return {
+    avg: profile.rating_avg != null ? Number(profile.rating_avg) : null,
+    count: profile.rating_count != null ? Number(profile.rating_count) : 0,
+  };
+}

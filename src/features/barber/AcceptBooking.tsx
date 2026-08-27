@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { IconTile, PrimaryButton, QuietButton } from '../../components/ScreenPieces';
+import { AddressPinIcon, Caption, FieldValue, IconTile, PrimaryButton, QuietButton, SubduedLine } from '../../components/ScreenPieces';
 import ScreenHeader from '../../components/ScreenHeader';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronRight, Scissors, Clock, Phone, Star, Calendar, MapPin, MessageSquareMore, Image as ImageIcon } from 'lucide-react';
+import { ChevronRight, Scissors, Clock, Phone, Star, Calendar, MessageSquareMore, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/store/useAuthStore';
 import { fetchBarberJobs, type Job } from './BarberJobs';
@@ -32,7 +32,7 @@ function BookingAcceptedState({
           <ImageIcon className="w-10 h-10 text-[#d4d2e3]" strokeWidth={1.6} />
         </div>
         <h1 className="mt-6 text-[28px] leading-9 font-bold text-[#1c1b1f]">Booking accepted</h1>
-        <p className="mt-1 text-[14px] leading-5 font-medium text-[#a09cab]">Chat and call are now unlocked.</p>
+        <SubduedLine>Chat and call are now unlocked.</SubduedLine>
       </div>
 
       {/* Customer */}
@@ -69,7 +69,7 @@ function BookingAcceptedState({
           </div>
           <div className="flex items-center gap-3">
             <IconTile>
-              <MapPin className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
+              <AddressPinIcon />
             </IconTile>
             <div>
               <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f]">In-Person</p>
@@ -140,8 +140,8 @@ function JobSummaryCard({ job }: { job: Job }) {
           <Scissors className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
         </span>
         <div>
-          <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Service</p>
-          <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f] mt-0.5">{job.services?.name}</p>
+          <Caption>Service</Caption>
+          <FieldValue>{job.services?.name}</FieldValue>
         </div>
       </div>
       <div className="flex items-center gap-4">
@@ -149,10 +149,10 @@ function JobSummaryCard({ job }: { job: Job }) {
           <Clock className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
         </span>
         <div>
-          <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Time</p>
-          <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f] mt-0.5">
+          <Caption>Time</Caption>
+          <FieldValue>
             {job.booking_date} {job.start_time}
-          </p>
+          </FieldValue>
         </div>
       </div>
     </div>

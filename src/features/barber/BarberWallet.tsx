@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Caption} from '../../components/ScreenPieces';
 import ScreenHeader from '../../components/ScreenHeader';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, CircleCheck, TrendingUp } from 'lucide-react';
@@ -66,11 +67,11 @@ function StatCards({ cards }: { cards: StatCard[] }) {
             <div className="w-[42px] h-[42px] bg-[#f2f1fa] rounded-[8px] flex items-center justify-center">
               <Icon className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
             </div>
-            <p className="text-[12px] leading-4 font-medium text-[#a09cab]">
+            <Caption>
               {card.label[0]}
               <br />
               {card.label[1]}
-            </p>
+            </Caption>
             <p className="text-[18px] leading-6 font-bold text-[#1c1b1f]">{card.value}</p>
           </div>
         );
@@ -90,11 +91,11 @@ function NoShowPanel({ loading, count, penalty }: { loading: boolean; count: num
       <div className="px-5">
         <div className="bg-white border-[0.75px] border-[#d2dbe9] rounded-[12px] p-3 flex items-start justify-between">
           <div className="flex flex-col gap-1">
-            <p className="text-[12px] leading-4 font-medium text-[#a09cab]">No-show reports (this month)</p>
+            <Caption>No-show reports (this month)</Caption>
             <p className="text-[16px] leading-6 font-bold text-[#1c1b1f]">{loading ? '—' : count}</p>
           </div>
           <div className="flex flex-col gap-1 items-end text-right">
-            <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Penalty applied</p>
+            <Caption>Penalty applied</Caption>
             <p className="text-[16px] leading-6 font-bold text-[#1c1b1f]">${penalty.toFixed(2)}</p>
           </div>
         </div>
@@ -136,7 +137,7 @@ function HistoryRow({ booking, amount, label }: { booking: Booking; amount: stri
       </div>
       <div className="flex flex-col gap-1 items-end text-right">
         <p className="text-[16px] leading-6 font-bold text-[#1c1b1f]">{amount}</p>
-        <p className="text-[12px] leading-4 font-medium text-[#a09cab]">{label}</p>
+        <Caption>{label}</Caption>
       </div>
     </div>
   );

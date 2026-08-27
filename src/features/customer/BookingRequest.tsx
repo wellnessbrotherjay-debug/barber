@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { WhiteIconTile} from '../../components/ScreenPieces';
 import { useNavigate, useParams } from 'react-router-dom';
 import CustomerScreenHeader from '../../components/CustomerScreenHeader';
 import { Scissors, Send, Store, Truck, User, Phone } from 'lucide-react';
@@ -123,9 +124,9 @@ function LocationPreferenceSection({
             locationPref === 'mobile' ? 'bg-ink' : 'bg-[#f6f7fb]'
           )}
         >
-          <span className="w-11 h-11 rounded-[10px] bg-white flex items-center justify-center shrink-0">
+          <WhiteIconTile>
             <Truck className="w-5 h-5 text-ink" strokeWidth={1.8} />
-          </span>
+          </WhiteIconTile>
           <span>
             <span className={cn('block text-[11px]', locationPref === 'mobile' ? 'text-white/60' : 'text-muted')}>
               Mobile

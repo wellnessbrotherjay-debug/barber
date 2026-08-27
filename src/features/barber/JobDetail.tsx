@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { AddressPinIcon, Caption } from '../../components/ScreenPieces';
 import ScreenHeader from '../../components/ScreenHeader';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Star, Check, MessageSquareMore, MapPin, Calendar, Image as ImageIcon } from 'lucide-react';
@@ -57,7 +58,7 @@ function LocationBlock({ job, address }: { job: Job; address: string }) {
     /* Location */
     <div className="pt-8">
       <div className="flex items-center gap-2.5 px-5">
-        <MapPin className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
+        <AddressPinIcon />
         <h2 className="text-[20px] leading-6 font-bold text-[#1c1b1f]">Location</h2>
       </div>
       <div className="mt-4 mx-5 h-[220px] rounded-[16px] bg-[#f2f1fa] flex items-center justify-center">
@@ -91,11 +92,11 @@ function BookingInfoBlock({ job }: { job: Job }) {
         </div>
         <div className="mt-4 flex gap-3">
           <div className="flex-1 bg-[#fafafa] rounded-[12px] p-4">
-            <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Service</p>
+            <Caption>Service</Caption>
             <p className="mt-1 text-[14px] leading-5 font-semibold text-[#1c1b1f]">{job.services?.name}</p>
           </div>
           <div className="flex-1 bg-[#fafafa] rounded-[12px] p-4">
-            <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Date &amp; Time</p>
+            <Caption>Date &amp; Time</Caption>
             <p className="mt-1 text-[14px] leading-5 font-semibold text-[#1c1b1f]">
               {job.booking_date} • {job.start_time}
             </p>
@@ -189,7 +190,7 @@ function JobActions({
 
       {isPast && (
         <div className="bg-[#fafafa] rounded-[12px] p-4">
-          <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Fee Earned</p>
+          <Caption>Fee Earned</Caption>
           <p className="mt-1 text-[14px] leading-5 font-semibold text-[#1c1b1f]">
             {job.status === 'completed' && job.payment_status === 'paid'
               ? `$${Number(job.total_amount).toFixed(2)}`

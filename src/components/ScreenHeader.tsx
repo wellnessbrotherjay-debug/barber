@@ -1,4 +1,5 @@
 import React from 'react';
+import { IconButton } from './ScreenPieces';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 
@@ -33,14 +34,9 @@ export default function ScreenHeader({
 
   return (
     <div className="flex items-center justify-center gap-1.5 px-5 py-4 pt-14 bg-white">
-      <button
-        type="button"
-        aria-label="Back"
-        onClick={onBack ?? (() => navigate(-1))}
-        className="w-6 h-6 flex items-center justify-center shrink-0"
-      >
+      <IconButton label="Back" onClick={onBack ?? (() => navigate(-1))}>
         <ChevronLeft className="w-6 h-6 text-[#1c1b1f]" strokeWidth={2} />
-      </button>
+      </IconButton>
       <p className="flex-1 text-center text-[16px] leading-6 font-bold text-[#1c1b1f]">{title}</p>
       {right ?? <span className="w-6 h-6 shrink-0" />}
     </div>

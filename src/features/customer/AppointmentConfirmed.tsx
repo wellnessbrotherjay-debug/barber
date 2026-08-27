@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { RoundIconTile } from '../../components/ScreenPieces';
+import { useBooking } from '../../lib/useBooking';
+import { BackArrowIcon, RoundIconTile } from '../../components/ScreenPieces';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, XCircle, ImageIcon, MessageSquare, Phone } from 'lucide-react';
+import { XCircle, ImageIcon, MessageSquare, Phone } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { authFetch } from '@/lib/api';
 
@@ -16,22 +17,7 @@ export default function AppointmentConfirmed() {
   const { id: bookingId } = useParams();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
-  const [booking, setBooking] = useState<Booking | null>(null);
-
-  useEffect(() => {
-    if (!user?.id || !bookingId) return;
-    let cancelled = false;
-    authFetch(`/api/bookings`, {
-      headers: {
-      },
-    })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: Booking[]) => {
-        if (!cancelled) setBooking(data.find((b) => b.id === bookingId) || null);
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [bookingId, user?.id]);
+  const { booking } = useBooking<Booking>(bookingId);
 
   const firstName = (booking?.barber_profiles?.display_name || 'your barber').split(' ')[0];
 
@@ -39,7 +25,7 @@ export default function AppointmentConfirmed() {
     <div className="min-h-screen bg-white flex flex-col">
       <div className="flex items-center px-6 pt-16 pb-2">
         <button type="button" aria-label="Back" onClick={() => navigate(-1)}>
-          <ChevronLeft className="w-6 h-6 text-ink" strokeWidth={2.25} />
+          <BackArrowIcon />
         </button>
       </div>
 

@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Caption} from '../../components/ScreenPieces';
 import ScreenHeader from '../../components/ScreenHeader';
 import { useNavigate } from 'react-router-dom';
 import { Star, UserRound } from 'lucide-react';
 import BarberNav from '@/components/BarberNav';
-import { authFetch } from '@/lib/api';
+import { authFetch, ratingFrom } from '@/lib/api';
+import type { BarberRating } from '@/lib/api';
 
 interface Review {
   id: string;
@@ -36,7 +38,7 @@ function AverageRating({ avgDisplay }: { avgDisplay: string }) {
   return (
     <div className="px-5 py-4 flex flex-col items-center gap-2">
       <p className="text-[28px] leading-9 font-bold text-[#1c1b1f]">{avgDisplay}</p>
-      <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Average Rating</p>
+      <Caption>Average Rating</Caption>
       <div className="flex gap-2 mt-1">
         {Array.from({ length: 5 }).map((_, i) => (
           <Star
@@ -90,7 +92,7 @@ function ReviewCard({ review }: { review: Review }) {
         ))}
       </div>
       {review.comment && (
-        <p className="text-[12px] leading-4 font-medium text-[#a09cab]">"{review.comment}"</p>
+        <Caption>"{review.comment}"</Caption>
       )}
     </div>
   );
@@ -101,8 +103,7 @@ export default function BarberReviews() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  const [ratingAvg, setRatingAvg] = useState<number | null>(null);
-  const [ratingCount, setRatingCount] = useState<number | null>(null);
+  const [rating, setRating] = useState<BarberRating | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,10 +112,7 @@ export default function BarberReviews() {
         const profileRes = await authFetch('/api/barber/profile');
         if (profileRes.ok) {
           const profile = await profileRes.json();
-          if (!cancelled) {
-            setRatingAvg(profile.rating_avg != null ? Number(profile.rating_avg) : null);
-            setRatingCount(profile.rating_count != null ? Number(profile.rating_count) : null);
-          }
+          if (!cancelled) setRating(ratingFrom(profile));
           const reviewsRes = await authFetch(`/api/reviews-by-barber/${profile.id}`);
           if (reviewsRes.ok) {
             const data = await reviewsRes.json();
@@ -143,8 +141,8 @@ export default function BarberReviews() {
     return buckets.map((count) => ({ count, pct: Math.round((count / total) * 100) })).reverse(); // 5star first
   }, [reviews]);
 
-  const avgDisplay = ratingAvg != null ? ratingAvg.toFixed(1) : reviews.length ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1) : '0.0';
-  const countDisplay = ratingCount ?? reviews.length;
+  const avgDisplay = rating?.avg != null ? rating.avg.toFixed(1) : reviews.length ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1) : '0.0';
+  const countDisplay = rating?.count ?? reviews.length;
 
   return (
     <div className="min-h-screen bg-white pb-[180px]">
@@ -155,9 +153,9 @@ export default function BarberReviews() {
       <div className="px-5 py-4 flex items-start justify-between">
         <div className="flex flex-col gap-1">
           <h2 className="text-[18px] leading-6 font-bold text-[#1c1b1f]">Reviews</h2>
-          <p className="text-[12px] leading-4 font-medium text-[#a09cab]">
+          <Caption>
             Based on {countDisplay} review{countDisplay === 1 ? '' : 's'}
-          </p>
+          </Caption>
         </div>
         <div className="flex items-center gap-1 bg-[#f8f8f8] rounded-full px-3 py-1.5">
           <Star className="w-3.5 h-3.5 fill-[#1c1b1f] text-[#1c1b1f]" />

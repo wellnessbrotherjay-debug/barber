@@ -1,9 +1,11 @@
 import React from 'react';
+import { RoleToggle } from '../../components/ScreenPieces';
+import { FormInput} from '../../components/ScreenPieces';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useAuthStore } from '@/store/useAuthStore';
-import { Scissors, Mail, Lock, ArrowRight, User as UserIcon } from 'lucide-react';
+import { Mail, Lock, ArrowRight, User as UserIcon } from 'lucide-react';
 import { ShorterMark } from '@/components/ShorterLogo';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -34,36 +36,6 @@ function LoginHeader() {
 // The customer/barber switch is a small control over a single piece of state, so
 // it is clearer as its own named component than as two near-identical buttons
 // in the middle of the page.
-function RoleToggle({
-  role,
-  onSelect,
-}: {
-  role: 'customer' | 'barber';
-  onSelect: (r: 'customer' | 'barber') => void;
-}) {
-  return (
-    <div className="flex p-1 bg-stone-100 rounded-2xl">
-      <button
-        onClick={() => onSelect('customer')}
-        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${
-          role === 'customer' ? 'bg-white shadow-sm text-primary' : 'text-neutral-500'
-        }`}
-      >
-        <UserIcon className="w-4 h-4" />
-        Customer
-      </button>
-      <button
-        onClick={() => onSelect('barber')}
-        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${
-          role === 'barber' ? 'bg-white shadow-sm text-primary' : 'text-neutral-500'
-        }`}
-      >
-        <Scissors className="w-4 h-4" />
-        Barber
-      </button>
-    </div>
-  );
-}
 
 export default function Login() {
   const navigate = useNavigate();
@@ -126,12 +98,9 @@ export default function Login() {
             <div>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 w-5 h-5" />
-                <input
-                  type="email"
+                <FormInput type="email"
                   placeholder="Email Address"
-                  {...register('email')}
-                  className="w-full pl-12 pr-4 py-4 bg-stone-50 rounded-2xl border-none focus:ring-2 focus:ring-accent/20 transition-all"
-                />
+                  {...register('email')} />
               </div>
               {errors.email && (
                 <p className="text-red-600 text-xs mt-1.5 ml-2">{errors.email.message}</p>
@@ -140,12 +109,9 @@ export default function Login() {
             <div>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 w-5 h-5" />
-                <input
-                  type="password"
+                <FormInput type="password"
                   placeholder="Password"
-                  {...register('password')}
-                  className="w-full pl-12 pr-4 py-4 bg-stone-50 rounded-2xl border-none focus:ring-2 focus:ring-accent/20 transition-all"
-                />
+                  {...register('password')} />
               </div>
               {errors.password && (
                 <p className="text-red-600 text-xs mt-1.5 ml-2">{errors.password.message}</p>

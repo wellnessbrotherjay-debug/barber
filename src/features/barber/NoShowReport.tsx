@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { NoteCard } from '../../components/ScreenPieces';
+import { Caption, NoteCard } from '../../components/ScreenPieces';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, X, Info, ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -103,9 +103,9 @@ export default function NoShowReport() {
       <div className="px-5 py-4">
         <NoteCard>
           <Info className="w-6 h-6 text-[#a09cab] shrink-0" strokeWidth={1.6} />
-          <p className="text-[12px] leading-4 font-medium text-[#a09cab]">
+          <Caption>
             Reporting no-shows helps protect your reliability rating and allows us to enforce cancellation policies.
-          </p>
+          </Caption>
         </NoteCard>
       </div>
 

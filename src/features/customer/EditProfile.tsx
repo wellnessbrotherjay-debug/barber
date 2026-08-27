@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { PanelCard } from '../../components/ScreenPieces';
+import { CentredTitle, IconButton, PanelCard } from '../../components/ScreenPieces';
 import { useNavigate } from 'react-router-dom';
 import { uploadMyAvatar } from '../../lib/api';
 import {
@@ -53,17 +53,12 @@ type AuthUser = ReturnType<typeof useAuthStore.getState>['user'];
 function EditProfileHeader({ onBack }: { onBack: () => void }) {
   return (
     <div className="flex items-center gap-1.5 px-5 py-4 pt-14">
-      <button
-        type="button"
-        onClick={onBack}
-        className="w-6 h-6 flex items-center justify-center shrink-0"
-        aria-label="Back"
-      >
+      <IconButton label="Back" onClick={onBack}>
         <ChevronLeft className="w-5 h-5 text-[#1c1b1f]" />
-      </button>
-      <p className="flex-1 text-center text-[16px] font-bold leading-6 text-[#1c1b1f]">
+      </IconButton>
+      <CentredTitle>
         Edit Profile
-      </p>
+      </CentredTitle>
       <span className="w-6 h-6 shrink-0" />
     </div>
   );

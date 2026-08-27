@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useBooking } from '../../lib/useBooking';
 import CustomerScreenHeader from '../../components/CustomerScreenHeader';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -236,22 +237,7 @@ export default function BarberArriving() {
   const { id: bookingId } = useParams();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
-  const [booking, setBooking] = useState<Booking | null>(null);
-
-  useEffect(() => {
-    if (!user?.id || !bookingId) return;
-    let cancelled = false;
-    authFetch(`/api/bookings`, {
-      headers: {
-      },
-    })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: Booking[]) => {
-        if (!cancelled) setBooking(data.find((b) => b.id === bookingId) || null);
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [bookingId, user?.id]);
+  const { booking } = useBooking<Booking>(bookingId);
 
   const barber = booking?.barber_profiles;
   const firstName = (barber?.display_name || 'your barber').split(' ')[0];

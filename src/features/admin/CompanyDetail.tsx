@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { BlockHeading, SectionHeading } from '../../components/ScreenPieces';
 import AdminTableHead from './AdminTableHead';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -370,9 +371,9 @@ function OverviewTab({ onboarding }: { onboarding: OnboardingResponse | null }) 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <Card className="bg-white border border-[#d4d2e3]">
-        <h3 className="text-lg font-bold text-[#1c1b1f] mb-4 flex items-center gap-2">
+        <SectionHeading>
           <Users className="w-5 h-5 text-[#C8A96A]" /> Onboarding &amp; Capacity
-        </h3>
+        </SectionHeading>
         {onboarding ? (
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
@@ -403,9 +404,9 @@ function OverviewTab({ onboarding }: { onboarding: OnboardingResponse | null }) 
       </Card>
 
       <Card className="bg-white border border-[#d4d2e3]">
-        <h3 className="text-lg font-bold text-[#1c1b1f] mb-4 flex items-center gap-2">
+        <SectionHeading>
           <Settings className="w-5 h-5 text-[#C8A96A]" /> Feature Entitlements
-        </h3>
+        </SectionHeading>
         {onboarding && onboarding.entitlements.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {onboarding.entitlements.map((e) => (
@@ -429,9 +430,9 @@ function BarberRosterCard({
 }: { barbers: Barber[]; loading: boolean; error: string; onSelectBarber: (id: string) => void }) {
   return (
     <Card className="bg-white border border-[#d4d2e3]">
-      <h3 className="text-lg font-bold text-[#1c1b1f] mb-4 flex items-center gap-2">
+      <SectionHeading>
         <Users className="w-5 h-5 text-[#C8A96A]" /> Barber Roster
-      </h3>
+      </SectionHeading>
       {error && <p className="text-red-700 mb-4">{error}</p>}
       {loading ? (
         <p className="text-[#a09cab]">Loading barbers...</p>
@@ -538,9 +539,9 @@ function BarberProfileCard({ barberDetail }: { barberDetail: BarberDetail }) {
 function BarberServicesCard({ services }: { services: Service[] }) {
   return (
     <Card className="bg-white border border-[#d4d2e3]">
-      <h4 className="text-base font-bold text-[#1c1b1f] mb-3 flex items-center gap-2">
+      <BlockHeading>
         <Scissors className="w-4 h-4 text-[#C8A96A]" /> Services
-      </h4>
+      </BlockHeading>
       {services.length === 0 ? (
         <p className="text-[#a09cab]">No services listed.</p>
       ) : (
@@ -563,9 +564,9 @@ function BarberServicesCard({ services }: { services: Service[] }) {
 function BarberScheduleCard({ schedule }: { schedule: ScheduleSlot[] }) {
   return (
     <Card className="bg-white border border-[#d4d2e3]">
-      <h4 className="text-base font-bold text-[#1c1b1f] mb-3 flex items-center gap-2">
+      <BlockHeading>
         <Clock className="w-4 h-4 text-[#C8A96A]" /> Availability / Schedule
-      </h4>
+      </BlockHeading>
       {schedule.length === 0 ? (
         <p className="text-[#a09cab]">No schedule set up yet.</p>
       ) : (
@@ -587,9 +588,9 @@ function BarberScheduleCard({ schedule }: { schedule: ScheduleSlot[] }) {
 function BarberRecentBookingsCard({ recentBookings }: { recentBookings: any[] }) {
   return (
     <Card className="bg-white border border-[#d4d2e3]">
-      <h4 className="text-base font-bold text-[#1c1b1f] mb-3 flex items-center gap-2">
+      <BlockHeading>
         <CalendarClock className="w-4 h-4 text-[#C8A96A]" /> Recent Bookings
-      </h4>
+      </BlockHeading>
       {recentBookings.length === 0 ? (
         <p className="text-[#a09cab]">No bookings yet.</p>
       ) : (
@@ -623,9 +624,9 @@ function BarberRecentBookingsCard({ recentBookings }: { recentBookings: any[] })
 function BarberReviewsCard({ reviews }: { reviews: Review[] }) {
   return (
     <Card className="bg-white border border-[#d4d2e3]">
-      <h4 className="text-base font-bold text-[#1c1b1f] mb-3 flex items-center gap-2">
+      <BlockHeading>
         <Star className="w-4 h-4 text-[#C8A96A]" /> Reviews
-      </h4>
+      </BlockHeading>
       {reviews.length === 0 ? (
         <p className="text-[#a09cab]">No reviews yet.</p>
       ) : (
@@ -681,9 +682,9 @@ function CompanyBookingsCard({
 }: { bookings: TenantBooking[]; loading: boolean; error: string }) {
   return (
     <Card className="bg-white border border-[#d4d2e3]">
-      <h3 className="text-lg font-bold text-[#1c1b1f] mb-4 flex items-center gap-2">
+      <SectionHeading>
         <CalendarClock className="w-5 h-5 text-[#C8A96A]" /> Recent Bookings (this company's own database)
-      </h3>
+      </SectionHeading>
       {error && <p className="text-red-700 mb-4">{error}</p>}
       {loading ? (
         <p className="text-[#a09cab]">Loading bookings...</p>
@@ -724,9 +725,9 @@ function PaymentsListCard({
 }: { payments: PaymentsResponse | null; loading: boolean; error: string }) {
   return (
     <Card className="bg-white border border-[#d4d2e3]">
-      <h3 className="text-lg font-bold text-[#1c1b1f] mb-4 flex items-center gap-2">
+      <SectionHeading>
         <DollarSign className="w-5 h-5 text-[#C8A96A]" /> Payments
-      </h3>
+      </SectionHeading>
       {error && <p className="text-red-700 mb-4">{error}</p>}
       {loading ? (
         <p className="text-[#a09cab]">Loading payments...</p>

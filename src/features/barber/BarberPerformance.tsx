@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import ScreenHeader from '../../components/ScreenHeader';
 import { useNavigate } from 'react-router-dom';
 import { Star, Scissors, Zap, Users, Info } from 'lucide-react';
-import { authFetch, fetchBarberBookingsForUser } from '@/lib/api';
+import { authFetch, fetchBarberBookingsForUser, ratingFrom } from '@/lib/api';
+import type { BarberRating } from '@/lib/api';
 import { useAuthStore } from '@/store/useAuthStore';
 
 interface Booking {
@@ -146,8 +147,7 @@ function VisibilityNote() {
 export default function BarberPerformance() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const [ratingAvg, setRatingAvg] = useState<number | null>(null);
-  const [ratingCount, setRatingCount] = useState<number>(0);
+  const [rating, setRating] = useState<BarberRating | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -165,10 +165,7 @@ export default function BarberPerformance() {
         ]);
         if (profileRes.ok) {
           const profile = await profileRes.json();
-          if (!cancelled) {
-            setRatingAvg(profile.rating_avg != null ? Number(profile.rating_avg) : null);
-            setRatingCount(profile.rating_count != null ? Number(profile.rating_count) : 0);
-          }
+          if (!cancelled) setRating(ratingFrom(profile));
         }
         if (bookingsRes.ok) {
           const data = await bookingsRes.json();
@@ -196,18 +193,18 @@ export default function BarberPerformance() {
     return Math.round((repeat / totalUnique) * 100);
   }, [bookings]);
 
-  const tier = tierFor(ratingAvg);
+  const tier = tierFor(rating?.avg ?? null);
   // Badge shown only when the barber's own real rating data supports it — no
   // cross-barber percentile query exists, so the Figma badge copy is gated on
   // a strong real rating rather than always fabricated.
-  const showTopBadge = ratingAvg != null && ratingAvg >= 4.5 && ratingCount >= 5;
+  const showTopBadge = rating?.avg != null && rating.avg >= 4.5 && (rating?.count ?? 0) >= 5;
 
   const metricRows = [
     {
       icon: Star,
       label: 'Average Rating',
-      value: ratingAvg != null ? ratingAvg.toFixed(1) : '—',
-      note: `Based on last ${ratingCount} review${ratingCount === 1 ? '' : 's'}`,
+      value: rating?.avg != null ? rating.avg.toFixed(1) : '—',
+      note: `Based on last ${(rating?.count ?? 0)} review${(rating?.count ?? 0) === 1 ? '' : 's'}`,
     },
     {
       icon: Scissors,
@@ -231,7 +228,7 @@ export default function BarberPerformance() {
       <ScreenHeader title="Performance Overview" />
 
       {/* Overall standing hero — Figma page 58 */}
-      <OverallStandingHero loading={loading} tier={tier} ratingAvg={ratingAvg} showTopBadge={showTopBadge} />
+      <OverallStandingHero loading={loading} tier={tier} ratingAvg={rating?.avg ?? null} showTopBadge={showTopBadge} />
 
       {/* Metric rows */}
       <MetricRows rows={metricRows} />

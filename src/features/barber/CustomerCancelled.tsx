@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { IconTile } from '../../components/ScreenPieces';
+import { AddressPinIcon, Caption, FieldValue, IconTile, QuietButton, SubduedLine } from '../../components/ScreenPieces';
 import ScreenHeader from '../../components/ScreenHeader';
 import { useNavigate, useParams } from 'react-router-dom';
-import { X, User, Calendar, MapPin } from 'lucide-react';
+import { X, User, Calendar } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { fetchBarberJobs, type Job } from './BarberJobs';
 
@@ -42,9 +42,9 @@ export default function CustomerCancelled() {
           </span>
         </div>
         <h1 className="mt-6 text-[28px] leading-9 font-bold text-[#1c1b1f]">Customer cancelled</h1>
-        <p className="mt-1 text-[14px] leading-5 font-medium text-[#a09cab]">
+        <SubduedLine>
           This booking has been cancelled by the customer.
-        </p>
+        </SubduedLine>
       </div>
 
       {/* Booking Overview */}
@@ -56,10 +56,10 @@ export default function CustomerCancelled() {
               <User className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
             </IconTile>
             <div>
-              <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Customer</p>
-              <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f] mt-0.5">
+              <Caption>Customer</Caption>
+              <FieldValue>
                 {job?.users?.full_name || '—'}
-              </p>
+              </FieldValue>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -67,21 +67,21 @@ export default function CustomerCancelled() {
               <Calendar className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
             </IconTile>
             <div>
-              <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Scheduled Date</p>
-              <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f] mt-0.5">
+              <Caption>Scheduled Date</Caption>
+              <FieldValue>
                 {job?.booking_date || '—'}
-              </p>
+              </FieldValue>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <IconTile>
-              <MapPin className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
+              <AddressPinIcon />
             </IconTile>
             <div>
-              <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Location</p>
-              <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f] mt-0.5">
+              <Caption>Location</Caption>
+              <FieldValue>
                 {job?.barber_profiles?.address_text || '—'}
-              </p>
+              </FieldValue>
             </div>
           </div>
         </div>
@@ -96,13 +96,9 @@ export default function CustomerCancelled() {
         >
           Back to Requests
         </button>
-        <button
-          type="button"
-          onClick={() => navigate('/barber/report-issue')}
-          className="w-full mt-4 text-center text-[16px] leading-5 font-semibold text-[#a09cab] py-2"
-        >
+        <QuietButton type="button" onClick={() => navigate('/barber/report-issue')}>
           Contact Support
-        </button>
+        </QuietButton>
       </div>
     </div>
   );

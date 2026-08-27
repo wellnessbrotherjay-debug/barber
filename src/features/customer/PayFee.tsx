@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { CentredTitle, IconButton, PanelCard, SmallLabel, TinyLabelMuted } from '../../components/ScreenPieces';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ChevronLeft,
@@ -111,17 +112,12 @@ function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
 function PayFeeHeader({ title, onBack }: { title: string; onBack: () => void }) {
   return (
     <div className="bg-white flex items-center gap-1.5 px-5 py-4 pt-14">
-      <button
-        type="button"
-        onClick={onBack}
-        className="w-6 h-6 flex items-center justify-center shrink-0"
-        aria-label="Back"
-      >
+      <IconButton label="Back" onClick={onBack}>
         <ChevronLeft className="w-5 h-5 text-[#1c1b1f]" />
-      </button>
-      <p className="flex-1 text-center text-[16px] font-bold leading-6 text-[#1c1b1f]">
+      </IconButton>
+      <CentredTitle>
         {title}
-      </p>
+      </CentredTitle>
       <span className="w-6 h-6 shrink-0" />
     </div>
   );
@@ -164,7 +160,7 @@ function AuthorizeAppointmentSummary() {
 function AuthorizeFeeBreakdown() {
   return (
     <div className="px-5 mt-4">
-      <div className="rounded-[16px] border-[0.75px] border-[#d2dbe9] bg-white p-4">
+      <PanelCard>
         <div className="flex items-center justify-between py-2">
           <p className="text-[13px] font-semibold text-[#1c1b1f]">Service Total</p>
           <p className="text-[13px] font-bold text-[#1c1b1f]">$45.00</p>
@@ -202,7 +198,7 @@ function AuthorizeFeeBreakdown() {
             You&rsquo;ll enter your card on the next step
           </p>
         </div>
-      </div>
+      </PanelCard>
     </div>
   );
 }
@@ -257,12 +253,12 @@ function AppointmentSection() {
               <Scissors className="w-4 h-4 text-[#1c1b1f]" />
             </IconTile>
             <div className="flex flex-col gap-1">
-              <p className="text-[10px] font-semibold leading-[14px] text-[#a09cab]">
+              <TinyLabelMuted>
                 Service Selected
-              </p>
-              <p className="text-[12px] font-semibold leading-4 text-[#1c1b1f]">
+              </TinyLabelMuted>
+              <SmallLabel>
                 Signature Skin Fade &amp; Beard Trim
-              </p>
+              </SmallLabel>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -270,22 +266,22 @@ function AppointmentSection() {
               <Calendar className="w-4 h-4 text-[#1c1b1f]" />
             </IconTile>
             <div className="flex flex-col gap-1">
-              <p className="text-[10px] font-semibold leading-[14px] text-[#a09cab]">
+              <TinyLabelMuted>
                 Date &amp; Time
-              </p>
+              </TinyLabelMuted>
               <div className="flex items-center gap-1.5">
-                <p className="text-[12px] font-semibold leading-4 text-[#1c1b1f]">
+                <SmallLabel>
                   Tuesday, Oct 24
-                </p>
+                </SmallLabel>
                 <span className="w-1 h-1 rounded-full bg-[#a09cab]" />
-                <p className="text-[12px] font-semibold leading-4 text-[#1c1b1f]">10:00 AM</p>
+                <SmallLabel>10:00 AM</SmallLabel>
               </div>
             </div>
           </div>
         </div>
-        <p className="text-[12px] font-semibold leading-4 text-[#1c1b1f]">
+        <SmallLabel>
           with Marcus 'The Fade' Rivera
-        </p>
+        </SmallLabel>
       </div>
     </div>
   );
@@ -302,10 +298,10 @@ function BookingFeeSection() {
       </div>
       <div className="bg-[#f6f7fb] rounded-[12px] p-4 flex items-center justify-between w-full">
         <div className="flex flex-col gap-1">
-          <p className="text-[10px] font-semibold leading-[14px] text-[#a09cab]">
+          <TinyLabelMuted>
             To confirm appointment
-          </p>
-          <p className="text-[12px] font-semibold leading-4 text-[#1c1b1f]">Booking Fee</p>
+          </TinyLabelMuted>
+          <SmallLabel>Booking Fee</SmallLabel>
         </div>
         <p className="text-[12px] font-bold leading-4 text-[#1c1b1f]">$20.00</p>
       </div>
@@ -329,9 +325,9 @@ function WhatThisUnlocksSection() {
             <Scissors className="w-4 h-4 text-[#1c1b1f]" />
           </IconTile>
           <div className="flex flex-col gap-1">
-            <p className="text-[10px] font-semibold leading-[14px] text-[#a09cab]">
+            <TinyLabelMuted>
               Confirmed Request
-            </p>
+            </TinyLabelMuted>
             <p className="text-[12px] font-semibold leading-4 text-[#1c1b1f] max-w-[279px]">
               Your card is temporarily authorizes. The booking fee will only be charged once the
               barber accepts your request.

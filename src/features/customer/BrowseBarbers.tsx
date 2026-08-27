@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { DotSeparator} from '../../components/ScreenPieces';
 import { useNavigate } from 'react-router-dom';
 import { Star, ImageIcon, Clock } from 'lucide-react';
 import CustomerNav from '@/components/CustomerNav';
@@ -52,7 +53,7 @@ function BarberCard({
             {/* "• Online" pill — is_active is the real accepting-requests flag */}
             {barber.is_active && (
               <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#f8f8f8] text-[10px] leading-[12px] font-medium text-[#514e59]">
-                <span className="w-[3px] h-[3px] rounded-full bg-[#514e59]" />
+                <DotSeparator />
                 Online
               </span>
             )}

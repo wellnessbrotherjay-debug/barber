@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { CentredTitle, DotSeparator, IconButton, SmallLabel } from '../../components/ScreenPieces';
 import { useNavigate } from 'react-router-dom';
 import CustomerNav from '@/components/CustomerNav';
 import { cn } from '@/lib/utils';
@@ -38,17 +39,12 @@ function BookingHistoryHeader({ onBack }: { onBack: () => void }) {
   return (
     /* Top navigation bar — Figma 1:1184: back chevron, centered bold title */
     <div className="bg-white flex items-center gap-1.5 px-5 py-4 pt-14">
-      <button
-        type="button"
-        onClick={onBack}
-        className="w-6 h-6 flex items-center justify-center shrink-0"
-        aria-label="Back"
-      >
+      <IconButton label="Back" onClick={onBack}>
         <ChevronLeft className="w-5 h-5 text-[#1c1b1f]" />
-      </button>
-      <p className="flex-1 text-center text-[16px] font-bold leading-6 text-[#1c1b1f]">
+      </IconButton>
+      <CentredTitle>
         Booking History
-      </p>
+      </CentredTitle>
       <span className="w-6 h-6 shrink-0" />
     </div>
   );
@@ -151,7 +147,7 @@ function BookingCard({
           </p>
         </div>
         <span className="flex items-center gap-1 bg-[#f8f8f8] rounded-full px-3 py-1.5 shrink-0">
-          <span className="w-[3px] h-[3px] rounded-full bg-[#514e59]" />
+          <DotSeparator />
           <span className="text-[10px] font-medium leading-3 text-[#514e59]">
             {b.status.charAt(0).toUpperCase() + b.status.slice(1)}
           </span>
@@ -176,9 +172,9 @@ function BookingCard({
           <div className="flex items-start gap-1">
             <MapPin className="w-3.5 h-3.5 text-[#1c1b1f]" />
             <div className="flex flex-col gap-1">
-              <p className="text-[12px] font-semibold leading-4 text-[#1c1b1f]">
+              <SmallLabel>
                 {b.barber_profiles.shop_name}
-              </p>
+              </SmallLabel>
             </div>
           </div>
           <hr className="border-t-[0.5px] border-dashed border-[#d2dbe9] w-full" />

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { IconTile } from '../../components/ScreenPieces';
+import { AddressPinIcon, IconTile, QuietButton } from '../../components/ScreenPieces';
 import ScreenHeader from '../../components/ScreenHeader';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Clock, MapPin, Image as ImageIcon } from 'lucide-react';
+import { Clock, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/store/useAuthStore';
 import { fetchBarberJobs, type Job } from './BarberJobs';
@@ -96,7 +96,7 @@ export default function BarberJobArriving() {
         <h2 className="text-[20px] leading-6 font-bold text-[#1c1b1f]">Customer Address</h2>
         <div className="mt-4 flex items-center gap-3">
           <IconTile>
-            <MapPin className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
+            <AddressPinIcon />
           </IconTile>
           <div>
             <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f]">{customerName}</p>
@@ -120,14 +120,9 @@ export default function BarberJobArriving() {
         >
           Open in Google Maps
         </button>
-        <button
-          type="button"
-          disabled
-          title="Coming soon"
-          className="w-full mt-4 text-center text-[16px] leading-5 font-semibold text-[#a09cab] py-2 disabled:opacity-90"
-        >
+        <QuietButton type="button">
           Call {customerName}
-        </button>
+        </QuietButton>
         {job && (
           <button
             type="button"

@@ -1,5 +1,5 @@
 import React from 'react';
-import { RoundIconTile } from '../../components/ScreenPieces';
+import { InkButton, RoundIconTile} from '../../components/ScreenPieces';
 import CustomerScreenHeader from '../../components/CustomerScreenHeader';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CircleCheck, Clock, Scissors, ShieldCheck, MessageSquare, Phone } from 'lucide-react';
@@ -150,13 +150,9 @@ export default function BookingRequestStatus() {
 
       {/* CTA */}
       <div className="px-6 mt-8">
-        <button
-          type="button"
-          onClick={handleCancel}
-          className="w-full bg-ink text-white text-[16px] font-semibold py-[20px] rounded-full"
-        >
+        <InkButton type="button" onClick={handleCancel}>
           Cancel Booking Request
-        </button>
+        </InkButton>
       </div>
     </div>
   );

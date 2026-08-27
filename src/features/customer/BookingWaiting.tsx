@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { RoundIconTile } from '../../components/ScreenPieces';
+import { BackArrowIcon, InkButton, RoundIconTile } from '../../components/ScreenPieces';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Clock, ChevronLeft, ImageIcon, Scissors, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
@@ -110,7 +110,7 @@ function NoResponseScreen({
     <div className="min-h-screen bg-white flex flex-col pb-8">
       <div className="flex items-center px-6 pt-16 pb-2">
         <button type="button" aria-label="Back" onClick={onBack}>
-          <ChevronLeft className="w-6 h-6 text-ink" strokeWidth={2.25} />
+          <BackArrowIcon />
         </button>
       </div>
 
@@ -127,13 +127,9 @@ function NoResponseScreen({
       </div>
 
       <div className="px-6 mt-8">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="w-full bg-ink text-white text-[16px] font-semibold py-[20px] rounded-full"
-        >
+        <InkButton type="button" onClick={onCancel}>
           Cancel Search
-        </button>
+        </InkButton>
         <button
           type="button"
           onClick={onChooseAnother}

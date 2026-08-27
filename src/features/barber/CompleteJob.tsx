@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PrimaryButton } from '../../components/ScreenPieces';
+import { PrimaryButton, QuietButton, SubduedLine } from '../../components/ScreenPieces';
 import ScreenHeader from '../../components/ScreenHeader';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -46,9 +46,9 @@ export default function CompleteJob() {
 
       <div className="px-5 pt-4">
         <h1 className="text-[24px] leading-8 font-bold text-[#1c1b1f]">Confirm this job is finished</h1>
-        <p className="mt-1 text-[14px] leading-5 font-medium text-[#a09cab]">
+        <SubduedLine>
           Please review the checklist before closing this ticket.
-        </p>
+        </SubduedLine>
       </div>
 
       <div className="px-5 pt-8">
@@ -84,13 +84,9 @@ export default function CompleteJob() {
         <PrimaryButton type="button" onClick={handleComplete} disabled={submitting}>
           {submitting ? 'Completing…' : 'Mark as Complete'}
         </PrimaryButton>
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="w-full mt-4 text-center text-[16px] leading-5 font-semibold text-[#a09cab] py-2"
-        >
+        <QuietButton type="button" onClick={() => navigate(-1)}>
           Go Back
-        </button>
+        </QuietButton>
       </div>
     </div>
   );

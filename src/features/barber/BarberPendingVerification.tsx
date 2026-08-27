@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { NoteCard } from '../../components/ScreenPieces';
+import { IconButton, NoteCard, SmallIconTile } from '../../components/ScreenPieces';
 import { useNavigate } from 'react-router-dom';
 import { useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ShieldCheck, ShieldAlert, CheckCircle2, FileText, Info, Image as ImageIcon, CircleX } from 'lucide-react';
@@ -142,9 +142,9 @@ function ReviewInProgressState({ onBack }: { onBack: () => void }) {
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <div className="flex items-center justify-center gap-1.5 px-5 py-4">
-        <button type="button" aria-label="Back" onClick={onBack} className="w-6 h-6 flex items-center justify-center shrink-0">
+        <IconButton label="Back" onClick={onBack}>
           <ArrowLeft className="w-5 h-5 text-ink" />
-        </button>
+        </IconButton>
         <h1 className="flex-1 text-center text-[16px] leading-6 font-bold text-ink">Verification Status</h1>
         <span className="w-6 h-6 shrink-0" />
       </div>
@@ -192,9 +192,9 @@ function SubmittedDocumentRows({
             className="bg-white border-[0.75px] border-[#d2dbe9] rounded-[12px] p-3 flex items-center justify-between"
           >
             <div className="flex gap-3 items-center">
-              <div className="size-[38px] bg-surface-2 rounded-[8px] flex items-center justify-center shrink-0">
+              <SmallIconTile>
                 <FileText className="w-4 h-4 text-ink" />
-              </div>
+              </SmallIconTile>
               <div className="flex flex-col gap-1 items-start">
                 <p className="text-[10px] font-medium leading-[14px] text-muted">{DOC_LABELS[key]}</p>
                 <p className="text-xs font-bold leading-4 text-ink">

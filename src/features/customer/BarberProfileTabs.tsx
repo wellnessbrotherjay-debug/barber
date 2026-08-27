@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import CustomerScreenHeader from '../../components/CustomerScreenHeader';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, Scissors, Clock, Calendar, CircleCheck, Facebook, Twitter, Instagram } from 'lucide-react';
+import { Scissors, Clock, Calendar, CircleCheck, Facebook, Twitter, Instagram } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
 import { authFetch } from '@/lib/api';
@@ -138,12 +139,7 @@ export default function BarberProfileTabs() {
   return (
     <div className="min-h-screen bg-white pb-8">
       {/* Top bar — centered "Barbar Profile" (copy exactly as designed) */}
-      <div className="flex items-center px-6 pt-16 pb-4">
-        <button type="button" aria-label="Back" onClick={() => navigate(-1)}>
-          <ChevronLeft className="w-6 h-6 text-ink" strokeWidth={2.25} />
-        </button>
-        <p className="flex-1 text-center text-[18px] font-bold text-ink pr-6">Barbar Profile</p>
-      </div>
+      <CustomerScreenHeader title="Barbar Profile" onBack={() => navigate(-1)} />
 
       <div className="px-6">
         {/* Profile card */}

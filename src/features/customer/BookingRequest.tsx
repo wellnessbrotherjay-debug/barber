@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, Scissors, Send, Store, Truck, User, Phone } from 'lucide-react';
+import CustomerScreenHeader from '../../components/CustomerScreenHeader';
+import { Scissors, Send, Store, Truck, User, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -201,12 +202,7 @@ function ContactDetailsSection({
 // what the board draws.
 function BookingRequestHeader({ onBack }: { onBack: () => void }) {
   return (
-    <div className="flex items-center px-6 pt-16 pb-4">
-      <button type="button" aria-label="Back" onClick={onBack}>
-        <ChevronLeft className="w-6 h-6 text-ink" strokeWidth={2.25} />
-      </button>
-      <p className="flex-1 text-center text-[18px] font-bold text-ink pr-6">Book Your Service</p>
-    </div>
+    <CustomerScreenHeader title="Book Your Service" onBack={onBack} />
   );
 }
 

@@ -1,6 +1,7 @@
 import React from 'react';
+import CustomerScreenHeader from '../../components/CustomerScreenHeader';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, CircleCheck, Clock, Scissors, ShieldCheck, MessageSquare, Phone } from 'lucide-react';
+import { CircleCheck, Clock, Scissors, ShieldCheck, MessageSquare, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -114,12 +115,7 @@ export default function BookingRequestStatus() {
   return (
     <div className="min-h-screen bg-white flex flex-col pb-8">
       {/* Header */}
-      <div className="flex items-center px-6 pt-16 pb-4">
-        <button type="button" aria-label="Back" onClick={() => navigate(-1)}>
-          <ChevronLeft className="w-6 h-6 text-ink" strokeWidth={2.25} />
-        </button>
-        <p className="flex-1 text-center text-[18px] font-bold text-ink pr-6">Booking Request</p>
-      </div>
+      <CustomerScreenHeader title="Booking Request" onBack={() => navigate(-1)} />
 
       <div className="px-6 flex-1">
         {/* Stepper */}

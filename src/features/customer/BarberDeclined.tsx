@@ -1,6 +1,7 @@
 import React from 'react';
+import CustomerScreenHeader from '../../components/CustomerScreenHeader';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, XCircle, Search } from 'lucide-react';
+import { XCircle, Search } from 'lucide-react';
 
 // Figma page 35 — "Barber declined" (header: Cancelled).
 // "Send to next available barber" routes back to browse — there is no backend
@@ -10,12 +11,7 @@ export default function BarberDeclined() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      <div className="flex items-center px-6 pt-16 pb-4">
-        <button type="button" aria-label="Back" onClick={() => navigate(-1)}>
-          <ChevronLeft className="w-6 h-6 text-ink" strokeWidth={2.25} />
-        </button>
-        <p className="flex-1 text-center text-[18px] font-bold text-ink pr-6">Cancelled</p>
-      </div>
+      <CustomerScreenHeader title="Cancelled" onBack={() => navigate(-1)} />
 
       <div className="flex flex-col items-center px-6 pt-8 text-center">
         <div className="w-[136px] h-[136px] rounded-[16px] bg-surface flex items-center justify-center">

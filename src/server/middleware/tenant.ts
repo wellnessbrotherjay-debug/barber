@@ -137,141 +137,179 @@ export async function getTenantPool(tenantId: string): Promise<Pool> {
   return pool;
 }
 
+// Each way in is its own function. They all answer the same question - who is
+// asking, and which tenant's data may they see - but they answer it from
+// completely different evidence, and reading them one after another inside a
+// single 140-line block meant the guarantee that matters (identity NEVER comes
+// from a client-supplied header) had to be re-checked by eye every time.
+//
+// Each returns true when it has dealt with the request, so tenantMiddleware is
+// the order they are tried in and nothing else.
+
+/**
+ * The estate's own admin key, sent as a bearer token alongside x-admin-role.
+ * It is a real server credential from the environment, never a cookie and never
+ * anything the caller can choose. Fail closed: with no key configured, admin
+ * access is off entirely. The comparison is constant-time on equal-length
+ * buffers, and a length mismatch fails at once without leaking timing.
+ */
+async function authenticateAsAdmin(req: Request, res: Response, next: NextFunction): Promise<boolean> {
+  if (req.headers['x-admin-role'] !== 'true') return false;
+
+  const adminKey = process.env.ADMIN_API_KEY;
+  if (!adminKey) {
+    res.status(401).json({
+      error: 'Admin access disabled',
+      hint: 'Set ADMIN_API_KEY in the server environment to enable admin access',
+    });
+    return true;
+  }
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Admin authentication required' });
+    return true;
+  }
+  const provided = Buffer.from(authHeader.slice(7));
+  const expected = Buffer.from(adminKey);
+  if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
+    res.status(401).json({ error: 'Invalid admin credentials' });
+    return true;
+  }
+  // No specific tenant: an admin sees all of them. userId is deliberately NOT
+  // taken from any client header.
+  req.tenant = {
+    companyId: 'admin',
+    companyName: 'Admin',
+    tier: 'enterprise',
+    isAdmin: true,
+    pool: adminDbPool,
+  };
+  next();
+  return true;
+}
+
+/**
+ * A signed-in person's session token. Verified locally with no database round
+ * trip, so it is tried before the company key. Everything about who they are
+ * comes out of the signed token and nothing else.
+ */
+async function authenticateAsSignedInUser(req: Request, next: NextFunction, token: string): Promise<boolean> {
+  try {
+    const decoded = jwt.verify(token, getJwtSecret()) as AuthTokenPayload;
+    const pool = await getTenantPool(decoded.tenant_id);
+    req.tenant = {
+      companyId: decoded.tenant_id,
+      companyName: `Company ${decoded.tenant_id}`,
+      tier: 'starter',
+      isAdmin: decoded.role === 'admin',
+      userId: decoded.sub,
+      userRole: decoded.role,
+      pool,
+    };
+    next();
+    return true;
+  } catch (jwtErr) {
+    // Not a signed-in person's token. The same header also carries a company
+    // API key, which is not a session token and will always land here, so this
+    // is an ordinary outcome rather than a failure - but an expired or tampered
+    // token looks identical from here, and that is worth being able to see.
+    console.debug('[tenant] bearer token is not a session token, trying it as a company API key:',
+                  (jwtErr as Error).message);
+    return false;
+  }
+}
+
+/**
+ * A company's own API key, which identifies the company but no person. It grants
+ * no user identity at all - userId stays undefined - so nothing that acts on
+ * behalf of a person can be reached with it.
+ */
+async function authenticateAsCompany(req: Request, res: Response, next: NextFunction, apiKey: string): Promise<boolean> {
+  try {
+    const result = await adminDbPool.query(
+      'SELECT * FROM barber.get_company_by_api_key(api_key_ => $1, status_ => $2)',
+      [apiKey, 'active']
+    );
+    if (result.rows.length === 0) {
+      res.status(401).json({ error: 'Invalid or expired API key' });
+      return true;
+    }
+
+    const company = result.rows[0];
+    const tenantId = company.id.toString();
+    const pool = await getTenantPool(tenantId);
+
+    req.tenant = {
+      companyId: tenantId,
+      companyName: company.name,
+      tier: company.subscription_tier,
+      isAdmin: false,
+      pool,
+    };
+
+    // Usage logging must never hold up the request it is recording.
+    await adminDbPool.query(
+      'SELECT * FROM barber.log_api_key_usage(company_id_ => $1, endpoint_ => $2, method_ => $3, status_code_ => $4)',
+      [company.id, req.path, req.method, 200]
+    ).catch(console.error);
+
+    next();
+    return true;
+  } catch (err) {
+    console.error('API key validation error:', err);
+    res.status(500).json({ error: 'Authentication failed' });
+    return true;
+  }
+}
+
+/**
+ * Guest browsing. The x-session-token header ("<tenantId>:guest") ONLY chooses
+ * which tenant's public data to read - it carries no identity whatsoever.
+ * userId is left undefined and x-user-id is ignored entirely: identity comes
+ * exclusively from a signed session token.
+ */
+async function authenticateAsGuest(req: Request, next: NextFunction): Promise<boolean> {
+  const customerSession = req.headers['x-session-token'] as string;
+  if (!customerSession) return false;
+
+  const parts = customerSession.split(':');
+  if (parts.length !== 2 || !/^[1-9]\d*$/.test(parts[0])) return false;
+
+  const tenantId = parts[0];
+  const pool = await getTenantPool(tenantId);
+  req.tenant = {
+    companyId: tenantId,
+    companyName: `Company ${tenantId}`,
+    tier: 'starter',
+    isAdmin: false,
+    pool,
+  };
+  next();
+  return true;
+}
+
 export async function tenantMiddleware(
   req: Request,
   res: Response,
   next: NextFunction
 ) {
   try {
-    // Attach admin DB
     req.adminDb = adminDbPool;
 
-    // Admin authentication: requests marked with `x-admin-role: true` must
-    // carry `Authorization: Bearer <ADMIN_API_KEY>`. The key is a real server
-    // credential from the environment — never a cookie, never a client-chosen
-    // value. Fail closed: if ADMIN_API_KEY is unset, admin access is disabled
-    // entirely. Comparison is constant-time (timingSafeEqual) on equal-length
-    // buffers; a length mismatch fails immediately without leaking timing.
-    if (req.headers['x-admin-role'] === 'true') {
-      const adminKey = process.env.ADMIN_API_KEY;
-      if (!adminKey) {
-        return res.status(401).json({
-          error: 'Admin access disabled',
-          hint: 'Set ADMIN_API_KEY in the server environment to enable admin access',
-        });
-      }
-      const authHeader = req.headers.authorization;
-      if (!authHeader?.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'Admin authentication required' });
-      }
-      const provided = Buffer.from(authHeader.slice(7));
-      const expected = Buffer.from(adminKey);
-      if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
-        return res.status(401).json({ error: 'Invalid admin credentials' });
-      }
-      // Admin context - no specific tenant, has access to all. userId is
-      // deliberately NOT taken from any client header.
-      req.tenant = {
-        companyId: 'admin',
-        companyName: 'Admin',
-        tier: 'enterprise',
-        isAdmin: true,
-        pool: adminDbPool,
-      };
-      return next();
-    }
+    if (await authenticateAsAdmin(req, res, next)) return;
 
-    // Check for API key (barber company authentication) OR a user session JWT
-    // issued by /api/auth/login|signup. These share the same Bearer header, so
-    // JWT verification is attempted first (cheap, local, no DB round-trip) —
-    // company API keys are opaque random strings and will always fail
-    // jwt.verify, so there is no ambiguity/collision between the two modes.
+    // A bearer token is either a signed-in person's session or a company's API
+    // key. The session is tried first because it costs nothing to check.
     const authHeader = req.headers.authorization;
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.slice(7);
-
-      try {
-        const decoded = jwt.verify(token, getJwtSecret()) as AuthTokenPayload;
-        const pool = await getTenantPool(decoded.tenant_id);
-        req.tenant = {
-          companyId: decoded.tenant_id,
-          companyName: `Company ${decoded.tenant_id}`,
-          tier: 'starter',
-          isAdmin: decoded.role === 'admin',
-          userId: decoded.sub,
-          userRole: decoded.role,
-          pool,
-        };
-        return next();
-      } catch (jwtErr) {
-        // Not a signed-in person's token. The same header also carries a company
-        // API key, which is not a JWT and will always land here, so this is an
-        // ordinary outcome rather than a failure - but an expired or tampered
-        // token looks identical from here, and that is worth being able to see.
-        console.debug('[tenant] bearer token is not a session token, trying it as a company API key:',
-                      (jwtErr as Error).message);
-      }
-
-      const apiKey = token;
-
-      try {
-        const result = await adminDbPool.query(
-          'SELECT * FROM barber.get_company_by_api_key(api_key_ => $1, status_ => $2)',
-          [apiKey, 'active']
-        );
-
-        if (result.rows.length === 0) {
-          return res.status(401).json({ error: 'Invalid or expired API key' });
-        }
-
-        const company = result.rows[0];
-        const tenantId = company.id.toString();
-        const pool = await getTenantPool(tenantId);
-
-        req.tenant = {
-          companyId: tenantId,
-          companyName: company.name,
-          tier: company.subscription_tier,
-          isAdmin: false,
-          pool,
-        };
-
-        // Log API usage
-        await adminDbPool.query(
-          'SELECT * FROM barber.log_api_key_usage(company_id_ => $1, endpoint_ => $2, method_ => $3, status_code_ => $4)',
-          [company.id, req.path, req.method, 200]
-        ).catch(console.error); // Don't block on logging error
-
-        return next();
-      } catch (err) {
-        console.error('API key validation error:', err);
-        return res.status(500).json({ error: 'Authentication failed' });
-      }
+      if (await authenticateAsSignedInUser(req, next, token)) return;
+      if (await authenticateAsCompany(req, res, next, token)) return;
+      return;
     }
 
-    // Anonymous tenant context for public discovery (guest browse). The
-    // x-session-token header ("<tenantId>:guest") ONLY selects a tenant DB —
-    // it carries NO identity. userId is left undefined and x-user-id is
-    // ignored entirely: identity comes exclusively from the JWT path above.
-    const customerSession = req.headers['x-session-token'] as string;
-    if (customerSession) {
-      const parts = customerSession.split(':');
-      if (parts.length === 2 && /^[1-9]\d*$/.test(parts[0])) {
-        const tenantId = parts[0];
-        const pool = await getTenantPool(tenantId);
+    if (await authenticateAsGuest(req, next)) return;
 
-        req.tenant = {
-          companyId: tenantId,
-          companyName: `Company ${tenantId}`,
-          tier: 'starter',
-          isAdmin: false,
-          pool,
-        };
-        return next();
-      }
-    }
-
-    // No valid authentication found
     return res.status(401).json({
       error: 'Tenant authentication required',
       hint: 'Provide: (1) a Bearer JWT or API key, (2) ADMIN_API_KEY with x-admin-role, or (3) an anonymous x-session-token for public discovery'

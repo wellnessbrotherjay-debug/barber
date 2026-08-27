@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { RoundIconTile } from '../../components/ScreenPieces';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Clock, ChevronLeft, ImageIcon, Scissors, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
@@ -61,9 +62,9 @@ function NoResponseDetails({ requestedTime }: { requestedTime: string }) {
     <>
       {/* Payment status card — copy per board */}
       <div className="bg-[#f6f7fb] rounded-[16px] p-4 mt-8 flex items-center gap-3">
-        <span className="w-11 h-11 rounded-full bg-white flex items-center justify-center shrink-0">
+        <RoundIconTile>
           <ImageIcon className="w-5 h-5 text-muted" />
-        </span>
+        </RoundIconTile>
         <span>
           <span className="block text-[16px] font-bold text-ink">Payment Status</span>
           <span className="block text-[14px] text-muted mt-0.5">
@@ -156,9 +157,9 @@ function BarberSummaryCard({
 }) {
   return (
     <div className="flex items-center gap-3 bg-surface rounded-[14px] p-3 mt-3">
-      <span className="w-11 h-11 rounded-full bg-white flex items-center justify-center shrink-0">
+      <RoundIconTile>
         <ImageIcon className="w-5 h-5 text-muted" />
-      </span>
+      </RoundIconTile>
       <span>
         <span className="block text-[15px] font-semibold text-ink">
           {barberName || 'Your barber'}

@@ -9,6 +9,7 @@ import path from 'path';
 import fsp from 'fs/promises';
 import { fileURLToPath } from 'url';
 import Stripe from 'stripe';
+import type { TenantContext } from './middleware/tenant';
 import { tenantMiddleware, requireAdmin, requireEntitlement, requireBarberAuth, requireUserAuth, requireCustomerAuth, closeTenantPools, getTenantPool, getJwtSecret, AuthTokenPayload } from './middleware/tenant.js';
 import { createUploadsRouter, UPLOAD_DIR } from './routes/uploads.js';
 import { sendEmail } from './mailer.js';
@@ -474,10 +475,7 @@ app.get('/admin/companies/:id/bookings', requireAdmin, async (req: Request, res:
     const { id } = req.params;
     const adminDb = req.adminDb!;
 
-    const companyResult = await adminDb.query('SELECT * FROM barber.get_company_by_id(id_ => $1)', [id]);
-    if (companyResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Company not found' });
-    }
+    if (!(await requireCompany(req, res, id))) return;
 
     const pool = await getTenantPool(id);
     const result = await pool.query('SELECT * FROM barber.admin_get_company_bookings()');
@@ -497,10 +495,7 @@ app.get('/admin/companies/:id/barbers', requireAdmin, async (req: Request, res: 
     const { id } = req.params;
     const adminDb = req.adminDb!;
 
-    const companyResult = await adminDb.query('SELECT * FROM barber.get_company_by_id(id_ => $1)', [id]);
-    if (companyResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Company not found' });
-    }
+    if (!(await requireCompany(req, res, id))) return;
 
     const pool = await getTenantPool(id);
     const result = await pool.query('SELECT * FROM barber.admin_get_company_barbers()');
@@ -519,10 +514,7 @@ app.get('/admin/companies/:id/barbers/:barberId', requireAdmin, async (req: Requ
     const { id, barberId } = req.params;
     const adminDb = req.adminDb!;
 
-    const companyResult = await adminDb.query('SELECT * FROM barber.get_company_by_id(id_ => $1)', [id]);
-    if (companyResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Company not found' });
-    }
+    if (!(await requireCompany(req, res, id))) return;
 
     const pool = await getTenantPool(id);
 
@@ -566,10 +558,7 @@ app.get('/admin/companies/:id/payments', requireAdmin, async (req: Request, res:
     const { id } = req.params;
     const adminDb = req.adminDb!;
 
-    const companyResult = await adminDb.query('SELECT * FROM barber.get_company_by_id(id_ => $1)', [id]);
-    if (companyResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Company not found' });
-    }
+    if (!(await requireCompany(req, res, id))) return;
 
     const pool = await getTenantPool(id);
 
@@ -699,9 +688,7 @@ app.get('/admin/income', requireAdmin, async (req: Request, res: Response) => {
 // GET /api/v1/company/dashboard - Company dashboard data
 app.get('/api/v1/company/dashboard', async (req: Request, res: Response) => {
   try {
-    if (!req.tenant || req.tenant.isAdmin) {
-      return res.status(401).json({ error: 'Company context required' });
-    }
+    if (!hasCompanyContext(req, res)) return;
 
     const companyId = req.tenant.companyId;
     const adminDb = req.adminDb!;
@@ -735,9 +722,7 @@ app.get('/api/v1/company/dashboard', async (req: Request, res: Response) => {
 // GET /api/v1/company/bookings - Company's bookings
 app.get('/api/v1/company/bookings', async (req: Request, res: Response) => {
   try {
-    if (!req.tenant || req.tenant.isAdmin) {
-      return res.status(401).json({ error: 'Company context required' });
-    }
+    if (!hasCompanyContext(req, res)) return;
 
     const result = await req.tenant!.pool.query('SELECT * FROM barber.company_list_bookings()');
 
@@ -751,9 +736,7 @@ app.get('/api/v1/company/bookings', async (req: Request, res: Response) => {
 // GET /api/v1/company/income - Company's income reports
 app.get('/api/v1/company/income', async (req: Request, res: Response) => {
   try {
-    if (!req.tenant || req.tenant.isAdmin) {
-      return res.status(401).json({ error: 'Company context required' });
-    }
+    if (!hasCompanyContext(req, res)) return;
 
     const adminDb = req.adminDb!;
     const companyId = req.tenant.companyId;
@@ -773,9 +756,7 @@ app.get('/api/v1/company/income', async (req: Request, res: Response) => {
 // GET /api/v1/company/barbers - Company's barbers
 app.get('/api/v1/company/barbers', async (req: Request, res: Response) => {
   try {
-    if (!req.tenant || req.tenant.isAdmin) {
-      return res.status(401).json({ error: 'Company context required' });
-    }
+    if (!hasCompanyContext(req, res)) return;
 
     const result = await req.tenant!.pool.query('SELECT * FROM barber.company_list_barbers()');
 
@@ -1215,6 +1196,37 @@ app.get('/api/services', async (req: Request, res: Response) => {
 // req.tenant.userId (the JWT's sub claim) — a barber can never touch another
 // barber's data because the barber_id is never taken from the client.
 // ============================================================================
+
+/**
+ * The company named in the address, or nothing - and if there is nothing, the
+ * 404 has already been sent by the time this returns.
+ *
+ * Five admin handlers opened by looking the company up and answering "Company
+ * not found" if it was not there. Written out five times, it only takes one of
+ * them to be forgotten for a handler to carry on with no company at all.
+ */
+async function requireCompany(req: Request, res: Response, id: string): Promise<boolean> {
+  const result = await req.adminDb!.query('SELECT * FROM barber.get_company_by_id(id_ => $1)', [id]);
+  if (result.rows.length === 0) {
+    res.status(404).json({ error: 'Company not found' });
+    return false;
+  }
+  return true;
+}
+
+/**
+ * True when the caller is acting as a specific company, and says so in a way
+ * TypeScript can follow - so everything after it knows req.tenant is there.
+ * An admin is refused here too: these endpoints answer for one company's data
+ * and an admin has no company of its own, so there would be no way to say whose.
+ */
+function hasCompanyContext(req: Request, res: Response): req is Request & { tenant: TenantContext } {
+  if (!req.tenant || req.tenant.isAdmin) {
+    res.status(401).json({ error: 'Company context required' });
+    return false;
+  }
+  return true;
+}
 
 async function getOwnBarberProfileId(pool: any, userId: string): Promise<string | null> {
   const result = await pool.query('SELECT * FROM barber.get_own_barber_profile_id(user_id_ => $1)', [userId]);
@@ -1857,10 +1869,7 @@ app.patch('/admin/companies/:id/barbers/:barberId/verify', requireAdmin, async (
     const { id, barberId } = req.params;
     const adminDb = req.adminDb!;
 
-    const companyResult = await adminDb.query('SELECT * FROM barber.get_company_by_id(id_ => $1)', [id]);
-    if (companyResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Company not found' });
-    }
+    if (!(await requireCompany(req, res, id))) return;
 
     const pool = await getTenantPool(id);
     const result = await pool.query(

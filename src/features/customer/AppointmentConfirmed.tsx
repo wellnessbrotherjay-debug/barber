@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { RoundIconTile } from '../../components/ScreenPieces';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, XCircle, ImageIcon, MessageSquare, Phone } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -54,9 +55,9 @@ export default function AppointmentConfirmed() {
       <div className="px-6 mt-8">
         <div className="border-[0.75px] border-[#d2dbe9] rounded-[20px] p-4">
           <div className="bg-[#f6f7fb] rounded-[16px] p-4 flex items-start gap-3">
-            <span className="w-11 h-11 rounded-full bg-white flex items-center justify-center shrink-0">
+            <RoundIconTile>
               <ImageIcon className="w-5 h-5 text-muted" />
-            </span>
+            </RoundIconTile>
             <span>
               <span className="block text-[16px] font-bold text-ink">
                 Chat and call are now unlocked.

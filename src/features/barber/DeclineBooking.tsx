@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PrimaryButton } from '../../components/ScreenPieces';
 import ScreenHeader from '../../components/ScreenHeader';
 import { useNavigate, useParams } from 'react-router-dom';
 import { X } from 'lucide-react';
@@ -81,14 +82,9 @@ export default function DeclineBooking() {
       </div>
 
       <div className="px-5 mt-auto pt-8">
-        <button
-          type="button"
-          onClick={handleConfirm}
-          disabled={submitting}
-          className="w-full bg-[#1c1b1f] rounded-full px-9 py-[18px] text-[16px] leading-5 font-semibold text-white text-center disabled:opacity-60"
-        >
+        <PrimaryButton type="button" onClick={handleConfirm} disabled={submitting}>
           {submitting ? 'Declining…' : 'Confirm decline'}
-        </button>
+        </PrimaryButton>
         <p className="mt-4 text-[13px] leading-5 font-medium text-[#a09cab] text-center">
           Declining may affect your acceptance rate. Contact support if this is an error.
         </p>

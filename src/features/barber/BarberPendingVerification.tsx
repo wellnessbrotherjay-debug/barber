@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { NoteCard } from '../../components/ScreenPieces';
 import { useNavigate } from 'react-router-dom';
 import { useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ShieldCheck, ShieldAlert, CheckCircle2, FileText, Info, Image as ImageIcon, CircleX } from 'lucide-react';
@@ -261,14 +262,14 @@ function PendingState({
 
       {/* Info card (Figma 1:740) */}
       <div className="px-5 py-4 mt-2">
-        <div className="bg-[#f4f5f8] rounded-[12px] p-4 flex gap-3 items-start">
+        <NoteCard>
           <div className="size-10 bg-white border border-[#e5e7eb] rounded-pill flex items-center justify-center shrink-0">
             <Info className="w-5 h-5 text-ink" />
           </div>
           <p className="text-xs font-medium leading-4 text-muted max-w-[264px]">
             Verification helps customers trust your profile and can improve booking conversion.
           </p>
-        </div>
+        </NoteCard>
       </div>
 
       <div className="flex-1" />

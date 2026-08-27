@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PrimaryButton } from '../../components/ScreenPieces';
 import ScreenHeader from '../../components/ScreenHeader';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ShieldAlert } from 'lucide-react';
@@ -84,14 +85,9 @@ export default function CancelJob() {
       </div>
 
       <div className="px-5 mt-auto pt-8">
-        <button
-          type="button"
-          onClick={handleConfirm}
-          disabled={submitting}
-          className="w-full bg-[#1c1b1f] rounded-full px-9 py-[18px] text-[16px] leading-5 font-semibold text-white text-center disabled:opacity-60"
-        >
+        <PrimaryButton type="button" onClick={handleConfirm} disabled={submitting}>
           {submitting ? 'Cancelling…' : 'Confirm Cancellation'}
-        </button>
+        </PrimaryButton>
         <button
           type="button"
           onClick={() => navigate(-1)}

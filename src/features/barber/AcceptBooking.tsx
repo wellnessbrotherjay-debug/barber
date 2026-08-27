@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { IconTile, PrimaryButton, QuietButton } from '../../components/ScreenPieces';
 import ScreenHeader from '../../components/ScreenHeader';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronRight, Scissors, Clock, Phone, Star, Calendar, MapPin, MessageSquareMore, Image as ImageIcon } from 'lucide-react';
@@ -56,9 +57,9 @@ function BookingAcceptedState({
         <h2 className="text-[20px] leading-6 font-bold text-[#1c1b1f]">Job Summary</h2>
         <div className="mt-4 space-y-4">
           <div className="flex items-center gap-3">
-            <span className="w-11 h-11 rounded-[10px] bg-[#f8f8f8] flex items-center justify-center shrink-0">
+            <IconTile>
               <Calendar className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
-            </span>
+            </IconTile>
             <div>
               <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f]">{job.services?.name}</p>
               <p className="text-[12px] leading-4 font-medium text-[#a09cab] mt-0.5">
@@ -67,9 +68,9 @@ function BookingAcceptedState({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="w-11 h-11 rounded-[10px] bg-[#f8f8f8] flex items-center justify-center shrink-0">
+            <IconTile>
               <MapPin className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
-            </span>
+            </IconTile>
             <div>
               <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f]">In-Person</p>
               {address && (
@@ -192,21 +193,12 @@ function AcceptActions({
 }) {
   return (
     <div className="px-5 mt-auto pt-8">
-      <button
-        type="button"
-        onClick={onAccept}
-        disabled={!canAccept || submitting}
-        className="w-full bg-[#1c1b1f] rounded-full px-9 py-[18px] text-[16px] leading-5 font-semibold text-white text-center disabled:opacity-60"
-      >
+      <PrimaryButton type="button" onClick={onAccept} disabled={!canAccept || submitting}>
         {submitting ? 'Accepting…' : 'Accept'}
-      </button>
-      <button
-        type="button"
-        onClick={onGoBack}
-        className="w-full mt-4 text-center text-[16px] leading-5 font-semibold text-[#a09cab] py-2"
-      >
+      </PrimaryButton>
+      <QuietButton type="button" onClick={onGoBack}>
         Go back
-      </button>
+      </QuietButton>
     </div>
   );
 }

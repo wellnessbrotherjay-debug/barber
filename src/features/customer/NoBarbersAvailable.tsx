@@ -1,4 +1,5 @@
 import React from 'react';
+import { RoundIconTile } from '../../components/ScreenPieces';
 import { useNavigate } from 'react-router-dom';
 import { XCircle, ShieldCheck, ImageIcon, ChevronLeft } from 'lucide-react';
 
@@ -51,9 +52,9 @@ export default function NoBarbersAvailable() {
               onClick={() => navigate('/customer')}
               className="w-full flex items-center gap-3 p-3 rounded-[14px] bg-surface text-left"
             >
-              <span className="w-11 h-11 rounded-full bg-white flex items-center justify-center shrink-0">
+              <RoundIconTile>
                 <ImageIcon className="w-5 h-5 text-muted" />
-              </span>
+              </RoundIconTile>
               <span>
                 <span className="block text-[15px] font-semibold text-ink">{label}</span>
                 <span className="block text-[13px] text-muted mt-0.5">{detail}</span>

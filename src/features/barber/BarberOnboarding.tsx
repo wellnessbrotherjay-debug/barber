@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { NoteCard } from '../../components/ScreenPieces';
 import {
   ArrowLeft,
   Check,
@@ -891,7 +892,7 @@ function StepVerification({ f, a }: { f: Fields; a: Actions }) {
 
       {/* Processing time info card (Figma 1:649) */}
       <div className="px-5 py-4">
-        <div className="bg-[#f4f5f8] rounded-[12px] p-4 flex gap-3 items-start">
+        <NoteCard>
           <div className="size-10 bg-white border border-[#e5e7eb] rounded-pill flex items-center justify-center shrink-0">
             <Clock className="w-5 h-5 text-ink" />
           </div>
@@ -901,7 +902,7 @@ function StepVerification({ f, a }: { f: Fields; a: Actions }) {
               Verification usually takes 24-48 hours once submitted.
             </p>
           </div>
-        </div>
+        </NoteCard>
       </div>
 
       <BottomActions

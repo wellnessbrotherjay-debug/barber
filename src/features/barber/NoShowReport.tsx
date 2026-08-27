@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { NoteCard } from '../../components/ScreenPieces';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, X, Info, ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -79,7 +80,7 @@ export default function NoShowReport() {
 
       {/* Booking summary card */}
       <div className="px-5 py-4">
-        <div className="bg-[#f4f5f8] rounded-[12px] p-4 flex gap-3 items-start">
+        <NoteCard>
           <div className="bg-white rounded-full size-10 flex items-center justify-center shrink-0">
             <ImageIcon className="w-3.5 h-3.5 text-[#d4d2e3]" />
           </div>
@@ -95,17 +96,17 @@ export default function NoShowReport() {
               <span>{job?.services?.name || 'Service'}</span>
             </div>
           </div>
-        </div>
+        </NoteCard>
       </div>
 
       {/* Info card */}
       <div className="px-5 py-4">
-        <div className="bg-[#f4f5f8] rounded-[12px] p-4 flex gap-3 items-start">
+        <NoteCard>
           <Info className="w-6 h-6 text-[#a09cab] shrink-0" strokeWidth={1.6} />
           <p className="text-[12px] leading-4 font-medium text-[#a09cab]">
             Reporting no-shows helps protect your reliability rating and allows us to enforce cancellation policies.
           </p>
-        </div>
+        </NoteCard>
       </div>
 
       {/* Submit */}

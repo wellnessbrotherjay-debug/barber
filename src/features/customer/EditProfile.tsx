@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { PanelCard } from '../../components/ScreenPieces';
 import { useNavigate } from 'react-router-dom';
 import { uploadMyAvatar } from '../../lib/api';
 import {
@@ -222,7 +223,7 @@ function PreferencesSection({
   return (
     <div className="px-5 mt-8">
       <h2 className="text-[20px] font-bold text-[#1c1b1f] mb-4">Preferences</h2>
-      <div className="rounded-[16px] border-[0.75px] border-[#d2dbe9] bg-white p-4">
+      <PanelCard>
         <p className="text-[15px] font-semibold text-[#1c1b1f]">Preferred Service Type</p>
         <div className="flex flex-wrap gap-2 mt-3">
           {SERVICE_TYPES.map((t) => {
@@ -267,7 +268,7 @@ function PreferencesSection({
           <p className="text-[15px] font-bold text-[#1c1b1f]">Preferred Time</p>
           <p className="text-[13px] font-medium text-[#a09cab]">Evenings / Weekends</p>
         </div>
-      </div>
+      </PanelCard>
     </div>
   );
 }

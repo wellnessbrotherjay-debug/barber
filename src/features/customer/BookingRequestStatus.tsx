@@ -1,4 +1,5 @@
 import React from 'react';
+import { RoundIconTile } from '../../components/ScreenPieces';
 import CustomerScreenHeader from '../../components/CustomerScreenHeader';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CircleCheck, Clock, Scissors, ShieldCheck, MessageSquare, Phone } from 'lucide-react';
@@ -123,9 +124,9 @@ export default function BookingRequestStatus() {
 
         {/* Status card */}
         <div className="bg-[#f6f7fb] rounded-[18px] p-5 mt-8 flex items-start gap-4">
-          <span className="w-11 h-11 rounded-full bg-white flex items-center justify-center shrink-0">
+          <RoundIconTile>
             <ShieldCheck className="w-5 h-5 text-ink" strokeWidth={1.8} />
-          </span>
+          </RoundIconTile>
           <div>
             <p className="text-[16px] font-bold text-ink">Status: Payment Authorizes</p>
             <p className="text-[14px] text-muted leading-6 mt-1">

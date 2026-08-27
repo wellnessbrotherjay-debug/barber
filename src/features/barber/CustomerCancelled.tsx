@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { IconTile } from '../../components/ScreenPieces';
 import ScreenHeader from '../../components/ScreenHeader';
 import { useNavigate, useParams } from 'react-router-dom';
 import { X, User, Calendar, MapPin } from 'lucide-react';
@@ -51,9 +52,9 @@ export default function CustomerCancelled() {
         <h2 className="text-[20px] leading-6 font-bold text-[#1c1b1f]">Booking Overview</h2>
         <div className="mt-4 space-y-4">
           <div className="flex items-center gap-3">
-            <span className="w-11 h-11 rounded-[10px] bg-[#f8f8f8] flex items-center justify-center shrink-0">
+            <IconTile>
               <User className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
-            </span>
+            </IconTile>
             <div>
               <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Customer</p>
               <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f] mt-0.5">
@@ -62,9 +63,9 @@ export default function CustomerCancelled() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="w-11 h-11 rounded-[10px] bg-[#f8f8f8] flex items-center justify-center shrink-0">
+            <IconTile>
               <Calendar className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
-            </span>
+            </IconTile>
             <div>
               <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Scheduled Date</p>
               <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f] mt-0.5">
@@ -73,9 +74,9 @@ export default function CustomerCancelled() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="w-11 h-11 rounded-[10px] bg-[#f8f8f8] flex items-center justify-center shrink-0">
+            <IconTile>
               <MapPin className="w-5 h-5 text-[#1c1b1f]" strokeWidth={1.8} />
-            </span>
+            </IconTile>
             <div>
               <p className="text-[12px] leading-4 font-medium text-[#a09cab]">Location</p>
               <p className="text-[14px] leading-5 font-semibold text-[#1c1b1f] mt-0.5">

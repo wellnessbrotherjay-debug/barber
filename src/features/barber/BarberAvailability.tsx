@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { NoteCard } from '../../components/ScreenPieces';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Globe, Zap, Smartphone, Clock, Info } from 'lucide-react';
 import { toast } from 'sonner';
@@ -350,12 +351,12 @@ function AvailabilityHeader({ onBack }: { onBack: () => void }) {
 function BufferAdviceCard() {
   return (
     <div className="px-5 py-4">
-      <div className="bg-[#f4f5f8] rounded-[12px] p-4 flex gap-3 items-start">
+      <NoteCard>
         <Info className="w-6 h-6 text-[#a09cab] shrink-0" strokeWidth={1.6} />
         <p className="text-[12px] leading-4 font-medium text-[#a09cab]">
           Setting a 15-minute buffer helps you handle travel time or clean-up without running late for the next client.
         </p>
-      </div>
+      </NoteCard>
     </div>
   );
 }

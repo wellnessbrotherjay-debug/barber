@@ -2,10 +2,10 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import CustomerNav from '@/components/CustomerNav';
-import { LogOut, User } from 'lucide-react';
+import { User } from 'lucide-react';
 
 export default function CustomerProfile() {
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
   const navigate = useNavigate();
 
   return (
@@ -27,10 +27,6 @@ export default function CustomerProfile() {
           <button key={item.l} type="button" onClick={() => navigate(item.p)}
             className="w-full text-left px-4 py-4 rounded-xl bg-[#fafaff] font-medium text-sm text-[#1c1b1f]">{item.l}</button>
         ))}
-        <button type="button" onClick={() => { logout(); navigate('/'); }}
-          className="w-full flex items-center gap-2 px-4 py-4 rounded-xl text-red-600 font-medium text-sm mt-4">
-          <LogOut className="w-4 h-4" /> Log out
-        </button>
       </div>
       <CustomerNav active="profile" />
     </div>

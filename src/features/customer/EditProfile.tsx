@@ -16,7 +16,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/store/useAuthStore';
-import { DeleteAccountRow } from '@/components/DeleteAccountDialog';
 
 // Board page 46 — customer "Edit Profile".
 // Layout, section order and copy replicate the Figma frame exactly; the data
@@ -292,7 +291,6 @@ function AccountSection({ onSwitchRole }: { onSwitchRole: () => void }) {
         You can switch between Customer and Barber anytime
       </p>
       <div className="mt-3">
-        <DeleteAccountRow />
       </div>
     </div>
   );

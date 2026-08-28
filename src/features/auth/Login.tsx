@@ -129,16 +129,6 @@ export default function Login() {
         </form>
 
         <div className="text-center">
-          <p className="text-neutral-500 text-sm">
-            Don't have an account?{' '}
-            <button
-              type="button"
-              onClick={() => navigate('/signup')}
-              className="text-accent font-bold hover:underline"
-            >
-              Create Account
-            </button>
-          </p>
         </div>
       </div>
     </div>

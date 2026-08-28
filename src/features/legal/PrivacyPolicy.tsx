@@ -233,10 +233,10 @@ function SectionsRightsChildrenStorage() {
     <>
       <H>9. Deleting your account and your rights</H>
       <P>
-        You can delete your account yourself at any time: go to your profile settings and choose
-        <strong className="text-ink"> Delete Account</strong>. This permanently removes your
-        profile, your photos, your services and your booking history from the app. It cannot be
-        undone, and it does not remove records we are legally required to retain (see section 8).
+        You can ask us to delete your account at any time, using the contact details in section
+        12. We will remove your profile, your photos, your services and your booking history from
+        the app. It cannot be undone, and it does not remove records we are legally required to
+        retain (see section 8).
       </P>
       <P>You may also ask us to:</P>
       <ul className="list-disc pl-5 mb-3">

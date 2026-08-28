@@ -14,7 +14,6 @@ import {
   Flag,
   HelpCircle,
   ImageIcon,
-  LogOut,
   MapPin,
   Phone,
   Star,
@@ -23,7 +22,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { authFetch, deleteBarberPhoto, errorMessage, fetchBarberBookingsForUser, fetchBarberPhotos, normalisePhone, type BarberPhoto, uploadAvatar, uploadGalleryPhotos } from '@/lib/api';
-import { DeleteAccountRow } from '@/components/DeleteAccountDialog';
 
 // Board page 61 — barber "Edit Profile".
 // Layout, section order and copy replicate the Figma frame exactly; all data
@@ -773,7 +771,6 @@ function SafetySupportSection({ navigate }: { navigate: (to: string) => void }) 
           <span className="flex-1 text-[14px] font-semibold text-[#1c1b1f]">Help/Support</span>
           <ChevronRight className="w-5 h-5 text-[#a09cab]" />
         </button>
-        <DeleteAccountRow />
       </div>
     </section>
   );
@@ -800,19 +797,8 @@ function FormActions({ saving, onCancel }: { saving: boolean; onCancel: () => vo
   );
 }
 
-function LogOutRow({ onLogOut }: { onLogOut: () => void }) {
-  return (
-    <div className="px-5 mt-2">
-      <button type="button" onClick={onLogOut}
-        className="w-full flex items-center justify-center gap-2 px-4 py-4 rounded-xl text-red-600 font-medium text-sm">
-        <LogOut className="w-4 h-4" /> Log out
-      </button>
-    </div>
-  );
-}
-
 export default function BarberProfileEdit() {
-  const { user, logout, setUser } = useAuthStore();
+  const { user, setUser } = useAuthStore();
   const navigate = useNavigate();
   const s = useProfileEditState(user);
   useProfileEditLoad(s, user);
@@ -862,7 +848,6 @@ export default function BarberProfileEdit() {
         <FormActions saving={s.saving} onCancel={() => navigate(-1)} />
       </form>
 
-      <LogOutRow onLogOut={() => { logout(); navigate('/'); }} />
       <BarberNav active="profile" />
     </div>
   );

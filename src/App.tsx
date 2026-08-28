@@ -6,7 +6,6 @@ import { authFetch, getToken } from '@/lib/api';
 import Splash from '@/features/onboarding/Splash';
 import RoleSelect from '@/features/onboarding/RoleSelect';
 import Login from '@/features/auth/Login';
-import Signup from '@/features/auth/Signup';
 import PrivacyPolicy from '@/features/legal/PrivacyPolicy';
 import Terms from '@/features/legal/Terms';
 
@@ -154,7 +153,6 @@ export default function App() {
           <Route path="/" element={<Splash />} />
           <Route path="/welcome" element={<RoleSelect />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
           {/* Public legal pages — required by App Store Connect and linked from
               signup/role-select. No auth guard: Apple's reviewer and the store
               listing must reach them without an account. */}

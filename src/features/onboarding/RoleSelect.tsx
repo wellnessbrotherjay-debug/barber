@@ -12,7 +12,10 @@ export default function RoleSelect() {
     if (!selected) return;
     // Route to real signup with the chosen role pre-selected — no account
     // exists yet, so this must never log the user in directly.
-    navigate('/signup', { state: { role: selected } });
+    // The board draws no account form - only these role cards, Continue, and a
+    // Log in link. Continue therefore goes to the one auth screen the design
+    // actually points at, carrying the role that was chosen.
+    navigate('/login', { state: { role: selected } });
   };
 
   return (

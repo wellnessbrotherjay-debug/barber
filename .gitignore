@@ -33,3 +33,10 @@ PROJECT_COMPLETE.txt
 docs/LOKI_SETUP_GUIDE.md
 docs/PROJECT_STATUS.md
 docs/MULTITENANT_PROJECT_STATUS.md
+
+# Android signing key. It lives in the secrets store, never here - losing it
+# means the app can never be updated, and committing it means anyone can
+# publish as us.
+*.jks
+*.keystore
+keystore.properties

@@ -16,10 +16,36 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // WHERE THE RELEASE KEY COMES FROM.
+    // Google Play refuses an unsigned bundle, and until this existed the release
+    // build produced one without complaining: it succeeded, wrote a 3.9MB .aab,
+    // and the file had no signature in it at all.
+    //
+    // Nothing about the key is written here. The path and the two passwords are
+    // read from the environment, so the key itself lives in the estate's secrets
+    // store and never in this repository. A build with the variables unset still
+    // works - it just produces an unsigned bundle for testing, and says so.
+    signingConfigs {
+        release {
+            def storePath = System.getenv("SHORTER_KEYSTORE")
+            if (storePath) {
+                storeFile file(storePath)
+                storePassword System.getenv("SHORTER_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("SHORTER_KEY_ALIAS")
+                keyPassword System.getenv("SHORTER_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (System.getenv("SHORTER_KEYSTORE")) {
+                signingConfig signingConfigs.release
+            } else {
+                logger.warn("SHORTER_KEYSTORE is not set - this release bundle will be UNSIGNED and Google Play will refuse it.")
+            }
         }
     }
 }

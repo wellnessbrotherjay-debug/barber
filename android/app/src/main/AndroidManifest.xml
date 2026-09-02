@@ -38,4 +38,21 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- The app asks the device where it is, in two places the board draws: the
+         Allow Your Location screen, and the Use my current location button on
+         the barber's Where Do You Work step. Without these two lines Android
+         refuses the request and the button does nothing at all, with no error
+         a person could see. iOS already declares the same thing in Info.plist.
+         Coarse is listed beside fine because Android 12 and later let a person
+         grant only the approximate one, and approximate is enough to find
+         barbers nearby. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- Location makes the app better but is not required to use it: a person
+         can type an address instead. Saying so keeps the app installable on a
+         device with no location hardware. -->
+    <uses-feature android:name="android.hardware.location" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 </manifest>
